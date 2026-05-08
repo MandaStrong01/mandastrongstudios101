@@ -2,28 +2,50 @@
 <html lang="en">
   <head>
     <style>
-      [data-bolt-badge],a[href*="bolt.new"],.bolt-badge,#bolt-badge,
-      [class*="bolt-badge"],[id*="bolt-badge"],img[src*="bolt"],
-      a[href*="bolt.new"] img,iframe[src*="bolt"],
-      bolt-ai-badge,bolt-badge,[data-testid*="bolt"],
-      #bolt-badge-container,.bolt-badge-container,
-      [style*="bolt"]{display:none!important;visibility:hidden!important;opacity:0!important;
-      width:0!important;height:0!important;max-width:0!important;max-height:0!important;
-      overflow:hidden!important;pointer-events:none!important;position:absolute!important;
-      left:-9999px!important;top:-9999px!important;}
+      bolt-ai-badge,
+      [data-bolt-badge],
+      .bolt-badge,
+      #bolt-badge,
+      #bolt-badge-container,
+      .bolt-badge-container,
+      [class*="bolt-badge"],
+      [id*="bolt-badge"],
+      [data-testid*="bolt"],
+      a[href*="bolt.new"],
+      a[href*="bolt.new"] *,
+      img[src*="bolt.new"],
+      iframe[src*="bolt"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+        position: fixed !important;
+        left: -99999px !important;
+        top: -99999px !important;
+        z-index: -99999 !important;
+        clip: rect(0,0,0,0) !important;
+      }
     </style>
     <script>
       (function(){
-        var HIDE="display:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;position:absolute!important;left:-9999px!important;";
-        var SEL='[data-bolt-badge],[class*="bolt-badge"],[id*="bolt-badge"],a[href*="bolt.new"],bolt-ai-badge,[data-testid*="bolt"]';
-        function killBolt(){
-          document.querySelectorAll(SEL).forEach(function(el){el.style.cssText=HIDE;});
-          document.querySelectorAll('*').forEach(function(el){try{if(el.shadowRoot){el.shadowRoot.querySelectorAll(SEL).forEach(function(s){s.style.cssText=HIDE;});}}catch(e){}});
+        var H="display:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;max-width:0!important;max-height:0!important;overflow:hidden!important;pointer-events:none!important;position:fixed!important;left:-99999px!important;top:-99999px!important;z-index:-99999!important;clip:rect(0,0,0,0)!important;";
+        var S='bolt-ai-badge,[data-bolt-badge],[class*="bolt-badge"],[id*="bolt-badge"],a[href*="bolt.new"],[data-testid*="bolt"],#bolt-badge,#bolt-badge-container,.bolt-badge-container';
+        function kill(){
+          try{document.querySelectorAll(S).forEach(function(e){e.style.cssText=H;e.setAttribute('hidden','');});}catch(x){}
+          try{document.querySelectorAll('*').forEach(function(e){try{if(e.shadowRoot){e.shadowRoot.querySelectorAll(S).forEach(function(s){s.style.cssText=H;s.setAttribute('hidden','');});}}catch(x){}});}catch(x){}
         }
-        killBolt();
-        setInterval(killBolt,300);
-        var obs=new MutationObserver(killBolt);
-        document.addEventListener('DOMContentLoaded',function(){if(document.body){obs.observe(document.body,{childList:true,subtree:true,attributes:true});}killBolt();});
+        kill();
+        setInterval(kill,100);
+        new MutationObserver(kill).observe(document.documentElement,{childList:true,subtree:true,attributes:true,characterData:false});
+        document.addEventListener('DOMContentLoaded',kill);
+        window.addEventListener('load',kill);
       })();
     </script>
     <meta charset="UTF-8" />
