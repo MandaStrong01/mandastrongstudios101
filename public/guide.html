@@ -1,477 +1,807 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MandaStrong Studio - Complete User Guide</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #1a0033 0%, #000000 50%, #1a0033 100%);
-            color: #e0e0e0;
-            line-height: 1.6;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: rgba(0, 0, 0, 0.6);
-            border: 2px solid rgba(168, 85, 247, 0.3);
-            border-radius: 20px;
-            padding: 40px;
-            backdrop-filter: blur(10px);
-        }
-
-        h1 {
-            color: #a855f7;
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        h2 {
-            color: #c084fc;
-            font-size: 2rem;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid rgba(168, 85, 247, 0.3);
-            padding-bottom: 10px;
-        }
-
-        h3 {
-            color: #d8b4fe;
-            font-size: 1.5rem;
-            margin-top: 30px;
-            margin-bottom: 15px;
-        }
-
-        h4 {
-            color: #e9d5ff;
-            font-size: 1.2rem;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }
-
-        p {
-            margin-bottom: 15px;
-            color: #d1d5db;
-        }
-
-        ul, ol {
-            margin-left: 30px;
-            margin-bottom: 15px;
-        }
-
-        li {
-            margin-bottom: 8px;
-            color: #d1d5db;
-        }
-
-        strong {
-            color: #f3e8ff;
-        }
-
-        a {
-            color: #c084fc;
-            text-decoration: underline;
-        }
-
-        a:hover {
-            color: #d8b4fe;
-        }
-
-        .highlight {
-            background: rgba(168, 85, 247, 0.2);
-            border-left: 4px solid #a855f7;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
-
-        .tip {
-            background: rgba(59, 130, 246, 0.2);
-            border-left: 4px solid #3b82f6;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
-
-        .tip::before {
-            content: "💡 Pro Tip: ";
-            font-weight: bold;
-            color: #60a5fa;
-        }
-
-        .plan-box {
-            background: rgba(168, 85, 247, 0.1);
-            border: 2px solid rgba(168, 85, 247, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-
-        .toc {
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(168, 85, 247, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-            margin: 30px 0;
-        }
-
-        .toc a {
-            display: block;
-            padding: 5px 0;
-            text-decoration: none;
-        }
-
-        .toc a:hover {
-            color: #e9d5ff;
-        }
-
-        hr {
-            border: none;
-            border-top: 1px solid rgba(168, 85, 247, 0.3);
-            margin: 30px 0;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 50px;
-            padding-top: 30px;
-            border-top: 2px solid rgba(168, 85, 247, 0.3);
-            color: #9ca3af;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MandaStrong Studio — Complete User Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --gold: #e8c96d;
+      --gold-dim: #a07820;
+      --bg: #000000;
+      --bg2: #0a0a0a;
+      --bg3: #080808;
+      --white: #d4c9a8;
+      --dim: #aaaaaa;
+    }
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 0 0 80px;
+    }
+    .hero {
+      background: linear-gradient(180deg, #0a0800 0%, #000 100%);
+      border-bottom: 1px solid var(--gold-dim);
+      text-align: center;
+      padding: 48px 24px 36px;
+    }
+    .hero-label {
+      font-size: 10px; letter-spacing: 6px; color: var(--gold); font-weight: 700; text-transform: uppercase; margin-bottom: 10px;
+    }
+    h1 {
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      font-size: clamp(22px, 4vw, 40px);
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      text-shadow: 0 0 40px #e8c96d66;
+      margin-bottom: 8px;
+    }
+    .hero-sub {
+      color: var(--dim);
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      margin: 24px auto;
+      max-width: 600px;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+    .toc {
+      background: #050500;
+      border: 1px solid var(--gold-dim);
+      padding: 24px 28px;
+      margin: 32px 0;
+    }
+    .toc-title {
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      font-size: 13px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .toc a {
+      display: block;
+      color: var(--white);
+      text-decoration: none;
+      padding: 4px 0;
+      font-size: 13px;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #1a1a0a;
+      transition: color 0.2s;
+    }
+    .toc a:last-child { border-bottom: none; }
+    .toc a:hover { color: var(--gold); }
+    .toc a span { color: var(--gold-dim); margin-right: 8px; font-size: 11px; }
+    h2 {
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      font-size: clamp(14px, 2vw, 18px);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin: 48px 0 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--gold-dim);
+    }
+    h3 {
+      color: var(--gold);
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin: 28px 0 10px;
+    }
+    p { margin-bottom: 14px; color: var(--white); font-size: 14px; }
+    ul, ol { margin-left: 24px; margin-bottom: 14px; }
+    li { margin-bottom: 7px; color: var(--white); font-size: 14px; }
+    strong { color: var(--gold); font-weight: 700; }
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--gold-dim);
+      padding: 18px 22px;
+      margin: 16px 0;
+    }
+    .card-gold {
+      background: rgba(10,8,0,0.97);
+      border: 2px solid var(--gold);
+      padding: 18px 22px;
+      margin: 16px 0;
+    }
+    .note {
+      background: #0a0800;
+      border-left: 3px solid var(--gold);
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 13px;
+    }
+    .note strong { color: var(--gold); }
+    .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 16px 0; }
+    .plan {
+      background: #060600;
+      border: 1px solid var(--gold-dim);
+      padding: 18px;
+    }
+    .plan-name { color: var(--gold); font-weight: 900; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
+    .plan-price { color: var(--gold); font-family: 'Cinzel', serif; font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+    .plan li { font-size: 13px; }
+    .workflow {
+      background: #050500;
+      border: 1px solid var(--gold-dim);
+      padding: 14px 18px;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    .workflow-title { color: var(--gold); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; font-size: 11px; }
+    .workflow-steps { color: var(--white); }
+    .tag {
+      display: inline-block;
+      background: var(--gold-dim);
+      color: #000;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      padding: 2px 8px;
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+    footer {
+      text-align: center;
+      border-top: 1px solid var(--gold-dim);
+      padding: 32px 24px;
+      margin-top: 60px;
+      color: var(--dim);
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+    @media (max-width: 600px) {
+      .hero { padding: 32px 16px 24px; }
+      .container { padding: 0 16px; }
+      h2 { font-size: 13px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>MandaStrong Studio</h1>
-        <p style="text-align: center; font-size: 1.2rem; color: #c084fc; margin-bottom: 30px;">Complete User Guide</p>
 
-        <div class="highlight">
-            <p><strong>Welcome to MandaStrong Studio!</strong></p>
-            <p>MandaStrong Studio is your all-in-one filmmaking platform that empowers you to create professional films up to 2.5 hours in duration. This guide will walk you through every feature and help you bring your creative vision to life.</p>
-        </div>
+<div class="hero">
+  <div class="hero-label">MandaStrong Studio · Cinema Intelligence Platform · 2026</div>
+  <h1>Complete User Guide</h1>
+  <div class="hero-sub">All 23 pages · Every feature · Full workflow</div>
+  <div class="divider"></div>
+  <p style="color:var(--dim);font-size:13px;max-width:600px;margin:0 auto;">Everything you need to create professional films — from first idea to final export — on any device.</p>
+</div>
 
-        <div class="toc">
-            <h3>Table of Contents</h3>
-            <a href="#getting-started">1. Getting Started</a>
-            <a href="#navigation">2. Navigation</a>
-            <a href="#ai-tools">3. AI Tool Board</a>
-            <a href="#uploading">4. Uploading Content</a>
-            <a href="#media-box">5. Media Box</a>
-            <a href="#editing">6. Editing Tools</a>
-            <a href="#timeline">7. Timeline</a>
-            <a href="#preview">8. Preview & Export</a>
-            <a href="#plans">9. Subscription Plans</a>
-            <a href="#support">10. Support</a>
-        </div>
+<div class="container">
 
-        <h2 id="getting-started">Getting Started</h2>
+  <div class="toc">
+    <div class="toc-title">Table of Contents</div>
+    <a href="#getting-started"><span>01</span>Getting Started &amp; Navigation</a>
+    <a href="#page1"><span>02</span>Page 1 — Home</a>
+    <a href="#page2"><span>03</span>Page 2 — Quick Access Dashboard</a>
+    <a href="#page3"><span>04</span>Page 3 — AI Tools Hub (600+ Tools)</a>
+    <a href="#page4"><span>05</span>Page 4 — Login &amp; Pricing</a>
+    <a href="#page5"><span>06</span>Page 5 — Writing Tools</a>
+    <a href="#page6"><span>07</span>Page 6 — Voice Engine &amp; Music Video Studio</a>
+    <a href="#page7"><span>08</span>Page 7 — Image Tools</a>
+    <a href="#page8"><span>09</span>Page 8 — Video Generator</a>
+    <a href="#page9"><span>10</span>Page 9 — VFX Tools</a>
+    <a href="#page10"><span>11</span>Page 10 — Enhancement</a>
+    <a href="#page11"><span>12</span>Page 11 — Asset Manager</a>
+    <a href="#page12"><span>13</span>Page 12 — Storyboard</a>
+    <a href="#page13"><span>14</span>Page 13 — Timeline Editor</a>
+    <a href="#page14"><span>15</span>Page 14 — Colour Grade</a>
+    <a href="#page15"><span>16</span>Page 15 — Audio Mixer</a>
+    <a href="#page16"><span>17</span>Page 16 — Render Engine</a>
+    <a href="#page17"><span>18</span>Page 17 — Preview</a>
+    <a href="#page18"><span>19</span>Page 18 — Export &amp; Distribute</a>
+    <a href="#page19"><span>20</span>Page 19 — Tutorials</a>
+    <a href="#page20"><span>21</span>Page 20 — About &amp; Legal</a>
+    <a href="#page21"><span>22</span>Page 21 — Agent Grok (AI Assistant)</a>
+    <a href="#page22"><span>23</span>Page 22 — Community Hub</a>
+    <a href="#page23"><span>24</span>Page 23 — That's All Folks</a>
+    <a href="#workflows"><span>25</span>Complete Production Workflows</a>
+    <a href="#plans"><span>26</span>Subscription Plans</a>
+    <a href="#tips"><span>27</span>Pro Tips &amp; Troubleshooting</a>
+  </div>
 
-        <h3>Pages 1-2: Welcome</h3>
-        <p>Your journey begins with our welcome pages where you'll learn about MandaStrong Studio's mission and capabilities.</p>
+  <!-- GETTING STARTED -->
+  <h2 id="getting-started">Getting Started &amp; Navigation</h2>
+  <p>MandaStrong Studio is a 23-page, fully browser-based filmmaking platform. There is nothing to install. Open it on any desktop, tablet, or mobile device in Chrome, Edge, or Safari.</p>
 
-        <h3>Page 3: Login/Register</h3>
-        <ul>
-            <li><strong>Login:</strong> If you already have an account, enter your email and password</li>
-            <li><strong>Register:</strong> Create a new account by:
-                <ul>
-                    <li>Entering your email address</li>
-                    <li>Creating a secure password</li>
-                    <li>Selecting your subscription plan (Basic, Pro, or Studio)</li>
-                    <li>Click "REGISTER" to complete setup</li>
-                </ul>
-            </li>
-        </ul>
-        <p><strong>Important:</strong> After registration, you'll have immediate access to all 720+ AI tools and features based on your chosen plan.</p>
+  <h3>How to move between pages</h3>
+  <ul>
+    <li><strong>NEXT / BACK buttons</strong> — bottom of every page for sequential navigation.</li>
+    <li><strong>Quick Access menu</strong> — always visible; jump directly to any of the 23 pages.</li>
+    <li><strong>Number pad</strong> — pages are numbered 1–23 at the top of the navigation bar.</li>
+  </ul>
 
-        <h2 id="navigation">Navigation</h2>
+  <h3>Saving your work</h3>
+  <ul>
+    <li>Hit <strong>SAVE PROJECT</strong> in the footer at any time to save your current state.</li>
+    <li><strong>MY PROJECTS</strong> restores exactly where you left off — your clips, timeline, settings, and progress.</li>
+    <li>Generated clips are saved to your browser's IndexedDB storage for offline access.</li>
+  </ul>
 
-        <h3>Using the Interface</h3>
-        <ul>
-            <li><strong>Back/Next Buttons:</strong> Found at the bottom of each page for sequential navigation</li>
-            <li><strong>Quick Access Menu:</strong> Always available for jumping directly to any page</li>
-            <li><strong>Home Button:</strong> Returns you to the welcome screen (Page 1)</li>
-        </ul>
+  <div class="note">
+    <strong>Tip:</strong> Save your project before closing your browser tab. IndexedDB storage persists unless you clear site data.
+  </div>
 
-        <h3>Page Overview</h3>
-        <ul>
-            <li><strong>Pages 1-3:</strong> Welcome, Introduction, Login/Register</li>
-            <li><strong>Pages 4-9:</strong> AI Tool Board (720+ creative tools)</li>
-            <li><strong>Page 10:</strong> "Doxy The School Bully" - Upload your existing movie files</li>
-            <li><strong>Page 11:</strong> Editor Dashboard with Media Box</li>
-            <li><strong>Pages 12-16:</strong> Professional editing tools with timeline</li>
-            <li><strong>Page 17:</strong> Full-screen preview of your finished film</li>
-            <li><strong>Page 18:</strong> Terms of Service and Disclaimer</li>
-            <li><strong>Page 19:</strong> Agent Grok 24/7 Help Desk</li>
-            <li><strong>Page 20:</strong> Community Hub</li>
-            <li><strong>Page 21:</strong> Closing page with resources</li>
-        </ul>
+  <!-- PAGE 1 -->
+  <h2 id="page1">Page 1 — Home</h2>
+  <p>Your entry point. The home page shows the platform name, tagline, and the main <strong>ENTER STUDIO</strong> button. Click it to proceed to the Quick Access dashboard. The ambient background video sets the cinematic tone.</p>
+  <ul>
+    <li>Click <strong>ENTER STUDIO</strong> to go to Page 2.</li>
+    <li>Use the footer navigation to jump to any page directly.</li>
+  </ul>
 
-        <h2 id="ai-tools">AI Tool Board</h2>
+  <!-- PAGE 2 -->
+  <h2 id="page2">Page 2 — Quick Access Dashboard</h2>
+  <p>A visual overview of the entire platform. All 23 pages are represented as cards you can click to jump to instantly. Use this as your home base when you know exactly which tool you need.</p>
+  <ul>
+    <li>Cards are grouped by category: Create, Edit, Export, Community.</li>
+    <li>Recently visited pages are highlighted.</li>
+    <li>Your project name and save status appear at the top.</li>
+  </ul>
 
-        <h3>Pages 4-9: 720+ Creative Tools</h3>
-        <p>Our AI Tool Board features over 720 specialized tools across six pages, each prefixed with "AI" for easy identification.</p>
+  <!-- PAGE 3 -->
+  <h2 id="page3">Page 3 — AI Tools Hub (600+ Tools)</h2>
+  <p>Browse and launch over 600 AI filmmaking tools organised into four categories: <strong>Writing</strong>, <strong>Image</strong>, <strong>Motion &amp; VFX</strong>, and <strong>Enhancement</strong>.</p>
 
-        <h4>How to Use AI Tools</h4>
-        <ol>
-            <li><strong>Browse Tools:</strong> Scroll through the grid of available tools</li>
-            <li><strong>Search:</strong> Use the search bar at the top to find specific tools by keyword</li>
-            <li><strong>Select a Tool:</strong> Click on any tool card to open its modal</li>
-            <li><strong>Choose Action:</strong>
-                <ul>
-                    <li><strong>Upload:</strong> Import existing files to enhance with AI</li>
-                    <li><strong>Create:</strong> Generate new content from scratch using AI</li>
-                </ul>
-            </li>
-        </ol>
+  <h3>How to use</h3>
+  <ol>
+    <li>Select a category tab at the top (Writing / Image / Motion &amp; VFX / Enhancement).</li>
+    <li>Use the search bar to filter tools by keyword.</li>
+    <li>Click any tool card to open its modal.</li>
+    <li>Inside the modal: read the description, then hit <strong>AI CREATE</strong> to launch the tool, or <strong>UPLOAD</strong> to use your own file as input.</li>
+    <li>Results save automatically to your Asset Manager (Page 11).</li>
+  </ol>
 
-        <h4>Tool Categories Include:</h4>
-        <ul>
-            <li>Image generation and enhancement</li>
-            <li>Video editing and effects</li>
-            <li>Audio processing and music creation</li>
-            <li>Script writing and story development</li>
-            <li>Voice synthesis and dubbing</li>
-            <li>Special effects and transitions</li>
-            <li>Color grading and correction</li>
-            <li>And much more!</li>
-        </ul>
+  <h3>Tool categories include</h3>
+  <ul>
+    <li><strong>Writing:</strong> loglines, treatments, scripts, episode arcs, character bibles, dialogue, scene rewrites, shot lists.</li>
+    <li><strong>Image:</strong> AI image generation, style transfer, upscaling, background removal, stills-to-video.</li>
+    <li><strong>Motion &amp; VFX:</strong> motion graphics, transitions, green-screen, crowd simulation, slow motion, time-lapse.</li>
+    <li><strong>Enhancement:</strong> upscaling, denoising, sharpening, frame interpolation, colour correction.</li>
+  </ul>
 
-        <div class="tip">
-            Tools are organized across pages 4-9, so explore all pages to discover the full range of creative possibilities.
-        </div>
+  <!-- PAGE 4 -->
+  <h2 id="page4">Page 4 — Login &amp; Pricing</h2>
+  <p>Create an account, sign in, or browse as a guest. Stripe handles all payments securely — no card details are ever stored by the platform.</p>
 
-        <h2 id="uploading">Uploading Content</h2>
+  <h3>Signing up</h3>
+  <ol>
+    <li>Enter your email address and choose a password.</li>
+    <li>Select your plan (Creator · Pro · Studio).</li>
+    <li>Click <strong>REGISTER</strong>. Your account is active immediately.</li>
+  </ol>
 
-        <h3>Page 10: Doxy The School Bully</h3>
-        <p>This page is specifically designed for uploading your existing movie files.</p>
+  <h3>Signing in</h3>
+  <ol>
+    <li>Enter your email and password.</li>
+    <li>Click <strong>SIGN IN</strong>.</li>
+    <li>Your saved projects and settings will reload automatically.</li>
+  </ol>
 
-        <h4>Upload Process:</h4>
-        <ol>
-            <li>Click the "Upload Video" button</li>
-            <li>Select one or multiple video files from your device</li>
-            <li>Wait for the upload to complete</li>
-            <li>Your videos will appear in the video selection bar</li>
-            <li>Click any video thumbnail to preview it</li>
-            <li>Use the playback controls (Play/Pause, Skip Back/Forward)</li>
-        </ol>
+  <div class="note">
+    <strong>Guest mode:</strong> You can use the full platform without an account. Projects are saved locally. To access cloud sync and rendering, sign in or register.
+  </div>
 
-        <p><strong>Supported Formats:</strong> Most common video formats including MP4, MOV, AVI, and more.</p>
+  <!-- PAGE 5 -->
+  <h2 id="page5">Page 5 — Writing Tools</h2>
+  <p>50+ AI writing tools purpose-built for film and video production. Everything from a two-line logline to a full three-act feature screenplay.</p>
 
-        <h2 id="media-box">Media Box</h2>
+  <h3>Available formats</h3>
+  <ul>
+    <li>Logline · Tagline · One-pager</li>
+    <li>Treatment · Outline · Beat sheet</li>
+    <li>Feature screenplay · Short film script · Episode arc</li>
+    <li>Character bible · Character dialogue · Scene rewrite</li>
+    <li>Documentary narration · Voiceover script · Interview questions</li>
+    <li>Music video treatment · Commercial brief · Shot list</li>
+  </ul>
 
-        <h3>Page 11: Editor Dashboard</h3>
-        <p>The Media Box is your central hub for all uploaded and AI-generated assets.</p>
+  <h3>How to generate</h3>
+  <ol>
+    <li>Choose a format from the left panel.</li>
+    <li>Enter your genre, tone, premise, or any notes in the text field.</li>
+    <li>Hit <strong>AI CREATE</strong>.</li>
+    <li>Edit the result inline, then <strong>SAVE TO PROJECT</strong> to keep it.</li>
+    <li>Scripts saved here are available to the Voice Engine on Page 6.</li>
+  </ol>
 
-        <h4>Upload Options:</h4>
-        <ul>
-            <li><strong>Open Files:</strong> Upload images, videos, audio, PDFs, documents</li>
-            <li><strong>Open Photos/Videos:</strong> Quick access to your device's photo library</li>
-            <li><strong>Open Google Drive:</strong> Connect your Google Drive account for cloud uploads</li>
-            <li><strong>Drag & Drop:</strong> Simply drag files into the Media Box area</li>
-        </ul>
+  <!-- PAGE 6 -->
+  <h2 id="page6">Page 6 — Voice Engine &amp; Music Video Studio</h2>
+  <p>Page 6 contains two major tools: the <strong>Voice Engine</strong> for narration and voiceover, and the <strong>Music Video Studio</strong> four-step wizard.</p>
 
-        <h4>Asset Management:</h4>
-        <ul>
-            <li>All your uploaded files and AI-generated content appear here</li>
-            <li>Click any asset to preview it in the Viewer</li>
-            <li>Delete unwanted assets using the X button (appears on hover)</li>
-            <li>Assets are automatically organized by date</li>
-        </ul>
+  <h3>Voice Engine</h3>
+  <p>54 voice characters covering a wide range of genders, ages, accents, and emotional styles.</p>
 
-        <div class="highlight">
-            <p><strong>Important Reminder:</strong> Before moving to the next step, make sure you've uploaded all necessary assets. Look for the "Have I Missed A Thing?" reminder to double-check!</p>
-        </div>
+  <h3>Browsing voices</h3>
+  <ul>
+    <li>Use the <strong>filter buttons</strong> at the top to filter by gender, age group, and origin (British, American, Australian, Irish, etc.).</li>
+    <li>Each character card shows name, style tags, and accent.</li>
+    <li>Hit <strong>TEST</strong> on any card to hear a short preview of that voice reading a sample line.</li>
+  </ul>
 
-        <h2 id="editing">Editing Tools</h2>
+  <h3>Configuring a voice</h3>
+  <ul>
+    <li><strong>PITCH slider</strong> — adjusts vocal pitch. Lower = deeper, higher = lighter.</li>
+    <li><strong>RATE slider</strong> — controls speaking pace. Lower = slower and more deliberate.</li>
+    <li><strong>PAUSE slider</strong> — adds natural pause time between sentences (in milliseconds).</li>
+    <li><strong>VOLUME slider</strong> — overall output level.</li>
+    <li><strong>MOOD selector</strong> — 14 moods including Calm, Dramatic, Excited, Sombre, Authoritative, Intimate, and more. Each mood adjusts pitch/rate/pause automatically.</li>
+  </ul>
 
-        <h3>Pages 12-16: Professional Editing Suite</h3>
-        <p>These pages provide comprehensive editing capabilities for your film.</p>
+  <div class="card-gold">
+    <strong>James Settings (Documentary Narration):</strong> Click <strong>APPLY JAMES SETTINGS</strong> for the optimal documentary narration preset — Pitch 0.86, Rate 0.62, Pause 1600ms. James delivers a deep, measured British narrator voice ideal for wildlife, history, and social documentary.
+  </div>
 
-        <h4>Key Features:</h4>
-        <ul>
-            <li><strong>Timeline Editor:</strong> 4-track system (SRT, VIDEO, AUDIO, TEXT)</li>
-            <li><strong>Duration Control:</strong> Set your film length (up to your plan's maximum)</li>
-            <li><strong>Aspect Ratio:</strong> Choose 16:9, 4:3, 1:1, or custom ratios</li>
-            <li><strong>Resolution:</strong> Select from 720p, 1080p, 4K options</li>
-            <li><strong>Volume Control:</strong> Adjust audio levels</li>
-            <li><strong>AI Duration Calculator:</strong> Smart duration estimation</li>
-            <li><strong>Generate Function:</strong> Compile your edited film</li>
-        </ul>
+  <h3>Speaking your script</h3>
+  <ol>
+    <li>Paste or type your script into the text area, or load a saved script from Page 5.</li>
+    <li>Click <strong>PREPARE &amp; SPEAK</strong> — this AI-formats your text for natural speech rhythm before speaking (adds natural pauses at sentence breaks, smooths ALL-CAPS, etc.).</li>
+    <li>Click <strong>SPEAK NOW</strong> to play the formatted narration using the selected voice.</li>
+    <li>Hit <strong>STOP</strong> to halt playback at any point.</li>
+  </ol>
 
-        <h4>Editing Workflow:</h4>
-        <ol>
-            <li>Select assets from your Media Box</li>
-            <li>Adjust settings (duration, ratio, size, volume)</li>
-            <li>Preview changes in real-time</li>
-            <li>Use the Generate button to process your edits</li>
-            <li>All generated outputs save automatically to Media Box</li>
-        </ol>
+  <h3>Music Video Studio (also on Page 6)</h3>
+  <p>A dedicated four-step wizard for creating complete music videos end-to-end.</p>
+  <ol>
+    <li><strong>Step 1 — Track details:</strong> Enter title, artist name, genre, mood, tempo, and upload your audio file.</li>
+    <li><strong>Step 2 — Visual style:</strong> Choose video style (cinematic, lyric, performance, abstract), colour grade, effects pack, and edit style (fast cut, slow burn, narrative).</li>
+    <li><strong>Step 3 — Scene description:</strong> Describe your visual in detail — lighting, setting, characters, motion, colour palette.</li>
+    <li><strong>Step 4 — Generate:</strong> Hit <strong>GENERATE MUSIC VIDEO</strong>. Download the output and share directly to all platforms.</li>
+  </ol>
 
-        <h2 id="timeline">Timeline</h2>
+  <!-- PAGE 7 -->
+  <h2 id="page7">Page 7 — Image Tools</h2>
+  <p>AI image generation and manipulation tools for creating visual reference, stills, posters, and production artwork.</p>
+  <ul>
+    <li><strong>Generate from prompt:</strong> Describe an image and hit CREATE. Specify style, lighting, composition, and colour.</li>
+    <li><strong>Style transfer:</strong> Upload a reference image and apply its visual style to a new prompt.</li>
+    <li><strong>Upscale:</strong> Increase resolution of any image up to 4x.</li>
+    <li><strong>Background removal:</strong> Automatically remove or replace the background of any subject.</li>
+    <li><strong>Stills to video:</strong> Animate a still image with subtle motion.</li>
+  </ul>
+  <div class="note">
+    <strong>Tip:</strong> Use generated stills as reference frames when prompting the Video Generator on Page 8 — describe "match the lighting and colour palette of this reference image."
+  </div>
 
-        <h3>4-Track System</h3>
-        <ol>
-            <li><strong>SRT Track:</strong> Subtitles and closed captions</li>
-            <li><strong>VIDEO Track:</strong> Your video content and visual effects</li>
-            <li><strong>AUDIO Track:</strong> Music, dialogue, sound effects</li>
-            <li><strong>TEXT Track:</strong> Title cards, credits, overlays</li>
-        </ol>
+  <!-- PAGE 8 -->
+  <h2 id="page8">Page 8 — Video Generator</h2>
+  <p>The core clip generation engine. Describe any scene in natural language and the AI writes and renders a custom canvas animation for it. Every clip saves automatically to your Media Library.</p>
 
-        <h4>Working with the Timeline:</h4>
-        <ul>
-            <li>Drag assets from Media Box onto tracks</li>
-            <li>Arrange clips in sequence</li>
-            <li>Trim and adjust clip lengths</li>
-            <li>Layer multiple elements</li>
-            <li>Maximum duration: 180 minutes (3 hours) for Studio plan</li>
-        </ul>
+  <h3>Writing an effective prompt</h3>
+  <p>Be as specific as possible. Include:</p>
+  <ul>
+    <li>Setting and time of day (e.g. "rain-soaked London street at dusk")</li>
+    <li>Camera angle and movement (e.g. "slow low-angle push-in", "aerial crane shot")</li>
+    <li>Lighting and mood (e.g. "warm golden hour", "high-contrast noir")</li>
+    <li>Characters and action (e.g. "elderly man walks slowly, pauses at a window")</li>
+    <li>Colour palette (e.g. "desaturated teal and orange")</li>
+    <li>Visual effects (e.g. "dust particles in light beam", "rain on lens")</li>
+  </ul>
 
-        <h2 id="preview">Preview & Export</h2>
+  <h3>Using a reference image</h3>
+  <ol>
+    <li>Click <strong>UPLOAD REFERENCE</strong> and choose an image.</li>
+    <li>The generator will match the visual style, colour grade, and lighting of your reference.</li>
+  </ol>
 
-        <h3>Page 17: Full-Screen Preview</h3>
-        <p>Before finalizing your film, preview it in full-screen mode to ensure everything looks perfect.</p>
+  <h3>Generating and saving</h3>
+  <ol>
+    <li>Enter your scene description.</li>
+    <li>Hit <strong>GENERATE CLIP</strong>.</li>
+    <li>Preview the result in the viewer. Hit <strong>REGENERATE</strong> if you want a new variation.</li>
+    <li>Click <strong>SAVE TO MEDIA LIBRARY</strong> — the clip is now available in the Asset Manager (Page 11) and the Timeline (Page 13).</li>
+  </ol>
 
-        <h4>Preview Features:</h4>
-        <ul>
-            <li>Full-screen playback</li>
-            <li>Quality check before export</li>
-            <li>Review all edits and transitions</li>
-            <li>Confirm audio sync</li>
-        </ul>
+  <!-- PAGE 9 -->
+  <h2 id="page9">Page 9 — VFX Tools</h2>
+  <p>Motion graphics, transitions, title cards, and visual effects for professional production polish.</p>
+  <ul>
+    <li>Motion graphics packs (opening titles, lower thirds, kinetic text)</li>
+    <li>Scene transitions (dissolve, wipe, whip pan, flash, dip to black)</li>
+    <li>Cinematic overlays (film grain, lens flare, vignette, anamorphic flare)</li>
+    <li>Green-screen / chroma key compositing</li>
+    <li>Particle effects (rain, snow, fire, smoke, dust)</li>
+    <li>Speed effects (slow motion, time-lapse, freeze frame)</li>
+  </ul>
+  <p>Select any VFX tool, configure its parameters, and hit <strong>APPLY</strong> to render the effect onto your selected clip. Output saves to your Media Library.</p>
 
-        <h2 id="plans">Subscription Plans</h2>
+  <!-- PAGE 10 -->
+  <h2 id="page10">Page 10 — Enhancement</h2>
+  <p>Upscale, sharpen, denoise, and enhance any footage or image in your project.</p>
+  <ul>
+    <li><strong>AI Upscale:</strong> 2x or 4x resolution increase using AI super-resolution.</li>
+    <li><strong>Denoising:</strong> Remove grain and digital noise while preserving detail.</li>
+    <li><strong>Sharpening:</strong> Edge-aware sharpening for crisp detail.</li>
+    <li><strong>Stabilisation:</strong> Remove camera shake from handheld footage.</li>
+    <li><strong>Frame interpolation:</strong> Increase frame rate (e.g. 24fps to 60fps) for smoother playback.</li>
+    <li><strong>Colour correction:</strong> One-click auto-balance for exposure, white balance, and contrast.</li>
+  </ul>
+  <p>Select a clip from your Media Library, choose an enhancement, adjust the strength slider, and click <strong>ENHANCE</strong>. The processed clip is saved alongside the original.</p>
 
-        <h3>Choose the Plan That Fits Your Vision</h3>
+  <!-- PAGE 11 -->
+  <h2 id="page11">Page 11 — Asset Manager</h2>
+  <p>Your complete media library. Every clip generated on Page 8, every image created, every file you upload, and every enhanced asset lives here.</p>
 
-        <div class="plan-box">
-            <h4>BASIC Plan - $10/month</h4>
-            <ul>
-                <li><strong>Film Length:</strong> Up to 30 minutes</li>
-                <li><strong>Best For:</strong> Short films, music videos, quick projects</li>
-                <li><strong>Access:</strong> All 720+ AI tools</li>
-                <li><strong>Features:</strong> Full editing suite, unlimited uploads</li>
-            </ul>
-        </div>
+  <h3>Uploading assets</h3>
+  <ul>
+    <li><strong>UPLOAD FILES</strong> — select video, image, audio, PDF, or document files from your device.</li>
+    <li><strong>Drag &amp; drop</strong> — drag files directly onto the Asset Manager area.</li>
+    <li><strong>Google Drive</strong> — connect your Drive account to pull files from the cloud.</li>
+  </ul>
 
-        <div class="plan-box">
-            <h4>PRO Plan - $20/month</h4>
-            <ul>
-                <li><strong>Film Length:</strong> Up to 1 hour</li>
-                <li><strong>Best For:</strong> Standard documentaries, corporate videos</li>
-                <li><strong>Access:</strong> All 720+ AI tools</li>
-                <li><strong>Features:</strong> Full editing suite, unlimited uploads, priority support</li>
-            </ul>
-        </div>
+  <h3>Managing assets</h3>
+  <ul>
+    <li>Click any thumbnail to preview the asset in the viewer.</li>
+    <li>Hover over an asset and click the <strong>X</strong> to delete it.</li>
+    <li>Click the pencil icon to rename an asset.</li>
+    <li>Assets are sorted by date created by default; use the sort toggle to switch to name order.</li>
+  </ul>
 
-        <div class="plan-box">
-            <h4>STUDIO Plan - $30/month</h4>
-            <ul>
-                <li><strong>Film Length:</strong> Up to 2.5 hours</li>
-                <li><strong>Best For:</strong> Feature-length films, complete cinematic experiences</li>
-                <li><strong>Access:</strong> All 720+ AI tools</li>
-                <li><strong>Features:</strong> Full editing suite, unlimited uploads, priority support, advanced export options</li>
-            </ul>
-        </div>
+  <div class="note">
+    <strong>Important:</strong> Assets are stored in your browser's IndexedDB. Do not clear site data if you want to keep your library. For permanent storage, download your important clips via the download button on each asset card.
+  </div>
 
-        <div class="highlight">
-            <p><strong>All plans include:</strong></p>
-            <ul>
-                <li>Access to 720+ AI creative tools</li>
-                <li>Unlimited cloud storage for your projects</li>
-                <li>Regular updates and new features</li>
-                <li>Cancel anytime with 30-day refund policy</li>
-            </ul>
-        </div>
+  <!-- PAGE 12 -->
+  <h2 id="page12">Page 12 — Storyboard</h2>
+  <p>Plan your production visually, shot by shot, before committing to the timeline.</p>
+  <ul>
+    <li>Each storyboard cell represents one shot or scene.</li>
+    <li>Assign an image or clip from your Asset Manager to each cell.</li>
+    <li>Add shot notes: camera angle, movement, dialogue cue, mood.</li>
+    <li>Drag cells to reorder your shot sequence.</li>
+    <li>Export the storyboard as a PDF for use in pre-production meetings.</li>
+  </ul>
+  <p>Your storyboard order feeds directly into the Timeline on Page 13 — hit <strong>POPULATE TIMELINE FROM STORYBOARD</strong> to auto-arrange clips in the order you planned.</p>
 
-        <h2 id="support">Support</h2>
+  <!-- PAGE 13 -->
+  <h2 id="page13">Page 13 — Timeline Editor</h2>
+  <p>The professional multi-track editor. Arrange, sequence, and sync all elements of your film here.</p>
 
-        <h3>Page 19: Agent Grok 24/7 Help Desk</h3>
-        <p>Need assistance? Our AI-powered help desk is available around the clock.</p>
+  <h3>Tracks</h3>
+  <ul>
+    <li><strong>VIDEO track</strong> — your main visual clips in sequence.</li>
+    <li><strong>VOICE track</strong> — narration and dialogue clips.</li>
+    <li><strong>MUSIC track</strong> — background score and sound design.</li>
+    <li><strong>EFFECTS track</strong> — sound effects, transitions, and VFX overlays.</li>
+  </ul>
 
-        <h4>Get Help With:</h4>
-        <ul>
-            <li>Technical issues</li>
-            <li>Feature questions</li>
-            <li>Creative guidance</li>
-            <li>Account management</li>
-            <li>Billing inquiries</li>
-        </ul>
+  <h3>Working with the timeline</h3>
+  <ol>
+    <li>Drag clips from the Asset Manager panel (left side) onto the appropriate track.</li>
+    <li>Clips snap to the playhead position.</li>
+    <li>Drag the right edge of a clip to trim its out-point.</li>
+    <li>Drag a clip left or right to reposition it in time.</li>
+    <li>Click a clip to select it; press DELETE to remove it from the timeline (the asset stays in your library).</li>
+  </ol>
 
-        <h3>Page 20: Community Hub</h3>
-        <p>Connect with fellow creators, share your work, and get inspired by others in the MandaStrong community.</p>
+  <h3>Auto-populate</h3>
+  <p>Click <strong>SYNC ALL TRACKS</strong> to automatically populate all four tracks from your Media Library in chronological order. This is the fastest way to get a first assembly cut.</p>
 
-        <hr>
+  <h3>Film duration</h3>
+  <p>Set your target film duration using the duration selector: <strong>60 minutes</strong>, <strong>90 minutes</strong>, or <strong>180 minutes</strong>. The timeline ruler scales to match. Duration limits depend on your subscription plan.</p>
 
-        <h2>Additional Resources</h2>
+  <h3>Rendering</h3>
+  <p>When your timeline is complete, hit <strong>RENDER</strong> to send it to the Render Engine on Page 16.</p>
 
-        <h3>Fundraiser Information</h3>
-        <p>MandaStrong Studio is part of a larger educational mission focused on:</p>
-        <ul>
-            <li>Bullying prevention programs for schools</li>
-            <li>Social skills development</li>
-            <li>Educational movie content for students</li>
-        </ul>
+  <!-- PAGE 14 -->
+  <h2 id="page14">Page 14 — Colour Grade</h2>
+  <p>Apply cinematic colour grades to your entire timeline or to individual clips.</p>
 
-        <div class="highlight">
-            <p><strong>100% of all Etsy Store proceeds</strong> are donated to Veterans Mental Health Services, supporting those who have served our country.</p>
-            <p style="text-align: center; margin-top: 20px;">
-                <a href="https://MandaStrong1.Etsy.com" target="_blank" style="font-size: 1.2rem; font-weight: bold;">Visit: MandaStrong1.Etsy.com</a>
-            </p>
-        </div>
+  <h3>Tools available</h3>
+  <ul>
+    <li><strong>LUT presets</strong> — one-click cinematic looks: Teal &amp; Orange, Bleach Bypass, Warm Vintage, Cold Blue, Noir, Vivid, Log-to-Rec709.</li>
+    <li><strong>Tone controls</strong> — Exposure, Contrast, Highlights, Shadows, Whites, Blacks.</li>
+    <li><strong>Colour controls</strong> — Temperature, Tint, Saturation, Vibrance.</li>
+    <li><strong>HSL panel</strong> — adjust hue, saturation, and luminance for specific colour ranges.</li>
+    <li><strong>Vignette</strong> — add a subtle edge darkening for cinematic focus.</li>
+    <li><strong>Grain</strong> — add organic film grain texture.</li>
+  </ul>
 
-        <h2>Tips for Success</h2>
-        <ol>
-            <li><strong>Start Small:</strong> Familiarize yourself with the interface before tackling large projects</li>
-            <li><strong>Explore AI Tools:</strong> Try different tools to discover what works best for your style</li>
-            <li><strong>Organize Assets:</strong> Keep your Media Box organized by deleting unused files</li>
-            <li><strong>Save Often:</strong> Your work auto-saves, but generate checkpoints regularly</li>
-            <li><strong>Preview Frequently:</strong> Check your work in preview mode throughout the editing process</li>
-            <li><strong>Use Drag & Drop:</strong> It's the fastest way to upload and organize files</li>
-            <li><strong>Check the Guide:</strong> Reference this guide whenever you need clarification</li>
-        </ol>
+  <div class="note">
+    <strong>Tip:</strong> Apply your grade to the whole timeline first for consistency, then use per-clip overrides for scenes that need individual treatment (e.g. flashbacks, dream sequences).
+  </div>
 
-        <h2>Troubleshooting</h2>
+  <!-- PAGE 15 -->
+  <h2 id="page15">Page 15 — Audio Mixer</h2>
+  <p>Balance your four audio tracks for a professional mix.</p>
 
-        <h3>Common Issues:</h3>
+  <h3>Track controls</h3>
+  <ul>
+    <li><strong>VOICE</strong> — narration and dialogue level.</li>
+    <li><strong>MUSIC</strong> — background score level.</li>
+    <li><strong>EFX</strong> — sound effects level.</li>
+    <li><strong>MASTER</strong> — overall output volume.</li>
+  </ul>
 
-        <h4>Google Drive Not Loading:</h4>
-        <ul>
-            <li>Ensure you've granted necessary permissions</li>
-            <li>Try using regular upload instead</li>
-            <li>Check your internet connection</li>
-        </ul>
+  <div class="card">
+    <strong>Documentary mix (recommended):</strong> VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85
+  </div>
+  <div class="card">
+    <strong>Music video mix (recommended):</strong> MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85
+  </div>
 
-        <h4>Upload Failed:</h4>
-        <ul>
-            <li>Verify file format is supported</li>
-            <li>Check file size (larger files may take longer)</li>
-            <li>Try compressing images before upload</li>
-        </ul>
+  <h3>Saving presets</h3>
+  <p>Enter a preset name and click <strong>SAVE PRESET</strong> to store your current mix settings. Load any saved preset from the dropdown for future projects.</p>
 
-        <h4>Video Not Playing:</h4>
-        <ul>
-            <li>Ensure video format is compatible</li>
-            <li>Check browser compatibility (Chrome recommended)</li>
-            <li>Clear browser cache and reload</li>
-        </ul>
+  <!-- PAGE 16 -->
+  <h2 id="page16">Page 16 — Render Engine</h2>
+  <p>Compile your completed timeline into a finished film file.</p>
 
-        <div class="footer">
-            <p style="font-size: 1.2rem; color: #c084fc; margin-bottom: 20px;"><strong>Thank you for choosing MandaStrong Studio!</strong></p>
-            <p>Together, we're creating content that educates, inspires, and makes a positive impact on the world.</p>
-            <p style="font-style: italic; margin-top: 20px; color: #d8b4fe;">Your creativity matters. Your stories matter. Your impact matters.</p>
-            <hr style="margin: 30px auto; max-width: 300px;">
-            <p style="font-size: 0.9rem;">© 2025 MandaStrong1 - All Rights Reserved</p>
-        </div>
+  <h3>Render settings</h3>
+  <ul>
+    <li><strong>Resolution:</strong> 1080p (Creator plan) · 4K (Pro plan) · 8K (Studio plan).</li>
+    <li><strong>Codec:</strong> H.264 (wide compatibility) or VP9 (better quality at smaller file size).</li>
+    <li><strong>Frame rate:</strong> 24fps (cinematic) · 25fps (PAL/broadcast) · 30fps (web/social).</li>
+    <li><strong>Audio:</strong> AAC 320kbps stereo.</li>
+  </ul>
+
+  <h3>Render process</h3>
+  <ol>
+    <li>Review your settings.</li>
+    <li>The engine checks all timeline clips. Any missing or incomplete clips are flagged — click <strong>AUTO-REGENERATE MISSING</strong> to fill gaps automatically.</li>
+    <li>Hit <strong>START RENDER</strong>.</li>
+    <li>A progress bar shows render status. Do not close the tab during rendering.</li>
+    <li>When complete, the output file appears in your Asset Manager and you are automatically taken to the Preview page (Page 17).</li>
+  </ol>
+
+  <!-- PAGE 17 -->
+  <h2 id="page17">Page 17 — Preview</h2>
+  <p>Full-screen preview of your rendered film before final export.</p>
+  <ul>
+    <li>Play, pause, and scrub through your completed film.</li>
+    <li>Chapter markers (if set in the timeline) appear below the player for quick navigation.</li>
+    <li>Check audio sync, colour grade, titles, and transitions here.</li>
+    <li>If anything needs adjustment, use the <strong>BACK TO EDITOR</strong> button to return to the Timeline without losing your render settings.</li>
+    <li>When satisfied, click <strong>APPROVE &amp; EXPORT</strong> to proceed to Page 18.</li>
+  </ul>
+
+  <!-- PAGE 18 -->
+  <h2 id="page18">Page 18 — Export &amp; Distribute</h2>
+  <p>Download your completed film and share it directly to major platforms from inside MandaStrong Studio.</p>
+
+  <h3>Download</h3>
+  <ul>
+    <li>Click <strong>DOWNLOAD FILM</strong> to save the rendered file to your device.</li>
+    <li>File is named with your project title and render date.</li>
+  </ul>
+
+  <h3>Direct sharing</h3>
+  <p>Share directly to:</p>
+  <ul>
+    <li><strong>YouTube</strong> — uploads to your connected channel.</li>
+    <li><strong>TikTok</strong> — optimised vertical or landscape format.</li>
+    <li><strong>Instagram</strong> — Reels and Feed post formats.</li>
+    <li><strong>Facebook</strong> — Page or personal post.</li>
+    <li><strong>LinkedIn</strong> — professional video post.</li>
+    <li><strong>Vimeo</strong> — high-quality portfolio upload.</li>
+    <li><strong>WhatsApp</strong> — share link directly to contacts.</li>
+  </ul>
+  <p>Connect each platform account once in your Profile settings — after that, sharing is one click.</p>
+
+  <!-- PAGE 19 -->
+  <h2 id="page19">Page 19 — Tutorials</h2>
+  <p>12 step-by-step in-app video tutorials covering every major part of the platform.</p>
+  <ul>
+    <li>Click any tutorial card to expand it and watch inline — no new tab required.</li>
+    <li>Each tutorial includes a pro tip panel with advanced techniques for that lesson.</li>
+    <li>Tutorials are ordered to follow the recommended production workflow.</li>
+  </ul>
+  <p>Topics covered: Getting Started · Writing Your Script · Using the Voice Engine · Generating Video Clips · Building Your Storyboard · Timeline Editing · Colour Grading · Audio Mixing · Rendering · Exporting &amp; Sharing · Using the Community Hub · Advanced Workflows.</p>
+
+  <!-- PAGE 20 -->
+  <h2 id="page20">Page 20 — About &amp; Legal</h2>
+  <p>Background on MandaStrong Studio, the platform's mission, terms of service, and full disclaimer.</p>
+  <ul>
+    <li>About Amanda Woolley — founder, author, and creative producer.</li>
+    <li>Platform mission: democratising filmmaking for everyone, with a focus on veterans' mental health and anti-bullying programmes in schools.</li>
+    <li>100% of all Etsy store proceeds are donated to Veterans Mental Health Services.</li>
+    <li>Full Terms of Service covering content ownership, AI-generated material, and acceptable use.</li>
+    <li>Disclaimer regarding AI output quality and the platform's role as a creative tool.</li>
+    <li>Contact information for support and business enquiries.</li>
+  </ul>
+
+  <!-- PAGE 21 -->
+  <h2 id="page21">Page 21 — Agent Grok (AI Assistant)</h2>
+  <p>Your 24/7 AI studio assistant. Ask anything about the platform — tools, workflow, pricing, voice settings, export, troubleshooting, or production advice.</p>
+  <ul>
+    <li>Agent Grok has full knowledge of all 23 pages and every feature.</li>
+    <li>Type your question in the chat input and hit <strong>SEND</strong>.</li>
+    <li>Responses appear instantly in the chat window.</li>
+    <li>Example questions: "How do I apply the James voice settings?", "What's the difference between VP9 and H.264?", "How do I add subtitles to my timeline?", "What plan do I need for 4K render?"</li>
+    <li>Chat history is preserved for your session.</li>
+  </ul>
+
+  <!-- PAGE 22 -->
+  <h2 id="page22">Page 22 — Community Hub</h2>
+  <p>Share your completed films with the MandaStrong creator community and discover what others are making.</p>
+
+  <h3>Posting your film</h3>
+  <ol>
+    <li>Enter your name or creator handle in the <strong>Your Name</strong> field.</li>
+    <li>Enter your film title.</li>
+    <li>Select an icon to represent your post.</li>
+    <li>Click <strong>SHARE FILM</strong> to publish to the community wall.</li>
+  </ol>
+
+  <h3>Browsing the community wall</h3>
+  <ul>
+    <li>All published films appear as cards on the community wall.</li>
+    <li>Click the <strong>heart icon</strong> to like a film.</li>
+    <li>Likes are tallied in real time.</li>
+    <li>Filter posts by most recent or most liked using the sort buttons.</li>
+  </ul>
+
+  <!-- PAGE 23 -->
+  <h2 id="page23">Page 23 — That's All Folks</h2>
+  <p>The closing page of MandaStrong Studio. A personal letter from founder Amanda Woolley, the platform mission statement, and the complete how-to guide (expandable inline).</p>
+  <ul>
+    <li>Click <strong>MANDASTRONG STUDIO — COMPLETE HOW TO USE GUIDE</strong> to expand the full in-app guide.</li>
+    <li>Hit <strong>START CREATING</strong> to return to Page 4 and begin a new project.</li>
+    <li>Visit <a href="https://MandaStrong1.Etsy.com" target="_blank">MandaStrong1.Etsy.com</a> — all proceeds support Veterans Mental Health.</li>
+    <li>Hit <strong>EXIT APP</strong> to return to the home page.</li>
+  </ul>
+
+  <!-- WORKFLOWS -->
+  <h2 id="workflows">Complete Production Workflows</h2>
+
+  <div class="workflow">
+    <div class="workflow-title">Documentary (recommended path)</div>
+    <div class="workflow-steps">
+      <strong>Page 5</strong> Write narration script →
+      <strong>Page 8</strong> Generate visual scenes →
+      <strong>Page 6</strong> Record narration with James voice →
+      <strong>Page 11</strong> Review assets →
+      <strong>Page 13</strong> Build timeline →
+      <strong>Page 14</strong> Apply colour grade →
+      <strong>Page 15</strong> Set audio mix (VOICE 85, MUSIC 40) →
+      <strong>Page 16</strong> Render →
+      <strong>Page 17</strong> Preview →
+      <strong>Page 18</strong> Export &amp; share
     </div>
+  </div>
+
+  <div class="workflow">
+    <div class="workflow-title">Short Film</div>
+    <div class="workflow-steps">
+      <strong>Page 5</strong> Write script →
+      <strong>Page 12</strong> Build storyboard →
+      <strong>Page 8</strong> Generate scenes →
+      <strong>Page 6</strong> Record character voices →
+      <strong>Page 13</strong> Populate timeline from storyboard →
+      <strong>Page 14</strong> Grade →
+      <strong>Page 16</strong> Render →
+      <strong>Page 18</strong> Export
+    </div>
+  </div>
+
+  <div class="workflow">
+    <div class="workflow-title">Music Video</div>
+    <div class="workflow-steps">
+      <strong>Page 6</strong> → Music Video Studio tab →
+      Step 1: Track details + audio upload →
+      Step 2: Visual style →
+      Step 3: Scene description →
+      Step 4: Generate → Download → Share to all platforms
+    </div>
+  </div>
+
+  <div class="workflow">
+    <div class="workflow-title">Quick Social Clip</div>
+    <div class="workflow-steps">
+      <strong>Page 8</strong> Generate one clip →
+      <strong>Page 14</strong> Apply a LUT →
+      <strong>Page 16</strong> Render at 1080p →
+      <strong>Page 18</strong> Share direct to TikTok or Instagram
+    </div>
+  </div>
+
+  <!-- PLANS -->
+  <h2 id="plans">Subscription Plans</h2>
+  <div class="plan-grid">
+    <div class="plan">
+      <div class="plan-name">Creator</div>
+      <div class="plan-price">$20<span style="font-size:14px;color:var(--dim)">/mo</span></div>
+      <ul>
+        <li>Films up to <strong>60 minutes</strong></li>
+        <li>1080p render</li>
+        <li>All 600+ AI tools</li>
+        <li>Full editing suite</li>
+        <li>7-day free trial</li>
+      </ul>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">$30<span style="font-size:14px;color:var(--dim)">/mo</span></div>
+      <ul>
+        <li>Films up to <strong>90 minutes</strong></li>
+        <li>4K render</li>
+        <li>All 600+ AI tools</li>
+        <li>Priority support</li>
+        <li>7-day free trial</li>
+      </ul>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Studio</div>
+      <div class="plan-price">$50<span style="font-size:14px;color:var(--dim)">/mo</span></div>
+      <ul>
+        <li>Films up to <strong>180 minutes</strong></li>
+        <li>8K render</li>
+        <li>All 600+ AI tools</li>
+        <li>Advanced export options</li>
+        <li>7-day free trial</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">
+    All plans include: 600+ AI creative tools · Cloud sync · Regular updates · Cancel anytime · Stripe-secured payments.
+  </div>
+
+  <!-- TIPS -->
+  <h2 id="tips">Pro Tips &amp; Troubleshooting</h2>
+
+  <h3>Pro Tips</h3>
+  <ul>
+    <li>Use <strong>PREPARE &amp; SPEAK</strong> (not just SPEAK NOW) for narration — the AI formatting step dramatically improves natural speech rhythm.</li>
+    <li>Generate 3–4 variations of each scene on Page 8 and pick the best — regeneration costs nothing.</li>
+    <li>Apply your colour grade on Page 14 before rendering, not after — it bakes into the final file and saves processing time.</li>
+    <li>Use <strong>SYNC ALL TRACKS</strong> on the timeline for a rough cut first, then refine manually.</li>
+    <li>VP9 codec gives 20–30% better quality at the same file size as H.264 — use it for Vimeo and download; use H.264 for YouTube and TikTok.</li>
+    <li>Save your project before every render to avoid losing progress.</li>
+  </ul>
+
+  <h3>Troubleshooting</h3>
+
+  <div class="card">
+    <strong>Video clip not generating</strong><br />
+    Try a shorter, more specific prompt. Avoid very abstract descriptions. Reload the page and try again if the generator hangs for more than 30 seconds.
+  </div>
+
+  <div class="card">
+    <strong>Voice not speaking</strong><br />
+    Check that your browser allows audio playback. Chrome may block autoplay — click anywhere on the page first, then try SPEAK NOW again. Ensure the text field is not empty.
+  </div>
+
+  <div class="card">
+    <strong>Asset not appearing in timeline</strong><br />
+    Go to Page 11 and confirm the clip is in your library. If it shows there, return to the timeline and use SYNC ALL TRACKS to re-populate. If still missing, try saving the project and reloading.
+  </div>
+
+  <div class="card">
+    <strong>Upload failed</strong><br />
+    Check the file format is supported (MP4, MOV, AVI, MP3, WAV, JPG, PNG, PDF). Large files may take 10–30 seconds. Try compressing video files before upload if they are above 500MB.
+  </div>
+
+  <div class="card">
+    <strong>Render taking too long</strong><br />
+    This is normal for long-form films. A 90-minute film may take 5–10 minutes to render at 4K. Keep the tab open and active. Do not switch to another browser tab repeatedly as this may throttle browser processing.
+  </div>
+
+  <div class="card">
+    <strong>Google Drive not loading</strong><br />
+    Ensure you have granted the necessary Google permissions when prompted. Try using the regular file upload instead. Check your internet connection.
+  </div>
+
+</div>
+
+<footer>
+  <p>&copy; 2026 MandaStrong Studio · All Rights Reserved</p>
+  <p style="margin-top:10px;">Founded by Amanda Woolley · <a href="https://MandaStrong1.Etsy.com" target="_blank">MandaStrong1.Etsy.com</a></p>
+  <p style="margin-top:8px;font-size:11px;color:#555;">100% of Etsy store proceeds donated to Veterans Mental Health Services</p>
+</footer>
+
 </body>
 </html>

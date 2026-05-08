@@ -57,18 +57,19 @@ export default function Page23({ onNavigate }: PageProps) {
 
   return (
     <div style={{ ...Sp, padding: 0, position: "relative" }}>
-      {/* Ambient background video */}
-      <video
-        autoPlay loop playsInline preload="auto" muted
-        style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.15, zIndex: 0, pointerEvents: "none" }}
-        onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = "none"; }}
-      >
-        <source src="./background.mp4" type="video/mp4" />
-        <source src="/background.mp4" type="video/mp4" />
-      </video>
-
       {/* Content layer */}
       <div style={{ position: "relative", zIndex: 1, padding: "26px 40px 80px" }}>
+        {/* Background video — top of page */}
+        <video
+          autoPlay loop playsInline preload="auto" muted
+          style={{ width: "100%", aspectRatio: "16/9", background: "#000", border: `1px solid ${GOLD}`, marginBottom: 24, display: "block" }}
+          onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = "none"; }}
+        >
+          <source src="./background.mp4" type="video/mp4" />
+          <source src="/background.mp4" type="video/mp4" />
+          <source src="background.mp4" type="video/mp4" />
+        </video>
+
         {/* Closing film video */}
         <video
           autoPlay loop playsInline preload="auto" muted

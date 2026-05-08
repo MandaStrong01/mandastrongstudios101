@@ -1,7 +1,17 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <style>[data-bolt-badge],a[href*="bolt.new"],.bolt-badge,#bolt-badge,[class*="bolt-badge"],[id*="bolt-badge"],img[src*="bolt"],a[href*="bolt.new"] img,iframe[src*="bolt"]{display:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;pointer-events:none!important;}</style>
+    <style>
+      [data-bolt-badge],a[href*="bolt.new"],.bolt-badge,#bolt-badge,
+      [class*="bolt-badge"],[id*="bolt-badge"],img[src*="bolt"],
+      a[href*="bolt.new"] img,iframe[src*="bolt"],
+      bolt-ai-badge,bolt-badge,[data-testid*="bolt"],
+      #bolt-badge-container,.bolt-badge-container,
+      [style*="bolt"]{display:none!important;visibility:hidden!important;opacity:0!important;
+      width:0!important;height:0!important;max-width:0!important;max-height:0!important;
+      overflow:hidden!important;pointer-events:none!important;position:absolute!important;
+      left:-9999px!important;top:-9999px!important;}
+    </style>
     <script>
       (function(){
         var HIDE="display:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;position:absolute!important;left:-9999px!important;";
