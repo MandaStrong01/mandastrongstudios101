@@ -28,87 +28,170 @@ interface PageProps {
 const tuts = [
   {
     n: "01", t: "Getting Started — Platform Overview & Navigation",
-    d: "Full walkthrough of all 23 pages, the Quick Access menu, footer controls, and how to navigate the studio.",
+    d: "Full walkthrough of all 23 pages, the Quick Access menu, footer controls, and how to navigate the studio. Learn how every page connects and what order gives you the fastest path from idea to finished film.",
     dur: "12:00", l: "Beginner",
     videoId: "4RixMPF4xis",
-    tips: ["Use the menu top left to jump to any page instantly", "Footer shows your current page and lets you save your project", "Page 23 has the full How-To guide"]
+    tips: [
+      "Use the Quick Access menu (top left) to jump to any of the 23 pages instantly",
+      "Hit SAVE PROJECT in the footer at any time — your work restores exactly where you left off",
+      "Page 23 has the complete How-To-Use Guide covering every page in detail",
+      "Guest users can explore the full platform without signing in",
+    ]
   },
   {
-    n: "02", t: "Writing Tools — Script to Screen in Minutes",
-    d: "How to use the 50+ writing tools on Page 5. From logline to full feature script using AI Create.",
+    n: "02", t: "Writing Tools — Script to Screen in Minutes (Page 5)",
+    d: "How to use the 50+ professional writing tools on Page 5. From logline to full feature screenplay, episode arc, character bible, and documentary script — all generated in seconds with AI CREATE.",
     dur: "9:30", l: "Beginner",
     videoId: "OWMS7PNL7Eo",
-    tips: ["Click any tool card to open it", "Use AI CREATE for instant professional scripts", "Save results to your Media Library"]
+    tips: [
+      "Click any tool card to open it in a full modal with prompt fields",
+      "Use AI CREATE to generate any script format instantly",
+      "Copy your finished script straight into the Voice Engine on Page 6",
+      "50+ formats: loglines, treatments, feature scripts, episode arcs, character bibles, dialogue rewrites",
+    ]
   },
   {
-    n: "03", t: "Voice Engine — 54 Characters, Real Narration",
-    d: "Complete guide to Page 6. Selecting voices, setting pitch and rate, using the TEST button, and preparing narration for your documentary.",
+    n: "03", t: "Voice Engine — 54 Characters, Real Narration (Page 6)",
+    d: "Complete guide to Page 6. Choosing from 54 professional voice characters, setting pitch, rate, pause and mood, using the TEST button before committing, and using PREPARE & SPEAK for the best AI-formatted delivery.",
     dur: "14:20", l: "Beginner",
     videoId: "pLqipLSTiKs",
-    tips: ["James is your primary documentary narrator — pitch 0.86, rate 0.62", "Hit TEST on any voice card to hear it instantly", "Use PREPARE & SPEAK to AI-format your script before speaking"]
+    tips: [
+      "APPLY JAMES SETTINGS sets the perfect documentary narration: pitch 0.86, rate 0.62, pause 1600ms",
+      "Filter voices by gender, age, and origin to find your character instantly",
+      "Hit TEST on any voice card to hear it before selecting",
+      "Always use PREPARE & SPEAK — it AI-formats your script for the best spoken result",
+      "Adjust the MOOD slider across 14 emotional registers for the right tone",
+    ]
   },
   {
-    n: "04", t: "Music Video Studio — Full Production Walkthrough",
-    d: "Step-by-step: Song setup, style selection, scene description, generating your music video, and exporting to social platforms.",
+    n: "04", t: "Music Video Studio — Full Production Walkthrough (Page 6)",
+    d: "Step-by-step guide to the Music Video Studio inside Page 6. Song setup, choosing visual style and colour grade, writing your scene description, generating your music video, and exporting to social platforms.",
     dur: "18:45", l: "Intermediate",
     videoId: "1vYvsdE8B6A",
-    tips: ["Access from the MUSIC VIDEO STUDIO button on Page 6", "Upload your own audio track on Step 1 for beat-synced video", "The more detailed your scene description, the better the output", "Download directly or share to YouTube, TikTok, Instagram"]
+    tips: [
+      "Access from the MUSIC VIDEO STUDIO button on Page 6",
+      "Upload your own audio track on Step 1 — the visuals sync to your beat automatically",
+      "The more detailed your Step 3 scene description, the better the generated result",
+      "Step 2 colour grade choices: Cinematic, Noir, Golden Hour, Arctic Blue, and more",
+      "Download directly from Step 4 or share to YouTube, TikTok, and Instagram in one click",
+    ]
   },
   {
-    n: "05", t: "Video Generator — Generating Cinematic Scenes (Page 8)",
-    d: "How to describe any scene and have the MandaStrong Cinema Engine build it. Using reference images, duration settings, and saving to your Media Library.",
+    n: "05", t: "Video Generator — Cinematic Scene Generation (Page 8)",
+    d: "How to describe any scene and have the MandaStrong Cinema Engine build it as a visual clip. Using reference images to match a style, setting duration, and saving clips to your Media Library for the Timeline.",
     dur: "16:00", l: "Intermediate",
     videoId: "sTsGILvmBVE",
-    tips: ["Be specific in your scene description — lighting, mood, camera angle", "Upload a reference image to match a visual style", "Each scene saves automatically to your Media Library", "Use NEXT SCENE to build your full film clip by clip"]
+    tips: [
+      "Describe lighting, mood, camera angle, time of day, characters, and setting for the best result",
+      "Upload a reference image to match a specific visual style or colour palette",
+      "Every generated clip saves automatically to your Media Library on Page 11",
+      "Use NEXT SCENE to build your full film clip by clip in sequence",
+      "You can also bypass this page entirely and upload your own video files using UPLOAD MEDIA on Page 13",
+    ]
   },
   {
-    n: "06", t: "Timeline Editor — Building Your Film (Page 13)",
-    d: "Dragging clips to tracks, syncing audio and video, adjusting film duration from 60 to 180 minutes, and preparing for render.",
+    n: "06", t: "Upload Media — Bring Your Own Files to the Timeline (Page 13)",
+    d: "How to upload your own video, audio, and image files directly into the Timeline Editor without using the AI Video Generator. Files are saved to your Supabase Media Library and available across every tool in the platform.",
+    dur: "5:00", l: "Beginner",
+    videoId: "Bl1WEiHvHEA",
+    tips: [
+      "Hit UPLOAD MEDIA at the top of the MEDIA BOX in the Timeline Editor on Page 13",
+      "Accepts video (MP4, MOV, WebM), audio (MP3, WAV), and images (JPG, PNG, WebP) — multiple files at once",
+      "Uploaded files are saved to Supabase Storage and your Asset Library on Page 11 — they persist across sessions",
+      "Guest users get a local session-only upload — sign in to save files permanently",
+      "A progress bar shows upload percentage in real time — green checkmark confirms the file is saved to your library",
+      "This is the fastest way to get your own footage, music, or photos into a production",
+    ]
+  },
+  {
+    n: "07", t: "Timeline Editor — Building Your Film (Page 13)",
+    d: "Dragging clips to video, voice, music, and effects tracks. Syncing all tracks from your Media Library with one click. Adjusting film duration from 1 to 180 minutes, and locking your timeline before render.",
     dur: "11:30", l: "Intermediate",
     videoId: "Bl1WEiHvHEA",
-    tips: ["Hit SYNC ALL TRACKS to auto-populate from your Media Library", "Drag any clip from the library to any track", "Set film duration with the slider — 60, 90, or 180 minutes", "Hit RENDER when your timeline is ready"]
+    tips: [
+      "Hit SYNC ALL TRACKS to auto-populate all four tracks from your Media Library",
+      "Four tracks: VIDEO · VOICE · MUSIC · EFFECTS — drag any asset to any track",
+      "Set film duration with the slider: 60, 90, or 180 minutes",
+      "Use UPLOAD MEDIA to bring in your own files without using the AI generator",
+      "Hit RENDER when your timeline is locked and ready",
+    ]
   },
   {
-    n: "07", t: "Audio Mixer — Professional Sound (Page 15)",
-    d: "Setting the perfect mix for documentary, narrative film, or music video. Recommended levels explained.",
+    n: "08", t: "Audio Mixer — Professional Sound Design (Page 15)",
+    d: "Setting the perfect mix for documentary, narrative film, or music video. Recommended levels for each format, the equaliser, audio ducking, noise reduction, and saving your mix as a preset.",
     dur: "7:15", l: "Beginner",
     videoId: "GOuniqx0geA",
-    tips: ["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85", "Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85", "Hit SAVE PRESET to store your favourite mix"]
+    tips: [
+      "Documentary mix: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85",
+      "Music video mix: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85",
+      "Enable AUDIO DUCKING to automatically lower music when voice plays",
+      "Use the 3-band EQ (Bass / Mid / Treble) to shape your final sound",
+      "Hit SAVE PRESET to store your favourite mix for future projects",
+    ]
   },
   {
-    n: "08", t: "Render Engine — Exporting Your Film in 4K (Page 16)",
-    d: "Choosing quality settings, understanding VP9 vs VP8, starting the render, and what to do if clips need regenerating.",
+    n: "09", t: "Render Engine — Producing Your Film (Page 16)",
+    d: "Choosing quality settings (1080p, 4K, 8K), understanding VP9 codec advantages, starting the render, and what happens when clips need regenerating before the final output.",
     dur: "10:45", l: "Intermediate",
     videoId: "v3hnz4OQ8c4",
-    tips: ["1080p recommended for most use", "4K for professional distribution", "VP9 gives better quality at same file size", "If clips are missing the engine regenerates them automatically"]
+    tips: [
+      "Creator plan: 1080p HD · Pro plan: 4K · Studio plan: 8K cinema quality",
+      "VP9 codec delivers better quality at the same file size compared to H.264",
+      "The engine automatically detects and re-generates any missing clips before rendering",
+      "Lock your timeline and approve your audio mix before hitting START RENDER",
+      "Studio plan supports films up to 3 hours (180 minutes)",
+    ]
   },
   {
-    n: "09", t: "Export & Distribute — Getting Your Film Out (Page 18)",
-    d: "Downloading your film, sharing to YouTube, TikTok, Instagram, Facebook, LinkedIn, Vimeo and WhatsApp directly from the platform.",
+    n: "10", t: "Export & Distribute — Getting Your Film Out (Page 18)",
+    d: "Downloading your completed film and sharing one-click to YouTube, TikTok, Instagram, Facebook, LinkedIn, Vimeo, and WhatsApp directly from inside the platform.",
     dur: "6:00", l: "Beginner",
     videoId: "pOfFmSPi7iE",
-    tips: ["Hit DOWNLOAD to save to your device first", "Each social platform button opens the upload page directly", "Share your MandaStrong Studio credit in your post description"]
+    tips: [
+      "Hit DOWNLOAD to save the film file to your device first as a backup",
+      "One-click share buttons open each platform's upload page with your file ready",
+      "Your rendered film is saved to your project history for re-download at any time",
+      "Add your MandaStrong Studio credit and a link in your post description",
+    ]
   },
   {
-    n: "10", t: "AI For Humanity Documentary — Full Production Case Study",
-    d: "Complete case study: how the AI For Humanity documentary was built inside MandaStrong Studio from script to render.",
+    n: "11", t: "AI For Humanity Documentary — Full Case Study",
+    d: "Complete production case study: how a full-length AI For Humanity documentary was built inside MandaStrong Studio from concept to render — covering script, narration, scene generation, timeline assembly, and export.",
     dur: "25:00", l: "Advanced",
     videoId: "qV8CBzxYIFw",
-    tips: ["James narration — pitch 0.86, rate 0.62, pause 1600ms", "13 scenes generated on Page 8, synced on Page 13", "Full workflow: P8 → P6 → P13 → P15 → P16 → P17 → P18", "Each chapter gets its own generated scene — total runtime 90 minutes"]
+    tips: [
+      "Full workflow: Page 5 (script) → Page 6 (James narration) → Page 8 (scenes) → Page 13 (timeline) → Page 15 (mix) → Page 16 (render) → Page 18 (export)",
+      "James narration settings: pitch 0.86, rate 0.62, pause 1600ms",
+      "13 scenes generated on Page 8 and synced on the timeline — total runtime 90 minutes",
+      "Each chapter of the documentary gets its own dedicated generated scene",
+      "Own footage was added via UPLOAD MEDIA on Page 13 alongside AI-generated clips",
+    ]
   },
   {
-    n: "11", t: "Saving, Loading & Project History",
-    d: "How to save your session, restore from the project history, and use IndexedDB clip persistence so nothing is ever lost.",
+    n: "12", t: "Saving, Loading & Project History",
+    d: "How to save your full session, restore from project history, and ensure your media library assets persist across devices and sessions via Supabase cloud storage.",
     dur: "5:30", l: "Beginner",
     videoId: "WRHPFKEiXv4",
-    tips: ["Hit SAVE PROJECT in the footer at any time", "MY PROJECTS shows your full session history", "Clips survive page reloads automatically via local storage", "Always download your finished film before closing the browser"]
+    tips: [
+      "Hit SAVE PROJECT in the footer at any time from any page",
+      "MY PROJECTS restores your work exactly where you left off — timeline, media, settings",
+      "Uploaded files via UPLOAD MEDIA are stored in Supabase and survive browser restarts",
+      "Always download your rendered film before closing the browser",
+      "Sign in to enable permanent cloud saves — guest sessions are local only",
+    ]
   },
   {
-    n: "12", t: "Agent Grok — Your 24/7 AI Studio Assistant (Page 21)",
-    d: "How to use Agent Grok to get instant answers about any tool, workflow, pricing, or production question.",
+    n: "13", t: "Agent Grok — Your 24/7 AI Studio Assistant",
+    d: "How to use Agent Grok for instant answers on any tool, workflow, voice settings, pricing, or export question. Grok has full knowledge of all 23 pages and every feature in the platform.",
     dur: "4:00", l: "Beginner",
     videoId: "yV3gOJwOa5I",
-    tips: ["Ask anything — tools, pricing, workflow, export settings", "Use the quick-question buttons for instant answers", "Agent Grok knows the entire MandaStrong Studio platform"]
+    tips: [
+      "Click the gold G button fixed to the bottom-left of every page to open Agent Grok",
+      "Use the Quick Start suggestion buttons to get answers immediately without typing",
+      "Follow-up suggestion buttons appear after each answer for deeper exploration",
+      "Ask about any page, tool, workflow, pricing plan, voice settings, or export options",
+      "Agent Grok covers all 23 pages with detailed, accurate answers — available 24/7",
+    ]
   },
 ];
 
@@ -146,7 +229,7 @@ export default function Page19({ onNavigate }: PageProps) {
           </div>
         </div>
         <div style={{ color: WHITE, fontSize: 13, marginBottom: 24, lineHeight: 1.8 }}>
-          Step-by-step guides for every part of MandaStrong Studio. Click any tutorial to expand and watch the lesson.
+          13 step-by-step lessons covering every part of MandaStrong Studio — from first upload to final export. Click any tutorial to expand and watch inline.
         </div>
 
         {tuts.map((t, idx) => (

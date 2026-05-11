@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Film, Volume2, Mic, Music, Sparkles, Play, Pause, VolumeX, Sliders, Headphones, Radio, BarChart3, Layers } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, ArrowRight, Film, Volume2, Mic, Music, Sparkles, Play, Pause, VolumeX, Sliders, Headphones, Radio, BarChart3, Layers, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { uploadFile } from '../lib/storage';
 import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
 import QuickAccess from '../components/QuickAccess';
@@ -21,6 +22,12 @@ export default function Page13({ onNavigate }: PageProps) {
   const { user } = useAuth();
   const [assets, setAssets] = useState<AIAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; type: string; url: string }>>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedAsset, setSelectedAsset] = useState<AIAsset | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(180);
@@ -64,6 +71,52 @@ export default function Page13({ onNavigate }: PageProps) {
     }
   };
 
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    e.target.value = '';
+
+    setUploading(true);
+    setUploadStatus('uploading');
+    setUploadProgress(0);
+    setUploadError('');
+
+    const fileList = Array.from(files);
+    const results: Array<{ name: string; type: string; url: string }> = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const assetType = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
+
+      if (user) {
+        const result = await uploadFile(file, user.id, (p) => {
+          const overall = Math.round(((i / fileList.length) + (p / 100) / fileList.length) * 100);
+          setUploadProgress(overall);
+        });
+        if (result.success && result.fileUrl) {
+          results.push({ name: file.name, type: assetType, url: result.fileUrl });
+        } else {
+          setUploadStatus('error');
+          setUploadError(result.error || 'Upload failed');
+          setUploading(false);
+          setTimeout(() => setUploadStatus('idle'), 3000);
+          return;
+        }
+      } else {
+        // Guest: local object URL only
+        results.push({ name: file.name, type: assetType, url: URL.createObjectURL(file) });
+      }
+    }
+
+    setUploadedFiles(prev => [...prev, ...results]);
+    setUploading(false);
+    setUploadProgress(100);
+    setUploadStatus('success');
+    // Refresh the asset list so new uploads appear in MEDIA BOX
+    if (user) loadAssets();
+    setTimeout(() => setUploadStatus('idle'), 2500);
+  };
+
   const formatTime = (minutes: number) => {
     const mins = Math.floor(minutes);
     const secs = Math.floor((minutes - mins) * 60);
@@ -78,7 +131,61 @@ export default function Page13({ onNavigate }: PageProps) {
 
           <div className="grid grid-cols-12 gap-4 flex-1">
             <div className="col-span-3 bg-black/30 backdrop-blur-sm rounded-2xl border border-purple-500/30 p-4 overflow-y-auto">
-              <h2 className="text-xl font-bold mb-4 text-purple-400">MEDIA BOX</h2>
+              <h2 className="text-xl font-bold mb-3 text-purple-400">MEDIA BOX</h2>
+
+              {/* Upload button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="video/*,audio/*,image/*"
+                onChange={handleUpload}
+                style={{ display: 'none' }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed border rounded-lg p-3 transition-all mb-1 font-bold text-sm relative overflow-hidden"
+                style={{
+                  background: uploadStatus === 'error' ? '#7f1d1d' : uploadStatus === 'success' ? '#14532d' : '#7c3aed',
+                  borderColor: uploadStatus === 'error' ? '#ef4444' : uploadStatus === 'success' ? '#22c55e' : '#a78bfa',
+                }}
+              >
+                {/* Progress fill */}
+                {uploadStatus === 'uploading' && (
+                  <div className="absolute inset-0 bg-purple-400/30 transition-all" style={{ width: `${uploadProgress}%` }} />
+                )}
+                <span className="relative flex items-center gap-2">
+                  {uploadStatus === 'uploading' ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : uploadStatus === 'success' ? (
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  ) : uploadStatus === 'error' ? (
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  {uploadStatus === 'uploading' ? `UPLOADING... ${uploadProgress}%` : uploadStatus === 'success' ? 'SAVED TO LIBRARY!' : uploadStatus === 'error' ? 'UPLOAD FAILED' : 'UPLOAD MEDIA'}
+                </span>
+              </button>
+              {uploadStatus === 'error' && (
+                <p className="text-red-400 text-xs mb-2 px-1">{uploadError}</p>
+              )}
+              {uploadStatus !== 'error' && <div className="mb-2" />}
+
+              {/* Locally uploaded files */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-1 mb-3">
+                  <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Uploaded</p>
+                  {uploadedFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-purple-900/20 border border-purple-500/30 rounded-lg px-3 py-2">
+                      {f.type === 'video' ? <Film className="w-3 h-3 text-purple-400 shrink-0" /> : f.type === 'audio' ? <Music className="w-3 h-3 text-purple-400 shrink-0" /> : <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />}
+                      <span className="text-xs truncate text-slate-300">{f.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-2">
                 {loading ? (
                   <div className="text-center py-8">

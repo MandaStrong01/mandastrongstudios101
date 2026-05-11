@@ -121,18 +121,69 @@ function MusicVideoStudio({ onClose, onSave }) {
     videoStyle: "Cinematic Narrative", colorGrade: "Cinematic Teal & Orange",
     effects: ["Slow Motion", "Film Grain", "Vignette"],
     cuts: "Long Takes", aspectRatio: "16:9", duration: "3 Minutes",
+    subjects: "Solo Artist — Female",
     visualDesc: "", refMedia: null,
   });
   const set = (k, v) => setConfig(p => ({ ...p, [k]: v }));
   const tog = (k, v) => setConfig(p => ({ ...p, [k]: (p[k] as string[]).includes(v) ? (p[k] as string[]).filter(x => x !== v) : [...(p[k] as string[]), v] }));
 
-  const GENRES = ["Pop", "Rock", "Hip Hop", "R&B / Soul", "Electronic / EDM", "Country", "Jazz", "Classical", "Metal", "Folk / Acoustic", "Latin", "K-Pop", "Blues", "Cinematic / Score"];
-  const MOODS = ["Euphoric", "Melancholic", "Energetic", "Romantic", "Angry", "Peaceful", "Mysterious", "Empowering", "Nostalgic", "Dark", "Haunting", "Uplifting", "Tense"];
-  const TEMPOS = ["Very Slow (40-60 BPM)", "Slow (60-80 BPM)", "Mid-Tempo (80-100 BPM)", "Upbeat (100-120 BPM)", "Fast (120-140 BPM)"];
-  const STYLES = ["Cinematic Narrative", "Performance / Live", "Abstract / Visual Art", "Documentary Style", "Lyric Video", "Retro / VHS", "Noir / Black & White", "Surrealist / Dreamlike"];
-  const GRADES = ["Natural / Clean", "Golden Hour Warm", "Cool Blue / Moody", "High Contrast Black & White", "Cinematic Teal & Orange", "Vintage Film Grain", "Dark & Desaturated"];
-  const EFFECTS = ["Slow Motion", "Speed Ramps", "Glitch Effects", "Light Leaks", "Lens Flares", "Rain / Water", "Bokeh / Blur", "Film Grain", "Vignette", "Particle Effects"];
-  const CUTS = ["Fast Cuts / High Energy", "Slow & Deliberate", "Long Takes", "Beat-Synced Cuts", "Montage Style"];
+  const GENRES = [
+    // Pop & Mainstream
+    "Pop", "Dance Pop", "Teen Pop", "Synth Pop", "Electro Pop", "Indie Pop", "Art Pop",
+    // Rock
+    "Rock", "Indie Rock", "Alt Rock", "Hard Rock", "Classic Rock", "Punk Rock", "Post-Punk", "Emo", "Grunge", "Shoegaze",
+    // Heavy
+    "Metal", "Heavy Metal", "Death Metal", "Black Metal", "Metalcore", "Nu Metal",
+    // Hip Hop & Urban
+    "Hip Hop", "Rap", "Trap", "Drill", "Grime", "Boom Bap", "Lo-Fi Hip Hop", "Conscious Rap",
+    // R&B & Soul
+    "R&B / Soul", "Neo Soul", "Gospel", "Funk", "Motown", "Contemporary R&B",
+    // Electronic
+    "Electronic / EDM", "House", "Deep House", "Tech House", "Techno", "Trance", "Drum & Bass", "Dubstep", "Ambient", "Chillout", "Synthwave", "Retrowave", "Future Bass", "Lo-Fi",
+    // Country & Folk
+    "Country", "Folk / Acoustic", "Bluegrass", "Americana", "Singer-Songwriter", "Indie Folk",
+    // Jazz & Blues
+    "Jazz", "Blues", "Soul Jazz", "Nu Jazz", "Swing", "Bebop",
+    // Classical & Cinematic
+    "Classical", "Cinematic / Score", "Orchestral", "Opera", "Neo-Classical", "Post-Classical",
+    // World & Latin
+    "Latin", "Reggaeton", "Salsa", "Bossa Nova", "Afrobeats", "Reggae", "Dancehall", "K-Pop", "J-Pop", "Bollywood", "Celtic",
+    // Other
+    "Gospel / Worship", "Children's", "Spoken Word / Poetry", "Experimental", "Punk", "Ska",
+  ];
+  const MOODS = [
+    "Euphoric", "Melancholic", "Energetic", "Romantic", "Angry", "Peaceful", "Mysterious",
+    "Empowering", "Nostalgic", "Dark", "Haunting", "Uplifting", "Tense", "Playful", "Sensual",
+    "Defiant", "Hopeful", "Sad / Heartbreak", "Celebratory", "Dreamy", "Raw / Gritty",
+    "Spiritual", "Triumphant", "Lonely", "Rebellious",
+  ];
+  const TEMPOS = ["Very Slow (40-60 BPM)", "Slow (60-80 BPM)", "Mid-Tempo (80-100 BPM)", "Upbeat (100-120 BPM)", "Fast (120-140 BPM)", "Very Fast (140+ BPM)"];
+  const STYLES = [
+    "Cinematic Narrative", "Performance / Live Stage", "Street Performance", "Studio Performance",
+    "Abstract / Visual Art", "Documentary Style", "Lyric Video", "Retro / VHS",
+    "Noir / Black & White", "Surrealist / Dreamlike", "Concert / Festival", "Intimate Acoustic",
+    "Dance Choreography", "Story-Driven Short Film", "Split Screen", "Found Footage",
+    "Anime / Illustrated", "Neon Nightlife", "Nature / Landscape", "Urban / Street",
+  ];
+  const GRADES = [
+    "Natural / Clean", "Golden Hour Warm", "Cool Blue / Moody", "High Contrast Black & White",
+    "Cinematic Teal & Orange", "Vintage Film Grain", "Dark & Desaturated", "Neon / Cyberpunk",
+    "Pastel / Dreamy", "Bleach Bypass", "Cross Processed", "Sepia / Old Film",
+  ];
+  const EFFECTS = [
+    "Slow Motion", "Speed Ramps", "Glitch Effects", "Light Leaks", "Lens Flares",
+    "Rain / Water", "Bokeh / Blur", "Film Grain", "Vignette", "Particle Effects",
+    "Smoke / Fog", "Fire / Sparks", "Confetti / Streamers", "Mirror / Kaleidoscope",
+    "Double Exposure", "Silhouette", "Neon Glow", "Strobe Light", "Dust / Haze",
+  ];
+  const CUTS = ["Fast Cuts / High Energy", "Slow & Deliberate", "Long Takes", "Beat-Synced Cuts", "Montage Style", "Jump Cuts", "Cross-Cutting", "Match Cut"];
+  const SUBJECTS = [
+    "Solo Artist — Female", "Solo Artist — Male", "Solo Artist — Non-Binary",
+    "Band / Group Performance", "Dancer / Choreographer", "Dancers (Group)",
+    "Actor / Character", "Couple / Romantic Lead", "Children / Young Performers",
+    "Elderly Subject", "Athlete in Motion", "Crowd / Audience", "Silhouette Only",
+    "No People — Pure Visual", "Animated Character", "Multiple Subjects",
+  ];
 
   const addLog = (msg) => setRenderLog(p => [...p, msg]);
 
@@ -176,23 +227,42 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(10);
       addLog("Claude is writing your film renderer...");
 
-      const filmPrompt = `You are the MandaStrong Cinema Engine — a professional cinematic renderer. Write a SINGLE JavaScript function that renders an entire music video from start to finish.
+      const filmPrompt = `You are the MandaStrong Cinema Engine. Write a JavaScript function that renders a FULLY ANIMATED cinematic music video. Every frame MUST look different — use t and sec to create continuous motion on every single call.
 
 SCENE: "${sceneDesc}"
 SONG: "${config.title}" by ${config.artist}
+GENRE: ${config.genre}
 MOOD: ${config.mood}
+SUBJECTS / TALENT: ${config.subjects}
+VIDEO STYLE: ${config.videoStyle}
+EFFECTS: ${config.effects.join(", ")}
+EDITING: ${config.cuts}
 COLOUR GRADE: ${config.colorGrade}
-TOTAL DURATION: ${totalDur.toFixed(0)} seconds
+DURATION: ${totalDur.toFixed(0)} seconds
+
+CRITICAL ANIMATION RULES — YOU MUST FOLLOW ALL OF THESE:
+1. EVERY element MUST move or change on every frame — NEVER draw anything at a fixed position
+2. Use Math.sin(sec * speed) and Math.cos(sec * speed) for all positions, sizes, rotations, opacity
+3. Use t (0.0→1.0) to control scene transitions — change the entire scene at t=0.25, t=0.5, t=0.75
+4. Backgrounds MUST scroll, pulse, or shift colour every frame
+5. Particles, stars, lights MUST float, drift, or pulse using sin/cos with different frequencies
+6. When beatNow===true: flash, burst, or shake elements visibly
+7. Draw at least 3 distinct animated layers: background, midground, foreground
+8. Camera pan: all x positions offset by Math.sin(t * Math.PI * 2) * W * 0.05
+
+COLOUR GRADE "${config.colorGrade}":
+- "Cinematic Teal & Orange": shadows rgb(0,40,50), highlights rgb(255,140,60)
+- "Golden Hour Warm": warm amber tones rgb(255,160,40) highlights
+- "Cool Blue / Moody": blues and silvers rgb(20,40,80)
+- "High Contrast Black & White": grayscale only
+- "Vintage Film Grain": sepia rgb(180,140,80), add noise
 
 Function signature:
-function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
-- t = 0.0 to 1.0 (overall film progress)
-- sec = current second
-- totalSec = total film duration
-- beatNow = true if this frame is on a beat
-- W=1280, H=720
+function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {
+  // t = 0.0 to 1.0, sec = current second, beatNow = beat flash trigger
+  // MUST animate every element using t and sec — static drawing = FAIL
 
-Return ONLY the function starting with exactly:
+Return ONLY the raw function body starting with:
 function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
 
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -219,7 +289,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
         const simple = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": "" + ["sk-ant-api03-", "rNj3uksGI3kmBJI9Mzjm2A2II2Ll6T05dea_dgB0aqqMjqbbIsembbeVVlT", "-lJ4LDSQzV8ertjcY1BodhaJcA-_mURVAAA"].join("") + "" },
-          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 3000, messages: [{ role: "user", content: `Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) for a cinematic music video. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. t=0-1 overall progress. Return only the function.` }] })
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 3000, messages: [{ role: "user", content: `Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) for an ANIMATED music video. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. CRITICAL: every element MUST move using Math.sin(sec*x) and Math.cos(sec*y) — use t and sec for ALL positions, colours, sizes. Draw 3+ animated layers. Scene transitions at t=0.25, 0.5, 0.75. beatNow triggers visible flash/burst. Return only the function body starting with: function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) {` }] })
         });
         const sd = await simple.json();
         let sc = sd.content && sd.content[0] ? sd.content[0].text.trim() : "";
@@ -231,13 +301,36 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
       }
 
       setRenderProgress(30);
-      addLog("Rendering " + totalDur.toFixed(0) + "s film at 12fps...");
+      addLog("Rendering " + totalDur.toFixed(0) + "s film at 24fps...");
 
       const canvas = canvasRef.current as HTMLCanvasElement;
       const W = 1280, H = 720;
       canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext("2d")!;
-      const fps = 12;
+      const fps = 24;
+
+      const fallbackRender = (ctx2: CanvasRenderingContext2D, W2: number, H2: number, t: number, sec: number, beatNow: boolean) => {
+        const pan = Math.sin(t * Math.PI * 4) * W2 * 0.04;
+        const bg = ctx2.createLinearGradient(0, 0, W2, H2);
+        const hue1 = (t * 180 + 200) % 360, hue2 = (t * 180 + 230) % 360;
+        bg.addColorStop(0, `hsl(${hue1},60%,4%)`); bg.addColorStop(1, `hsl(${hue2},50%,8%)`);
+        ctx2.fillStyle = bg; ctx2.fillRect(0, 0, W2, H2);
+        for (let i = 0; i < 80; i++) {
+          const sx = ((i * 137.5 + pan * 0.5 + sec * (5 + (i % 5))) % W2 + W2) % W2;
+          const sy = ((i * 97.3 + Math.sin(sec * 0.3 + i) * 40) % H2 + H2) % H2;
+          const r = 1 + Math.sin(sec * 0.8 + i * 0.4) * 0.8 + (beatNow ? 2 : 0);
+          const a = 0.4 + Math.sin(sec * 1.2 + i) * 0.3;
+          ctx2.beginPath(); ctx2.arc(sx, sy, r, 0, Math.PI * 2);
+          ctx2.fillStyle = `rgba(232,201,109,${a})`; ctx2.fill();
+        }
+        const midY = H2 * 0.5 + Math.sin(sec * 0.5) * H2 * 0.08;
+        const grd = ctx2.createLinearGradient(0, midY - H2 * 0.15, 0, midY + H2 * 0.15);
+        grd.addColorStop(0, "rgba(0,0,0,0)"); grd.addColorStop(0.5, `rgba(160,120,32,${0.08 + Math.sin(sec * 1.5) * 0.04})`); grd.addColorStop(1, "rgba(0,0,0,0)");
+        ctx2.fillStyle = grd; ctx2.fillRect(0, midY - H2 * 0.15, W2, H2 * 0.3);
+        if (beatNow) {
+          ctx2.fillStyle = `rgba(232,201,109,0.08)`; ctx2.fillRect(0, 0, W2, H2);
+        }
+      };
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
       const videoStream = canvas.captureStream(fps);
       let combinedStream: MediaStream = videoStream;
@@ -256,11 +349,9 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
           const sec = frame / fps, t = sec / totalDur;
           const beatNow = beatGrid.some(b => Math.abs(sec - b) < 0.055);
           ctx.clearRect(0, 0, W, H);
-          ctx.save(); ctx.translate(-(t * W * 0.04) * 0.3, 0);
+          ctx.save();
           try { renderFn(ctx, W, H, t, sec, totalDur, beatNow); } catch (_) {
-            const bg = ctx.createLinearGradient(0, 0, 0, H);
-            bg.addColorStop(0, "rgb(2,5,18)"); bg.addColorStop(1, "rgb(4,8,28)");
-            ctx.fillStyle = bg; ctx.fillRect(-W, 0, W * 3, H);
+            fallbackRender(ctx, W, H, t, sec, beatNow);
           }
           ctx.restore();
           const vig = ctx.createRadialGradient(W / 2, H / 2, W * 0.08, W / 2, H / 2, W * 0.85);
@@ -369,6 +460,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
             )}
             {step === 2 && (
               <div>
+                {label("SUBJECTS / TALENT")}{selBtn("subjects", SUBJECTS)}
                 {label("VIDEO STYLE")}{selBtn("videoStyle", STYLES)}
                 {label("COLOUR GRADE")}{selBtn("colorGrade", GRADES)}
                 {label("VISUAL EFFECTS")}{multiBtn("effects", EFFECTS)}
@@ -401,7 +493,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                 <textarea value={config.visualDesc} onChange={e => set("visualDesc", e.target.value)} placeholder="Describe what you want to see..." style={{ width: "100%", background: "#000", border: `1px solid ${GOLD}`, padding: "12px", color: WHITE, fontSize: 13, outline: "none", fontFamily: "'Rajdhani',sans-serif", boxSizing: "border-box" as const, height: 130, resize: "vertical" as const, lineHeight: 1.8, marginBottom: 10 }} />
                 <div style={{ background: "#0a0500", border: `1px solid ${GOLDDIM}`, padding: 14, marginBottom: 14 }}>
                   <div style={{ color: GOLD, fontSize: 11, letterSpacing: 2, marginBottom: 8, fontWeight: 900 }}>YOUR MUSIC VIDEO</div>
-                  {[["TITLE", config.title || "—"], ["ARTIST", config.artist || "—"], ["GENRE", config.genre || "—"], ["MOOD", config.mood || "—"], ["STYLE", config.videoStyle || "—"], ["GRADE", config.colorGrade || "—"], ["DURATION", config.duration || "—"], ["AUDIO", audioName || "No audio uploaded"]].map(([k, v]) => (
+                  {[["TITLE", config.title || "—"], ["ARTIST", config.artist || "—"], ["GENRE", config.genre || "—"], ["MOOD", config.mood || "—"], ["SUBJECTS", config.subjects || "—"], ["STYLE", config.videoStyle || "—"], ["GRADE", config.colorGrade || "—"], ["DURATION", config.duration || "—"], ["AUDIO", audioName || "No audio uploaded"]].map(([k, v]) => (
                     <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", borderBottom: `1px solid #0a0800` }}>
                       <span style={{ color: GOLDDIM, letterSpacing: 2 }}>{k}</span><span style={{ color: WHITE, fontWeight: 700 }}>{v}</span>
                     </div>
