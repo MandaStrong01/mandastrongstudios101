@@ -5,14 +5,12 @@ import { supabase } from "../lib/supabase";
 const GOLD = "#e8c96d";
 const GOLDDIM = "#a07820";
 const GOLDFAINT = "#e8c96d18";
+const GOLDHOVER = "#f0d88a";
 const WHITE = "#d4c9a8";
 const DIM = "#666655";
-const GREEN = "#00ff88";
-const GREENDIM = "#00cc66";
-const GREENFAINT = "#00ff8812";
 const BG = "#000000";
-const BG2 = "#030402";
-const BG3 = "#050804";
+const BG2 = "#020200";
+const BG3 = "#060500";
 
 const Sp = {
   minHeight: "100vh",
@@ -81,12 +79,12 @@ const QUICK_Qs = [
 ];
 
 const CAPABILITIES = [
-  { label: "AI TOOLS", value: "600+", color: GOLD },
-  { label: "VOICE CHARACTERS", value: "54", color: GREEN },
-  { label: "MAX FILM LENGTH", value: "3 HRS", color: GOLD },
-  { label: "MAX RESOLUTION", value: "8K", color: GREEN },
-  { label: "EXPORT PLATFORMS", value: "7", color: GOLD },
-  { label: "WORKFLOW PAGES", value: "23", color: GREEN },
+  { label: "AI TOOLS", value: "600+" },
+  { label: "VOICE CHARACTERS", value: "54" },
+  { label: "MAX FILM LENGTH", value: "3 HRS" },
+  { label: "MAX RESOLUTION", value: "8K" },
+  { label: "EXPORT PLATFORMS", value: "7" },
+  { label: "WORKFLOW PAGES", value: "23" },
 ];
 
 interface PageProps {
@@ -162,47 +160,44 @@ export default function Page21({ onNavigate }: PageProps) {
   return (
     <div style={{ ...Sp }}>
       <style>{`
-        @keyframes grokPulse { 0%,100%{opacity:.2;transform:scale(.75)} 50%{opacity:1;transform:scale(1)} }
-        @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
-        @keyframes glow { 0%,100%{box-shadow:0 0 8px ${GREEN}44} 50%{box-shadow:0 0 18px ${GREEN}99} }
+        @keyframes goldGlow { 0%,100%{box-shadow:0 0 10px ${GOLDDIM}66} 50%{box-shadow:0 0 22px ${GOLD}99} }
         @keyframes borderPulse { 0%,100%{border-color:${GOLDDIM}} 50%{border-color:${GOLD}} }
-        .grok-quick:hover { border-color:${GREEN} !important; color:${GREEN} !important; }
-        .grok-inp:focus { border-color:${GREEN} !important; outline:none; }
-        .grok-send:hover:not(:disabled) { background:linear-gradient(135deg,${GREENDIM},${GREEN}) !important; color:#000 !important; }
+        .grok-quick:hover { border-color:${GOLD} !important; color:${GOLD} !important; background:${GOLDFAINT} !important; }
+        .grok-inp:focus { border-color:${GOLD} !important; outline:none; }
+        .grok-send:hover:not(:disabled) { background:${GOLDHOVER} !important; }
       `}</style>
 
-      {/* Top scan-line decoration */}
-      <div style={{ height: 2, background: `linear-gradient(90deg,transparent,${GREEN},${GOLD},${GREEN},transparent)`, marginBottom: 0 }} />
+      {/* Top accent line */}
+      <div style={{ height: 2, background: `linear-gradient(90deg,transparent,${GOLDDIM},${GOLD},${GOLDDIM},transparent)` }} />
 
       <div style={{ maxWidth: 920, margin: "0 auto", padding: "32px 24px 60px" }}>
 
         {/* ── HEADER ── */}
         <div style={{ position: "relative", background: BG3, border: `1px solid ${GOLDDIM}`, marginBottom: 2, padding: "28px 32px", display: "flex", alignItems: "center", gap: 28, overflow: "hidden" }}>
-          {/* Background grid lines */}
           <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(${GOLDFAINT} 1px,transparent 1px),linear-gradient(90deg,${GOLDFAINT} 1px,transparent 1px)`, backgroundSize: "40px 40px", pointerEvents: "none" }} />
 
           {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: 72, height: 72, background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", animation: "glow 2.5s ease-in-out infinite" }}>
+            <div style={{ width: 72, height: 72, background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", animation: "goldGlow 2.5s ease-in-out infinite" }}>
               <span style={{ fontFamily: "'Cinzel',serif", fontSize: 36, fontWeight: 900, color: "#000", lineHeight: 1 }}>G</span>
             </div>
-            <div style={{ position: "absolute", bottom: -4, right: -4, width: 16, height: 16, background: GREEN, borderRadius: "50%", boxShadow: `0 0 10px ${GREEN}`, border: `2px solid ${BG}` }} />
+            <div style={{ position: "absolute", bottom: -4, right: -4, width: 14, height: 14, background: GOLD, borderRadius: "50%", border: `2px solid ${BG}` }} />
           </div>
 
           <div style={{ flex: 1, position: "relative" }}>
-            <div style={{ fontSize: 9, color: GREEN, letterSpacing: 5, fontWeight: 900, marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: GOLDDIM, letterSpacing: 5, fontWeight: 900, marginBottom: 6 }}>
               MANDASTRONG STUDIO · AI PRODUCTION ASSISTANT · ACTIVE
             </div>
             <h1 style={{ ...H1, fontSize: "clamp(22px,3vw,34px)", marginBottom: 10 }}>AGENT GROK</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: GREEN, boxShadow: `0 0 10px ${GREEN}` }} />
-                <span style={{ color: GREEN, fontSize: 11, fontWeight: 900, letterSpacing: 2 }}>ONLINE · FULL PLATFORM KNOWLEDGE</span>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: GOLD, boxShadow: `0 0 8px ${GOLD}88` }} />
+                <span style={{ color: GOLD, fontSize: 11, fontWeight: 900, letterSpacing: 2 }}>ONLINE · FULL PLATFORM KNOWLEDGE</span>
               </div>
               {subCount !== null && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} />
-                  <span style={{ color: GOLD, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: GOLDDIM }} />
+                  <span style={{ color: WHITE, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>
                     {subCount.toLocaleString()} CREATOR{subCount !== 1 ? "S" : ""} ON PLATFORM
                   </span>
                 </div>
@@ -210,20 +205,19 @@ export default function Page21({ onNavigate }: PageProps) {
             </div>
           </div>
 
-          {/* Right corner tag */}
           <div style={{ position: "absolute", top: 16, right: 20, fontSize: 9, color: DIM, letterSpacing: 3, fontWeight: 700 }}>
             MODEL · CLAUDE SONNET 4
           </div>
         </div>
 
-        {/* Divider line */}
-        <div style={{ height: 1, background: `linear-gradient(90deg,${GREEN}44,${GOLD},${GREEN}44)`, marginBottom: 2 }} />
+        {/* Divider */}
+        <div style={{ height: 1, background: `linear-gradient(90deg,transparent,${GOLD},transparent)`, marginBottom: 2 }} />
 
         {/* ── STATS BAR ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 1, marginBottom: 28, background: GOLDDIM }}>
-          {CAPABILITIES.map(({ label, value, color }) => (
+          {CAPABILITIES.map(({ label, value }) => (
             <div key={label} style={{ background: BG3, padding: "12px 8px", textAlign: "center" }}>
-              <div style={{ color, fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+              <div style={{ color: GOLD, fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 900, lineHeight: 1 }}>{value}</div>
               <div style={{ color: DIM, fontSize: 8, letterSpacing: 1.5, fontWeight: 700, marginTop: 5, lineHeight: 1.3 }}>{label}</div>
             </div>
           ))}
@@ -246,14 +240,14 @@ export default function Page21({ onNavigate }: PageProps) {
                     <span style={{ fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 900, color: "#000" }}>G</span>
                   </div>
                 ) : (
-                  <div style={{ width: 24, height: 24, background: GREENFAINT, border: `1px solid ${GREEN}66`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, color: GREEN, fontWeight: 900 }}>YOU</span>
+                  <div style={{ width: 24, height: 24, background: "#0a0800", border: `1px solid ${GOLDDIM}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, color: GOLDDIM, fontWeight: 900 }}>YOU</span>
                   </div>
                 )}
-                <span style={{ fontSize: 10, color: m.role === "user" ? GREEN : GOLD, fontWeight: 900, letterSpacing: 3 }}>
+                <span style={{ fontSize: 10, color: m.role === "user" ? WHITE : GOLD, fontWeight: 900, letterSpacing: 3 }}>
                   {m.role === "user" ? "YOU" : "AGENT GROK"}
                 </span>
-                <div style={{ flex: 1, height: 1, background: m.role === "user" ? `${GREEN}22` : `${GOLDDIM}33` }} />
+                <div style={{ flex: 1, height: 1, background: `${GOLDDIM}33` }} />
               </div>
               <div style={{ color: WHITE, fontSize: 14, lineHeight: 1.9, whiteSpace: "pre-wrap", paddingLeft: 34 }}>
                 {m.content}
@@ -273,9 +267,9 @@ export default function Page21({ onNavigate }: PageProps) {
               <div style={{ display: "flex", gap: 6, alignItems: "center", paddingLeft: 34 }}>
                 {[0, 1, 2].map(i => (
                   <div key={i} style={{
-                    width: 8, height: 8, borderRadius: "50%",
-                    background: i === typingDot ? GREEN : GOLDDIM,
-                    boxShadow: i === typingDot ? `0 0 10px ${GREEN}` : "none",
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: i === typingDot ? GOLD : GOLDDIM,
+                    boxShadow: i === typingDot ? `0 0 8px ${GOLD}` : "none",
                     transition: "all .2s",
                   }} />
                 ))}
@@ -286,8 +280,8 @@ export default function Page21({ onNavigate }: PageProps) {
           <div ref={bot} />
         </div>
 
-        {/* Bottom border line */}
-        <div style={{ height: 1, background: `linear-gradient(90deg,${GREEN}44,${GOLD},${GREEN}44)`, marginBottom: 16 }} />
+        {/* Bottom accent */}
+        <div style={{ height: 1, background: `linear-gradient(90deg,transparent,${GOLD},transparent)`, marginBottom: 16 }} />
 
         {/* ── QUICK QUESTIONS ── */}
         <div style={{ marginBottom: 18 }}>
@@ -309,8 +303,8 @@ export default function Page21({ onNavigate }: PageProps) {
                   letterSpacing: 1,
                   fontFamily: "'Rajdhani',sans-serif",
                   lineHeight: 1.4,
-                  textAlign: "left",
-                  transition: "border-color .15s, color .15s",
+                  textAlign: "left" as const,
+                  transition: "border-color .15s, color .15s, background .15s",
                 }}
               >
                 {q}
