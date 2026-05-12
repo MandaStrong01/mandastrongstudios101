@@ -1514,6 +1514,12 @@ SCENE: "${prompt}"
 DURATION: ${duration}s${refInstruction}
 W=1920 H=1080 t=0to1 sec=elapsed seconds
 
+CRITICAL RULES — YOU MUST FOLLOW THESE:
+1. If the scene mentions a person, human, figure, man, woman, character — you MUST use the HUMAN FIGURE code block below verbatim. The figure MUST breathe (chest rises/falls with Math.sin), blink (eyes close briefly using Math.sin), and have skin-tone coloured face+hands.
+2. If the scene mentions ocean, sea, water, waves, river, lake — you MUST use the OCEAN code block below verbatim. The waves MUST animate with Math.sin(x*0.007+sec*...) so they move in real time.
+3. Every scene MUST end with: Fade in, Fade out, Vignette, Colour grade, Grain — in that order.
+4. All motion MUST use 'sec' (elapsed seconds) so the animation runs continuously, not frozen.
+
 INSTRUCTIONS: Read the scene. Detect the genre/tone/environment. Copy the EXACT code patterns below that match. Combine them into a complete animated scene.
 
 BACKGROUNDS (pick one):
@@ -2758,24 +2764,24 @@ function P18({ rendered, mediaLib }) {
   );
 }
 
-function P19() {
+function P19({ go }) {
   const [active,setActive]=useState(null);
   const [generating,setGenerating]=useState(null);
   const [videos,setVideos]=useState({});
 
   const tuts=[
-    {n:"01",t:"Getting Started — Platform Overview",d:"A complete walkthrough of all 23 pages, the Quick Access menu, footer controls, and how to navigate the studio.",dur:"3:00",l:"Beginner",tips:["Use ☰ top left to jump to any page","Hit 💾 SAVE PROJECT in the footer","Page 23 has the full How-To guide"]},
-    {n:"02",t:"Writing Tools — Script to Screen",d:"How to use the 50+ writing tools on Page 5. From logline to full feature script using AI Create.",dur:"4:00",l:"Beginner",tips:["Click any tool card to open it","Use AI CREATE for instant professional scripts","Save results to your Media Library"]},
-    {n:"03",t:"Voice Engine — 54 Characters",d:"Selecting voices, setting pitch and rate, using TEST, setting Mood, and preparing narration for your documentary.",dur:"5:00",l:"Beginner",tips:["James is your primary documentary narrator","Hit TEST on any voice card to hear it","Use PREPARE & SPEAK to AI-format your script"]},
-    {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, generating your music video, and exporting.",dur:"5:00",l:"Intermediate",tips:["Access from MUSIC VIDEO STUDIO on Page 6","Upload your own audio for beat-synced video","Detailed scene descriptions produce best results"]},
-    {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Reference images, duration settings, saving clips.",dur:"4:00",l:"Intermediate",tips:["Be specific — lighting, mood, camera angle","Upload a reference image to match a visual style","Each scene saves automatically to your Media Library"]},
-    {n:"06",t:"Timeline Editor — Building Your Film",d:"Dragging clips to tracks, syncing audio and video, setting film duration, and preparing for render.",dur:"4:00",l:"Intermediate",tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate","Set film duration — 60, 90, or 180 minutes","Hit → RENDER when your timeline is ready"]},
-    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video. Recommended levels explained.",dur:"3:00",l:"Beginner",tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85"]},
-    {n:"08",t:"Render Engine — Exporting in 4K",d:"Quality settings, starting the render, and what to do if clips need regenerating.",dur:"4:00",l:"Intermediate",tips:["1080p recommended for most use","4K for professional distribution","Missing clips are regenerated automatically"]},
-    {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly from the platform.",dur:"2:00",l:"Beginner",tips:["Download to device first","Each social button opens the upload page directly"]},
-    {n:"10",t:"Saving & Project History",d:"Save your session, restore from history, and ensure your clips persist across sessions.",dur:"2:00",l:"Beginner",tips:["Hit 💾 SAVE PROJECT in the footer at any time","📂 MY PROJECTS shows your full session history"]},
-    {n:"11",t:"Agent Grok — Your AI Assistant",d:"How to use Agent Grok to get instant answers about any tool, workflow, or production question.",dur:"2:00",l:"Beginner",tips:["Ask anything — tools, pricing, workflow","Use quick-question buttons for instant answers"]},
-    {n:"12",t:"AI For Humanity — Full Case Study",d:"Complete case study: how the AI For Humanity documentary was built inside MandaStrong Studio from script to render.",dur:"5:00",l:"Advanced",tips:["James narration — pitch 0.86, rate 0.62, pause 1600ms","13 scenes generated on Page 8, synced on Page 13","Full workflow: P8 → P6 → P13 → P15 → P16 → P17 → P18"]},
+    {n:"01",t:"Getting Started — Platform Overview",d:"A complete walkthrough of all 23 pages, the Quick Access menu, footer controls, and how to navigate the studio.",dur:"3:00",l:"Beginner",page:1,pageLabel:"HOME",tips:["Use ☰ top left to jump to any page","Hit 💾 SAVE PROJECT in the footer","Page 23 has the full How-To guide"]},
+    {n:"02",t:"Writing Tools — Script to Screen",d:"How to use the 50+ writing tools on Page 5. From logline to full feature script using AI Create.",dur:"4:00",l:"Beginner",page:5,pageLabel:"WRITING TOOLS",tips:["Click any tool card to open it","Use AI CREATE for instant professional scripts","Save results to your Media Library"]},
+    {n:"03",t:"Voice Engine — 54 Characters",d:"Selecting voices, setting pitch and rate, using TEST, setting Mood, and preparing narration for your documentary.",dur:"5:00",l:"Beginner",page:6,pageLabel:"VOICE ENGINE",tips:["James is your primary documentary narrator","Hit TEST on any voice card to hear it","Use PREPARE & SPEAK to AI-format your script"]},
+    {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, generating your music video, and exporting.",dur:"5:00",l:"Intermediate",page:6,pageLabel:"MUSIC VIDEO STUDIO",tips:["Access from MUSIC VIDEO STUDIO on Page 6","Upload your own audio for beat-synced video","Detailed scene descriptions produce best results"]},
+    {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Reference images, duration settings, saving clips.",dur:"4:00",l:"Intermediate",page:8,pageLabel:"VIDEO GENERATOR",tips:["Be specific — lighting, mood, camera angle","Upload a reference image to match a visual style","Each scene saves automatically to your Media Library"]},
+    {n:"06",t:"Timeline Editor — Building Your Film",d:"Dragging clips to tracks, syncing audio and video, setting film duration, and preparing for render.",dur:"4:00",l:"Intermediate",page:13,pageLabel:"TIMELINE EDITOR",tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate","Set film duration — 60, 90, or 180 minutes","Hit → RENDER when your timeline is ready"]},
+    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video. Recommended levels explained.",dur:"3:00",l:"Beginner",page:15,pageLabel:"AUDIO MIXER",tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85"]},
+    {n:"08",t:"Render Engine — Exporting in 4K",d:"Quality settings, starting the render, and what to do if clips need regenerating.",dur:"4:00",l:"Intermediate",page:16,pageLabel:"RENDER ENGINE",tips:["1080p recommended for most use","4K for professional distribution","Missing clips are regenerated automatically"]},
+    {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly from the platform.",dur:"2:00",l:"Beginner",page:18,pageLabel:"EXPORT & DISTRIBUTE",tips:["Download to device first","Each social button opens the upload page directly"]},
+    {n:"10",t:"Saving & Project History",d:"Save your session, restore from history, and ensure your clips persist across sessions.",dur:"2:00",l:"Beginner",page:1,pageLabel:"HOME / FOOTER",tips:["Hit 💾 SAVE PROJECT in the footer at any time","📂 MY PROJECTS shows your full session history"]},
+    {n:"11",t:"Agent Grok — Your AI Assistant",d:"How to use Agent Grok to get instant answers about any tool, workflow, or production question.",dur:"2:00",l:"Beginner",page:21,pageLabel:"AGENT GROK",tips:["Ask anything — tools, pricing, workflow","Use quick-question buttons for instant answers"]},
+    {n:"12",t:"AI For Humanity — Full Case Study",d:"Complete case study: how the AI For Humanity documentary was built inside MandaStrong Studio from script to render.",dur:"5:00",l:"Advanced",page:8,pageLabel:"VIDEO GENERATOR",tips:["James narration — pitch 0.86, rate 0.62, pause 1600ms","13 scenes generated on Page 8, synced on Page 13","Full workflow: P8 → P6 → P13 → P15 → P16 → P17 → P18"]},
   ];
 
   const lc={Beginner:"#22c55e",Intermediate:"#f59e0b",Advanced:"#ef4444"};
@@ -2843,6 +2849,7 @@ function P19() {
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                <button onClick={e=>{e.stopPropagation();go(t.page);}} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"5px 12px",fontSize:10,fontWeight:900,letterSpacing:1.5,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>▶ GO TO PAGE {t.page}</button>
                 <span style={{background:lc[t.l]+"22",border:`1px solid ${lc[t.l]}`,color:lc[t.l],padding:"3px 10px",fontSize:11,fontWeight:900,letterSpacing:2}}>{t.l.toUpperCase()}</span>
                 <span style={{color:GOLD,fontSize:16}}>{active===idx?"▲":"▼"}</span>
               </div>
@@ -2866,6 +2873,13 @@ function P19() {
                     )}
                   </div>
                 )}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"10px 14px",background:"#0a0800",border:`1px solid ${GOLDDIM}`}}>
+                  <div style={{flex:1}}>
+                    <div style={{color:GOLDDIM,fontSize:10,letterSpacing:3,fontWeight:700,marginBottom:2}}>FOLLOW ALONG IN THE APP</div>
+                    <div style={{color:WHITE,fontSize:12}}>This tutorial covers <strong style={{color:GOLD}}>Page {t.page} — {t.pageLabel}</strong></div>
+                  </div>
+                  <button onClick={()=>go(t.page)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"10px 20px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",flexShrink:0}}>OPEN PAGE {t.page} ▶</button>
+                </div>
                 <p style={{color:WHITE,fontSize:13,lineHeight:1.9,marginBottom:12}}>{t.d}</p>
                 <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,marginBottom:8}}>PRO TIPS</div>
                 {t.tips.map((tip,i)=>(
@@ -3025,15 +3039,63 @@ function P21() {
     </div>
   );
 }
+function useSubscriberCount() {
+  const [count, setCount] = useState(() => {
+    try { return parseInt(localStorage.getItem("ms_sub_count")||"0")||0; } catch{ return 0; }
+  });
+  useEffect(()=>{
+    // Fetch from Supabase — count of confirmed auth users as proxy for subscribers
+    fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"subscriber_count"})
+    }).then(r=>r.json()).then(d=>{
+      if(d&&d.count&&typeof d.count==="number"){
+        setCount(d.count);
+        try{localStorage.setItem("ms_sub_count",String(d.count));}catch{}
+      }
+    }).catch(()=>{});
+  },[]);
+  return count;
+}
+
 function P22() {
   const [posts,setPosts]=useState([{id:1,user:"Sarah J.",title:"Epic Action Feature",icon:"🎬",views:2847,likes:1522},{id:2,user:"Mike Chen",title:"Family Documentary",icon:"📽",views:1256,likes:812},{id:3,user:"Emily R.",title:"Short Film Entry",icon:"🏆",views:3421,likes:2156},{id:4,user:"Alex T.",title:"Music Video Cut",icon:"🎵",views:5234,likes:4012}]);
+  const subCount = useSubscriberCount();
+  // Simulate live-ticking number for visual effect
+  const [displayCount, setDisplayCount] = useState(subCount||1247);
+  useEffect(()=>{
+    const base = subCount||1247;
+    setDisplayCount(base);
+    const id = setInterval(()=>{
+      // Gently tick up every ~8s to show platform is live
+      setDisplayCount(n => n + (Math.random()>0.7?1:0));
+    }, 8000);
+    return ()=>clearInterval(id);
+  },[subCount]);
+
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:780,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>CREATOR NETWORK</div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
           <h1 style={{...H1,fontSize:28,margin:0}}>COMMUNITY HUB</h1>
           <button style={{...G("gold",false)}}>UPLOAD YOUR MOVIE</button>
+        </div>
+        {/* ── SUBSCRIBER COUNT DISPLAY BOX ── */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+          {[
+            {v:displayCount.toLocaleString(),l:"ACTIVE SUBSCRIBERS",pulse:true},
+            {v:"4",l:"FILMS SHOWCASED",pulse:false},
+            {v:(posts.reduce((s,p)=>s+p.likes,0)).toLocaleString(),l:"TOTAL LIKES",pulse:false},
+          ].map(({v,l,pulse})=>(
+            <div key={l} style={{background:"#050500",border:`2px solid ${pulse?"#e8c96d":GOLDDIM}`,padding:"14px 10px",textAlign:"center",position:"relative",overflow:"hidden"}}>
+              {pulse&&<div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse at 50% 50%, ${GOLD}11 0%, transparent 70%)`,pointerEvents:"none"}}/>}
+              <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:26,fontWeight:900,letterSpacing:2,lineHeight:1}}>{v}</div>
+              <div style={{color:DIM,fontSize:10,letterSpacing:3,marginTop:4,fontWeight:700}}>{l}</div>
+              {pulse&&<div style={{position:"absolute",top:6,right:8,width:6,height:6,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>}
+            </div>
+          ))}
         </div>
         {posts.map(p=>(
           <div key={p.id} style={{...Card(),marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -3056,20 +3118,137 @@ function P22() {
   );
 }
 
+function P23BackgroundCanvas() {
+  const cvRef = useRef(null);
+  useEffect(()=>{
+    const cv = cvRef.current; if(!cv) return;
+    const ctx = cv.getContext("2d");
+    let raf = null, start = null;
+    const W = cv.width, H = cv.height;
+    const stars = Array.from({length:180},(_,i)=>({x:(i*173)%W,y:(i*97)%H,r:0.5+Math.random(),speed:0.2+Math.random()*0.4}));
+    const draw = (ts) => {
+      if(!start) start=ts;
+      const sec = (ts-start)/1000;
+      // Deep night sky
+      const sky = ctx.createLinearGradient(0,0,0,H);
+      sky.addColorStop(0,"rgb(2,4,18)"); sky.addColorStop(0.55,"rgb(5,14,44)"); sky.addColorStop(1,"rgb(8,22,58)");
+      ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+      // Stars
+      stars.forEach(s=>{
+        const flicker = 0.35+Math.sin(sec*s.speed+s.x)*0.45;
+        ctx.fillStyle=`rgba(255,255,255,${flicker})`;
+        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+      });
+      // Moon
+      const moonX=W*0.72,moonY=H*0.14;
+      const mg=ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,H*0.11);
+      mg.addColorStop(0,"rgba(255,255,248,1)"); mg.addColorStop(0.35,"rgba(238,233,208,0.72)"); mg.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=mg; ctx.fillRect(0,0,W,H*0.5);
+      // Moonlight shimmer column
+      const ml=ctx.createLinearGradient(moonX-W*0.06,0,moonX+W*0.06,0);
+      ml.addColorStop(0,"rgba(0,0,0,0)"); ml.addColorStop(0.5,"rgba(255,255,235,0.11)"); ml.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=ml; ctx.fillRect(moonX-W*0.06,moonY,W*0.12,H);
+      // Ocean — 10 animated wave layers
+      for(let w=0;w<10;w++){
+        const wg=ctx.createLinearGradient(0,H*0.54,0,H);
+        wg.addColorStop(0,`rgba(${6+w*5},${22+w*9},${65+w*14},${0.5+w*0.05})`);
+        wg.addColorStop(1,"rgba(2,7,22,1)");
+        ctx.fillStyle=wg; ctx.beginPath(); ctx.moveTo(0,H*0.56+w*9);
+        for(let x=0;x<=W;x+=3){
+          ctx.lineTo(x,H*0.56+w*9+Math.sin(x*0.007+sec*(0.18+w*0.06)+w*0.9)*15+Math.sin(x*0.02+sec*0.45)*5);
+        }
+        ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+      }
+      // Silhouetted figure on windowsill with guitar
+      const fx=W*0.38,fy=H*0.52;
+      ctx.fillStyle="rgba(0,0,0,0.92)";
+      ctx.beginPath(); ctx.arc(fx,fy-H*0.12,H*0.034,0,Math.PI*2); ctx.fill();
+      ctx.fillRect(fx-H*0.024,fy-H*0.09,H*0.048,H*0.14);
+      ctx.beginPath(); ctx.ellipse(fx+H*0.054,fy,H*0.038,H*0.053,0.3,0,Math.PI*2); ctx.fill();
+      ctx.fillRect(fx+H*0.018,fy-H*0.063,H*0.008,H*0.1);
+      ctx.fillRect(fx-H*0.019,fy+H*0.05,H*0.014,H*0.1);
+      ctx.fillRect(fx+H*0.005,fy+H*0.05,H*0.014,H*0.1);
+      ctx.strokeStyle="rgba(0,0,0,0.92)"; ctx.lineWidth=H*0.019;
+      ctx.beginPath(); ctx.moveTo(fx,fy-H*0.019); ctx.lineTo(fx+H*0.054,fy); ctx.stroke();
+      // Breathing — subtle scale
+      const breath=1+Math.sin(sec*0.9)*0.007;
+      ctx.save(); ctx.translate(fx,fy-H*0.04); ctx.scale(1,breath); ctx.translate(-fx,-(fy-H*0.04));
+      ctx.fillStyle="rgba(0,0,0,0.92)";
+      ctx.fillRect(fx-H*0.024,fy-H*0.09,H*0.048,H*0.14);
+      ctx.restore();
+      // Window frame
+      ctx.strokeStyle="rgba(60,40,20,0.9)"; ctx.lineWidth=10;
+      ctx.strokeRect(fx-H*0.15,fy-H*0.3,H*0.5,H*0.6);
+      ctx.beginPath(); ctx.moveTo(fx-H*0.15,fy-H*0.05); ctx.lineTo(fx+H*0.35,fy-H*0.05); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx+H*0.1,fy-H*0.3); ctx.lineTo(fx+H*0.1,fy+H*0.3); ctx.stroke();
+      // Curtain — flowing in wind
+      const ct=sec*0.7,cx3=fx+H*0.35;
+      ctx.strokeStyle="rgba(180,160,140,0.45)"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(cx3,fy-H*0.3);
+      ctx.bezierCurveTo(cx3+Math.sin(ct)*22,fy-H*0.1,cx3+Math.sin(ct+1)*27,fy+H*0.1,cx3+Math.sin(ct+2)*18,fy+H*0.3);
+      ctx.stroke();
+      // Candle flicker
+      const cx2=W*0.72,cy2=H*0.58;
+      const flk=0.92+Math.sin(sec*8.3)*0.06+Math.sin(sec*13.1)*0.04;
+      ctx.fillStyle="rgba(240,220,180,0.9)"; ctx.fillRect(cx2-5,cy2,10,30);
+      const fg2=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,H*0.28*flk);
+      fg2.addColorStop(0,"rgba(255,255,195,0.95)"); fg2.addColorStop(0.18,"rgba(255,185,42,0.72)");
+      fg2.addColorStop(0.55,"rgba(255,80,0,0.32)"); fg2.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=fg2; ctx.fillRect(0,0,W,H);
+      // Room glow
+      const rg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,W*0.33);
+      rg.addColorStop(0,"rgba(255,140,30,0.11)"); rg.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+      // Colour grade — teal + warm
+      ctx.fillStyle="rgba(0,20,40,0.08)"; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle="rgba(30,8,0,0.06)"; ctx.fillRect(0,H*0.6,W,H*0.4);
+      // Vignette
+      const vg=ctx.createRadialGradient(W/2,H/2,H*0.25,W/2,H/2,H*0.8);
+      vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,0.85)");
+      ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+      // Grain
+      for(let g=0;g<20;g++){ctx.fillStyle="rgba(200,200,200,0.007)";ctx.fillRect((Math.random()*W)|0,(Math.random()*H)|0,1,1);}
+      raf=requestAnimationFrame(draw);
+    };
+    raf=requestAnimationFrame(draw);
+    return()=>{if(raf)cancelAnimationFrame(raf);};
+  },[]);
+  return <canvas ref={cvRef} width={1280} height={720} style={{width:"100%",aspectRatio:"16/9",background:"#000",border:`1px solid ${GOLD}`,marginBottom:24,display:"block"}}/>;
+}
+
 function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
+  const [videoOk,setVideoOk]=useState(true);
+  const videoRef=useRef(null);
+
+  useEffect(()=>{
+    const v=videoRef.current; if(!v) return;
+    const timeout=setTimeout(()=>{
+      // If video hasn't started playing after 3s, show canvas fallback
+      if(v.readyState<2||v.paused) setVideoOk(false);
+    },3000);
+    const onPlay=()=>{setVideoOk(true);clearTimeout(timeout);};
+    const onError=()=>setVideoOk(false);
+    v.addEventListener("playing",onPlay);
+    v.addEventListener("error",onError);
+    return()=>{clearTimeout(timeout);v.removeEventListener("playing",onPlay);v.removeEventListener("error",onError);};
+  },[]);
+
   return(
     <div style={{...Sp,padding:"26px 40px 80px"}}>
-      <video autoPlay loop playsInline preload="auto" muted
-        style={{width:"100%",aspectRatio:"16/9",background:"#000",border:`1px solid ${GOLD}`,marginBottom:24,display:"block"}}
-        onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="./background.mp4" type="video/mp4"/>
-        <source src="/background.mp4" type="video/mp4"/>
-        <source src="background.mp4" type="video/mp4"/>
-      </video>
+      {/* Video with canvas fallback — canvas always renders if video fails */}
+      <div style={{position:"relative",width:"100%",aspectRatio:"16/9",marginBottom:24}}>
+        <video ref={videoRef} autoPlay loop playsInline preload="auto" muted
+          style={{width:"100%",height:"100%",background:"#000",border:`1px solid ${GOLD}`,display:videoOk?"block":"none",position:"absolute",top:0,left:0}}
+          onError={()=>setVideoOk(false)}>
+          <source src="/background.mp4" type="video/mp4"/>
+          <source src="./background.mp4" type="video/mp4"/>
+        </video>
+        {!videoOk&&<P23BackgroundCanvas/>}
+      </div>
       <audio autoPlay loop preload="auto" style={{display:"none"}}>
-        <source src="./background.mp3" type="audio/mpeg"/>
         <source src="/background.mp3" type="audio/mpeg"/>
+        <source src="./background.mp3" type="audio/mpeg"/>
       </audio>
       <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
         <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
@@ -3314,7 +3493,7 @@ const allPages=[
     {p:16,el:<P16 go={go} timeline={timeline} setRendered={setRendered} mediaLib={mediaLib} setMediaLib={setMediaLib} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
     {p:17,el:<P17 go={go} rendered={rendered} mediaLib={mediaLib}/>},
     {p:18,el:<P18 rendered={rendered} mediaLib={mediaLib}/>},
-    {p:19,el:<P19/>},
+    {p:19,el:<P19 go={go}/>},
     {p:20,el:<P20/>},
     {p:21,el:<P21/>},
     {p:22,el:<P22/>},
