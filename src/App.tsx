@@ -3082,21 +3082,6 @@ function P22() {
           <h1 style={{...H1,fontSize:28,margin:0}}>COMMUNITY HUB</h1>
           <button style={{...G("gold",false)}}>UPLOAD YOUR MOVIE</button>
         </div>
-        {/* ── SUBSCRIBER COUNT DISPLAY BOX ── */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
-          {[
-            {v:displayCount.toLocaleString(),l:"ACTIVE SUBSCRIBERS",pulse:true},
-            {v:"4",l:"FILMS SHOWCASED",pulse:false},
-            {v:(posts.reduce((s,p)=>s+p.likes,0)).toLocaleString(),l:"TOTAL LIKES",pulse:false},
-          ].map(({v,l,pulse})=>(
-            <div key={l} style={{background:"#050500",border:`2px solid ${pulse?"#e8c96d":GOLDDIM}`,padding:"14px 10px",textAlign:"center",position:"relative",overflow:"hidden"}}>
-              {pulse&&<div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse at 50% 50%, ${GOLD}11 0%, transparent 70%)`,pointerEvents:"none"}}/>}
-              <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:26,fontWeight:900,letterSpacing:2,lineHeight:1}}>{v}</div>
-              <div style={{color:DIM,fontSize:10,letterSpacing:3,marginTop:4,fontWeight:700}}>{l}</div>
-              {pulse&&<div style={{position:"absolute",top:6,right:8,width:6,height:6,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>}
-            </div>
-          ))}
-        </div>
         {posts.map(p=>(
           <div key={p.id} style={{...Card(),marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -3218,34 +3203,18 @@ function P23BackgroundCanvas() {
 
 function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
-  const [videoOk,setVideoOk]=useState(true);
-  const videoRef=useRef(null);
-
-  useEffect(()=>{
-    const v=videoRef.current; if(!v) return;
-    const timeout=setTimeout(()=>{
-      // If video hasn't started playing after 3s, show canvas fallback
-      if(v.readyState<2||v.paused) setVideoOk(false);
-    },3000);
-    const onPlay=()=>{setVideoOk(true);clearTimeout(timeout);};
-    const onError=()=>setVideoOk(false);
-    v.addEventListener("playing",onPlay);
-    v.addEventListener("error",onError);
-    return()=>{clearTimeout(timeout);v.removeEventListener("playing",onPlay);v.removeEventListener("error",onError);};
-  },[]);
 
   return(
-    <div style={{...Sp,padding:"26px 40px 80px"}}>
-      {/* Video with canvas fallback — canvas always renders if video fails */}
-      <div style={{position:"relative",width:"100%",aspectRatio:"16/9",marginBottom:24}}>
-        <video ref={videoRef} autoPlay loop playsInline preload="auto" muted
-          style={{width:"100%",height:"100%",background:"#000",border:`1px solid ${GOLD}`,display:videoOk?"block":"none",position:"absolute",top:0,left:0}}
-          onError={()=>setVideoOk(false)}>
-          <source src="/background.mp4" type="video/mp4"/>
-          <source src="./background.mp4" type="video/mp4"/>
-        </video>
-        {!videoOk&&<P23BackgroundCanvas/>}
-      </div>
+    <div style={{...Sp,padding:0}}>
+      {/* background.mp4 — full width at very top of page */}
+      <video autoPlay loop playsInline preload="auto" muted
+        style={{width:"100%",display:"block",maxHeight:"70vh",objectFit:"cover",background:"#000"}}
+        onError={e=>{(e.currentTarget).style.display="none";}}>
+        <source src="/background.mp4" type="video/mp4"/>
+        <source src="background.mp4" type="video/mp4"/>
+        <source src="./background.mp4" type="video/mp4"/>
+      </video>
+      <div style={{padding:"26px 40px 80px"}}>
       <audio autoPlay loop preload="auto" style={{display:"none"}}>
         <source src="/background.mp3" type="audio/mpeg"/>
         <source src="./background.mp3" type="audio/mpeg"/>
@@ -3317,6 +3286,7 @@ function P23({ go }) {
           <button onClick={()=>go(1)} style={{...G("out",false),padding:"12px 32px"}}>🏠 HOME</button>
           <button onClick={()=>go(1)} style={{...G("out",false),padding:"12px 32px"}}>EXIT APP</button>
         </div>
+      </div>
       </div>
     </div>
   );
