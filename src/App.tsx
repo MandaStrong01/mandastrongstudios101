@@ -1478,8 +1478,8 @@ const DOC_SCENES = [
 ];
 
 function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
-  const [open, setOpen] = React.useState(false);
-  const [loaded, setLoaded] = React.useState<number|null>(null);
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(null);
   return (
     <div style={{margin:"12px 20px 0",border:`1px solid #e8c96d44`,background:"#030200"}}>
       <button onClick={()=>setOpen(o=>!o)}
@@ -1895,34 +1895,6 @@ function drawFrame(ctx, W, H, t, sec) {`;
 
 
 function P1({ go }) {
-  const [installPrompt,setInstallPrompt]=useState(null);
-  const [installed,setInstalled]=useState(false);
-
-  useEffect(()=>{
-    // Pick up any already-captured prompt from global
-    if(window.deferredInstallPrompt) setInstallPrompt(window.deferredInstallPrompt);
-    const handler=(e)=>{e.preventDefault();setInstallPrompt(e);window.deferredInstallPrompt=e;};
-    window.addEventListener("beforeinstallprompt",handler);
-    window.addEventListener("appinstalled",()=>setInstalled(true));
-    return()=>{window.removeEventListener("beforeinstallprompt",handler);};
-  },[]);
-
-  const handleInstall=()=>{
-    const ua=navigator.userAgent.toLowerCase();
-    const isIOS=/iphone|ipad|ipod/.test(ua);
-    const isAndroid=/android/.test(ua);
-    if(installPrompt){
-      installPrompt.prompt();
-      installPrompt.userChoice.then(()=>{setInstallPrompt(null);window.deferredInstallPrompt=null;});
-    } else if(isIOS){
-      alert("Install on iPhone/iPad:\n\n1. Tap the Share button ↑\n2. Tap 'Add to Home Screen'\n3. Tap Add\n\nOpens full screen on your device.");
-    } else if(isAndroid){
-      alert("Install on Android:\n\n1. Tap menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install");
-    } else {
-      alert("Install on Desktop:\n\n1. Look for the install icon ⊕ in your address bar\n2. Click it and select Install\n\nUse Chrome or Edge for the best experience.");
-    }
-  };
-
   return (
     <div style={{...Sp}}>
       <div style={{background:"#000",padding:"56px 40px 36px",textAlign:"center",position:"relative",overflow:"hidden"}}>
@@ -1953,17 +1925,20 @@ function P1({ go }) {
       </div>
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-          {installed ? (
-            <div style={{color:"#22c55e",fontSize:13,fontWeight:900,letterSpacing:3,padding:"14px 32px",border:"1px solid #22c55e"}}>✓ APP INSTALLED</div>
-          ) : (
-            <button onClick={handleInstall}
-              style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
-              ⬇ DOWNLOAD APP
-            </button>
-          )}
-          <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>
-            {installPrompt ? "CLICK ABOVE TO INSTALL IMMEDIATELY" : "BROWSER MENU → ADD TO HOME SCREEN"}
-          </div>
+          <button onClick={()=>{
+            if(window.deferredInstallPrompt){
+              window.deferredInstallPrompt.prompt();
+              window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
+            } else {
+              const ua=navigator.userAgent.toLowerCase();
+              if(/iphone|ipad|ipod/.test(ua)) alert("Tap the Share button ↑ then 'Add to Home Screen'");
+              else if(/android/.test(ua)) alert("Tap menu ⋮ then 'Add to Home Screen' or 'Install App'");
+              else alert("Click the install icon ⊕ in your browser address bar to install.");
+            }
+          }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
+            ⬇ DOWNLOAD APP
+          </button>
+          <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>BROWSER MENU → ADD TO HOME SCREEN</div>
         </div>
       </div>
     </div>
