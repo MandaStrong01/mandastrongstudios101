@@ -562,7 +562,7 @@ function RecordYourOwnSong({ onRecorded }) {
   );
 }
 
-function MusicVideoStudio({ onClose, onSave }) {
+function MusicVideoStudio({ onClose, onSave, setMediaLib }) {
   const [step, setStep] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
@@ -945,7 +945,10 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
         const clipId="mv_"+Date.now();
         await saveClipToDB(clipId,blob,fn,"video/webm");
         addLog("✓ Saved");
-        if(onSave)onSave({id:clipId,name:fn,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],fn,{type:"video/webm"}),dbId:clipId});
+        const mvAsset={id:clipId,name:fn,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],fn,{type:"video/webm"}),dbId:clipId};
+        if(onSave)onSave(mvAsset);
+        if(setMediaLib)setMediaLib(p=>[...p,mvAsset]);
+        addLog("✓ Auto-saved to Media Library");
       }catch(e){}
       if(audioCtx)try{audioCtx.close();}catch(e){}
 
@@ -1037,7 +1040,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                   {audioFile&&<div style={{color:GOLDDIM,fontSize:10,marginTop:4}}>Audio will be mixed into your music video</div>}
                 </div>
                 <input ref={audioInputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={handleAudioUpload}/>
-                <RecordYourOwnSong onRecorded={(blob,name)=>{setAudioFile(blob);setAudioUrl(URL.createObjectURL(blob));setAudioName(name);}}/>
+                <RecordYourOwnSong onRecorded={(blob,name)=>{setAudioFile(blob);const u=URL.createObjectURL(blob);setAudioUrl(u);setAudioName(name);const asset={id:"rec_"+Date.now(),name,type:"audio/webm",url:u,file:new File([blob],name,{type:"audio/webm"})};if(onSave)onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);}}/>
                 {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:`1px solid #ef4444`,color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:4}}>✕ REMOVE AUDIO</button>}
               </div>
             )}
@@ -1311,8 +1314,8 @@ const VOICE_CHARACTERS = [
   {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal · Dreamy · Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
 
-function P6Voice({ onSave }) {
-  const [text,setText]=useState("");const [processed,setProcessed]=useState("");const [loading,setLoading]=useState(false);const [speaking,setSpeaking]=useState(false);const [saved,setSaved]=useState(false);const [copied,setCopied]=useState(false);
+function P6Voice({ onSave, setMediaLib }) {
+  const [text,setText]=useState("");const [processed,setProcessed]=useState("");const [loading,setLoading]=useState(false);const [speaking,setSpeaking]=useState(false);const [saved,setSaved]=useState(false);const [savedToLib,setSavedToLib]=useState(false);const [copied,setCopied]=useState(false);
   const [selected,setSelectedRaw]=useState(VOICE_CHARACTERS[0]);
   const [filter,setFilter]=useState({gender:"All",age:"All",origin:"All"});
   const [speed,setSpeed]=useState(VOICE_CHARACTERS[0].rate);
@@ -1398,7 +1401,7 @@ function P6Voice({ onSave }) {
       else{window.speechSynthesis.onvoiceschanged=()=>{doSpeak();window.speechSynthesis.onvoiceschanged=null;};}
     }catch(e){console.warn("Speech error:",e);}
   };
-  if(showMVS)return <MusicVideoStudio onClose={()=>setShowMVS(false)} onSave={onSave}/>;
+  if(showMVS)return <MusicVideoStudio onClose={()=>setShowMVS(false)} onSave={onSave} setMediaLib={setMediaLib}/>;
   return(
     <div style={{...Sp,display:"flex",flexDirection:"column",height:"calc(100vh - 120px)",overflow:"hidden"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px 0",flexShrink:0}}>
@@ -1471,7 +1474,7 @@ function P6Voice({ onSave }) {
             )}
             {activeTab==="result"&&(
               <div>
-                {processed?(<><div style={{color:GOLD,fontSize:11,letterSpacing:2,fontWeight:900,marginBottom:10}}>AI-FORMATTED NARRATION</div><div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"14px",fontSize:13,color:WHITE,lineHeight:1.9,whiteSpace:"pre-wrap",marginBottom:12,maxHeight:300,overflowY:"auto"}}>{processed}</div><div style={{display:"flex",gap:8}}><button onClick={()=>speakText(processed)} style={{...G("gold",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>▶ SPEAK RESULT</button><button onClick={()=>{navigator.clipboard.writeText(processed);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...G("out",false),padding:"10px 16px",fontSize:11}}>{copied?"✓":"COPY"}</button></div></>):(<div style={{color:DIM,fontSize:13,textAlign:"center",marginTop:40}}>Go to SPEAK tab and hit PREPARE and SPEAK to see your formatted narration here.</div>)}
+                {processed?(<><div style={{color:GOLD,fontSize:11,letterSpacing:2,fontWeight:900,marginBottom:10}}>AI-FORMATTED NARRATION</div><div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"14px",fontSize:13,color:WHITE,lineHeight:1.9,whiteSpace:"pre-wrap",marginBottom:12,maxHeight:300,overflowY:"auto"}}>{processed}</div><div style={{display:"flex",gap:8,marginBottom:8}}><button onClick={()=>speakText(processed)} style={{...G("gold",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>▶ SPEAK RESULT</button><button onClick={()=>{navigator.clipboard.writeText(processed);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...G("out",false),padding:"10px 16px",fontSize:11}}>{copied?"✓":"COPY"}</button></div><button onClick={()=>{const asset={id:Date.now(),name:"Narration — "+selected.name+" — "+new Date().toLocaleTimeString(),type:"narration",text:processed,voice:selected.name,date:new Date().toISOString()};if(onSave)onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);}} style={{...G(savedToLib?"out":"gold",false),width:"100%",padding:"12px",fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:4}}>{savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}</button></>):(<div style={{color:DIM,fontSize:13,textAlign:"center",marginTop:40}}>Go to SPEAK tab and hit PREPARE and SPEAK to see your formatted narration here.</div>)}
               </div>
             )}
           </div>
@@ -3611,7 +3614,7 @@ const allPages=[
     {p:3,el:<P3/>},
     {p:4,el:<P4 go={go} setUser={setUser}/>},
     {p:5,el:<ToolPage title="WRITING TOOLS" subtitle="AI WORKSTATION 01 — WRITING" tools={WRITING} onSave={saveAsset}/>},
-    {p:6,el:<P6Voice onSave={saveAsset}/>},
+    {p:6,el:<P6Voice onSave={saveAsset} setMediaLib={setMediaLib}/>},
     {p:7,el:<ToolPage title="IMAGE TOOLS" subtitle="AI WORKSTATION 03 — IMAGE" tools={IMAGE_T} onSave={saveAsset}/>},
     {p:8,el:<P8VideoGenerator onSave={saveAsset} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
     {p:9,el:<ToolPage title="MOTION & VFX" subtitle="AI WORKSTATION 05 — MOTION" tools={MOTION} onSave={saveAsset}/>},
