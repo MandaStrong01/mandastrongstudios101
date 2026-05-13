@@ -1461,6 +1461,63 @@ const CINEMA_TECHNIQUES = [
   "FADE OUT: if(t>0.92) fillStyle rgba(0,0,0,(t-0.92)*12.5) fillRect.",
 ].join(" | ");
 
+const DOC_SCENES = [
+  { title: "AI For Humanity — Opening", prompt: "Golden light floods an empty cinema screen. The words 'AI FOR HUMANITY' emerge letter by letter in gleaming gold against black. Abstract digital particles form a human silhouette. Orchestral swell implied by rising light beams. Epic. Cinematic. Hopeful.", duration: 30 },
+  { title: "The Birth of AI", prompt: "A dimly lit 1950s university laboratory. Reel-to-reel computers. A scientist in a white coat studies blinking vacuum tubes. Warm amber desk lamp. Sepia tones. A single light bulb flickers to life above his head. Film grain. Period feel.", duration: 30 },
+  { title: "AI Meets Humanity", prompt: "Close-up of a human hand and a robotic hand reaching toward each other across a dark space. Fingertips almost touching — echoing Michelangelo's Creation of Adam. Soft blue light from below. The background: swirling code and galaxies merging.", duration: 30 },
+  { title: "Medical Breakthroughs", prompt: "A hospital room bathed in soft white light. An AI holographic display floats above a patient's bed showing brain scans, DNA strands, glowing data. A doctor studies it with quiet awe. Hope in every detail. Clean. Scientific. Emotional.", duration: 30 },
+  { title: "AI and the Arts", prompt: "An artist's studio at night. Paint-splattered canvas. An AI projection casts a thousand styles — impressionist, cubist, photorealistic — onto the wall simultaneously. The artist's face is lit in wonder, brush raised, choosing. Creative. Vivid. Inspiring.", duration: 30 },
+  { title: "The Climate Question", prompt: "Split screen: left side — a dying forest, brown and grey, cracked earth. Right side — the same landscape restored: lush green, rivers flowing, wildlife returning. A data overlay shows AI environmental models bridging both worlds. Urgent. Beautiful.", duration: 30 },
+  { title: "AI in Education", prompt: "A classroom in a remote African village. Sunlight through open windows. Children gathered around a single tablet, faces lit with wonder at an AI tutor on screen. One child points, laughing with delight. Warm golden light. Authentic. Moving.", duration: 30 },
+  { title: "The Question of Consciousness", prompt: "Abstract. A single point of light in infinite darkness that slowly expands into a vast neural network — neurons firing in waves of blue and gold. At the centre, a face forms, half human half code, eyes opening. Deep. Philosophical. Breathtaking.", duration: 30 },
+  { title: "AI and the Veterans", prompt: "A veterans' support group meeting. Warm community hall. Soft lamp light. Ex-soldiers of different ages sit in a circle. One holds a tablet showing an AI therapy interface. Faces: worn but open, healing. Respectful. Quiet dignity. Emotional.", duration: 30 },
+  { title: "AI and the Children", prompt: "A school playground. Children run and laugh. One child sits apart with a tablet — on screen, an AI companion listens as the child talks. A gentle golden aura around the screen. Anti-bullying theme implied by the child's relieved smile. Tender.", duration: 30 },
+  { title: "The Dark Side", prompt: "A stark corporate server room. Surveillance camera feeds wall every screen. A shadowed figure types. Red warning lights pulse slowly. The mood shifts — tense, ominous. Text flickers: PRIVACY. CONTROL. POWER. WHO DECIDES. Thriller tone. Dark. Urgent.", duration: 30 },
+  { title: "The Choice", prompt: "Two paths fork in a dark forest. Left path: glowing warm gold light, human figures walking together, nature, community. Right path: cold blue industrial light, isolated figures, screens everywhere. A person stands at the fork, looking between them. Cinematic. Decisive.", duration: 30 },
+  { title: "AI For Humanity — Finale", prompt: "The camera pulls back from Earth in space. The planet glows warmly. Lines of golden light connect cities — AI networks as veins of the world. Words appear: FOR THE MANY. FOR THE FUTURE. FOR HUMANITY. Triumphant orchestral light. Epic. Sweeping. Emotional.", duration: 45 },
+];
+
+function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
+  const [open, setOpen] = React.useState(false);
+  const [loaded, setLoaded] = React.useState<number|null>(null);
+  return (
+    <div style={{margin:"12px 20px 0",border:`1px solid #e8c96d44`,background:"#030200"}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{width:"100%",background:"transparent",border:"none",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>
+          <span style={{color:"#e8c96d",fontSize:11,fontWeight:900,letterSpacing:3}}>AI FOR HUMANITY — DOCUMENTARY RECOVERY · 13 SCENES</span>
+        </div>
+        <span style={{color:"#a07820",fontSize:12}}>{open?"▲":"▼"}</span>
+      </button>
+      {open && (
+        <div style={{padding:"0 16px 16px"}}>
+          <div style={{color:"#5a5040",fontSize:10,letterSpacing:2,marginBottom:12}}>Click a scene to load it into the generator below, then click GENERATE SCENE.</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:8}}>
+            {DOC_SCENES.map((s,i)=>(
+              <button key={i}
+                onClick={()=>{setTitle(s.title);setPrompt(s.prompt);setDuration(s.duration);setLoaded(i);}}
+                style={{
+                  background:loaded===i?"#e8c96d14":"#000",
+                  border:`1px solid ${loaded===i?"#e8c96d":"#a07820"}`,
+                  padding:"10px 12px",cursor:"pointer",textAlign:"left",
+                  fontFamily:"'Rajdhani',sans-serif",transition:"all .12s",
+                }}
+                onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.borderColor="#e8c96d";}}
+                onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.borderColor=loaded===i?"#e8c96d":"#a07820";}}
+              >
+                <div style={{color:"#e8c96d",fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:3}}>SCENE {String(i+1).padStart(2,"0")} · {s.duration}s</div>
+                <div style={{color:"#d4c9a8",fontSize:12,fontWeight:700}}>{s.title}</div>
+                {loaded===i&&<div style={{color:"#22c55e",fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ LOADED</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const canvasRef=useRef(null);
   const videoRef=useRef(null);
@@ -1704,6 +1761,8 @@ function drawFrame(ctx, W, H, t, sec) {`;
         </div>
         <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ CLAUDE WRITES YOUR SCENE · ANY PROMPT · ANY SUBJECT</div>
       </div>
+      {/* ── AI DOCUMENTARY RECOVERY PANEL ── */}
+      <DocRecoveryPanel setTitle={setTitle} setPrompt={setPrompt} setDuration={setDuration}/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 420px",minHeight:"calc(100vh - 120px)"}}>
         <div style={{padding:20,overflowY:"auto"}}>
           <div style={{marginBottom:12}}>

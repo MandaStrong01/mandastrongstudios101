@@ -672,7 +672,7 @@ export default function Page19({ onNavigate }: PageProps) {
                       transition: "filter .15s",
                     }}
                   >
-                    ▶ GENERATE
+                    ▶ GENERATE TO WATCH
                   </button>
                 )}
                 {playing.has(idx) && (
@@ -726,7 +726,7 @@ export default function Page19({ onNavigate }: PageProps) {
                   <div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {!playing.has(idx) && (
                       <button onClick={e => generate(e, idx)} style={{ background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`, border: "none", color: "#000", padding: "12px 24px", cursor: "pointer", fontSize: 12, fontWeight: 900, letterSpacing: 2, fontFamily: "'Rajdhani',sans-serif" }}>
-                        ▶ GENERATE & WATCH
+                        ▶ GENERATE TO WATCH
                       </button>
                     )}
                     {playing.has(idx) && (
