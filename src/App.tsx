@@ -273,7 +273,7 @@ function Header({ go, setMenu }) {
   );
 }
 
-function Footer({ page, go, onSave, onHistory }) {
+function Footer({ page, go, onSave, onHistory, onGoTo }) {
   return (
     <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:400,background:"#000",borderTop:`1px solid ${GOLD}`,padding:"6px 20px 8px",display:"flex",flexDirection:"column",gap:4}}>
       <div style={{textAlign:"center"}}>
@@ -284,7 +284,8 @@ function Footer({ page, go, onSave, onHistory }) {
         <span style={{color:GOLD,fontSize:11,fontWeight:900,fontFamily:"'Cinzel',serif",letterSpacing:2}}>PAGE {page} / {TOTAL}</span>
         <button onClick={()=>go(Math.min(TOTAL,page+1))} disabled={page===TOTAL} style={{...G("gold",true),opacity:page===TOTAL?0.3:1}}>NEXT ▶</button>
         <button onClick={onSave} style={{...G("out",true),fontSize:11,letterSpacing:2}}>💾 SAVE PROJECT</button>
-        <button onClick={onHistory} style={{background:"linear-gradient(135deg,#0a0300,#1a0800)",border:`1px solid ${GOLD}`,color:GOLD,padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>📂 MY PROJECTS</button>
+        <button onClick={()=>{try{const p=JSON.parse(localStorage.getItem("ms_page")||"1");if(typeof onGoTo==="function")onGoTo(p||1);}catch(e){}}} style={{background:"linear-gradient(135deg,#0a0500,#1a0a00)",border:`1px solid ${GOLD}`,color:GOLD,padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>📂 OPEN PROJECT</button>
+        <button onClick={onHistory} style={{background:"linear-gradient(135deg,#0a0300,#1a0800)",border:`1px solid ${GOLD}`,color:GOLD,padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>🗂 MY PROJECTS</button>
         <span style={{color:"#22c55e",fontSize:11,fontWeight:700}}>● AUTOSAVE ON</span>
       </div>
     </footer>
@@ -517,6 +518,47 @@ function ToolPage({ title, subtitle, tools, onSave }) {
         </div>
       )}
     </div>
+  );
+}
+
+function RecordYourOwnSong({ onRecorded }) {
+  const [recording,setRecording]=useState(false);
+  const [recTime,setRecTime]=useState(0);
+  const mrRef=useRef(null);
+  const timerRef=useRef(null);
+  const start=async()=>{
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(stream);
+      mrRef.current=mr;
+      const chunks=[];
+      mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+      mr.onstop=()=>{
+        const blob=new Blob(chunks,{type:"audio/webm"});
+        const name="recording_"+Date.now()+".webm";
+        onRecorded(blob,name);
+        stream.getTracks().forEach(t=>t.stop());
+        setRecording(false);setRecTime(0);
+      };
+      mr.start(100);setRecording(true);setRecTime(0);
+      timerRef.current=setInterval(()=>setRecTime(t=>t+1),1000);
+    }catch(e){alert("Microphone access denied. Please allow microphone and try again.");}
+  };
+  const stop=()=>{
+    if(mrRef.current&&mrRef.current.state!=="inactive")mrRef.current.stop();
+    if(timerRef.current)clearInterval(timerRef.current);
+  };
+  const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  return recording?(
+    <div style={{display:"flex",alignItems:"center",gap:10,background:"#1a0000",border:"1px solid #ef4444",padding:"10px 14px",marginTop:8}}>
+      <div style={{width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444",animation:"pulse 1s ease-in-out infinite"}}/>
+      <span style={{color:"#ef4444",fontWeight:900,fontSize:12,letterSpacing:2,flex:1}}>RECORDING — {fmt(recTime)}</span>
+      <button onClick={stop} style={{background:"#ef4444",border:"none",color:"#fff",padding:"6px 16px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>■ STOP & SAVE</button>
+    </div>
+  ):(
+    <button onClick={start} style={{width:"100%",background:"linear-gradient(135deg,#7a0000,#ef4444)",border:"none",color:"#fff",padding:"10px 14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,marginTop:8,fontFamily:"'Rajdhani',sans-serif"}}>
+      ● RECORD YOUR OWN SONG
+    </button>
   );
 }
 
@@ -995,6 +1037,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                   {audioFile&&<div style={{color:GOLDDIM,fontSize:10,marginTop:4}}>Audio will be mixed into your music video</div>}
                 </div>
                 <input ref={audioInputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={handleAudioUpload}/>
+                <RecordYourOwnSong onRecorded={(blob,name)=>{setAudioFile(blob);setAudioUrl(URL.createObjectURL(blob));setAudioName(name);}}/>
                 {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:`1px solid #ef4444`,color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:4}}>✕ REMOVE AUDIO</button>}
               </div>
             )}
@@ -1269,7 +1312,22 @@ const VOICE_CHARACTERS = [
 ];
 
 function P6Voice({ onSave }) {
-  const [text,setText]=useState("");const [processed,setProcessed]=useState("");const [loading,setLoading]=useState(false);const [speaking,setSpeaking]=useState(false);const [saved,setSaved]=useState(false);const [copied,setCopied]=useState(false);const [selected,setSelected]=useState(VOICE_CHARACTERS[0]);const [filter,setFilter]=useState({gender:"All",age:"All",origin:"All"});const [speed,setSpeed]=useState(0.62);const [pitchV,setPitchV]=useState(0.86);const [pauseLen,setPauseLen]=useState(1600);const [volume,setVolume]=useState(0.85);const [mood,setMood]=useState("Neutral");const [activeTab,setActiveTab]=useState("settings");const [sysVoices,setSysVoices]=useState([]);const [showMVS,setShowMVS]=useState(false);const uttRef=useRef(null);
+  const [text,setText]=useState("");const [processed,setProcessed]=useState("");const [loading,setLoading]=useState(false);const [speaking,setSpeaking]=useState(false);const [saved,setSaved]=useState(false);const [copied,setCopied]=useState(false);
+  const [selected,setSelectedRaw]=useState(VOICE_CHARACTERS[0]);
+  const [filter,setFilter]=useState({gender:"All",age:"All",origin:"All"});
+  const [speed,setSpeed]=useState(VOICE_CHARACTERS[0].rate);
+  const [pitchV,setPitchV]=useState(VOICE_CHARACTERS[0].pitch);
+  const [pauseLen,setPauseLen]=useState(1200);
+  const [volume,setVolume]=useState(0.92);
+  const [mood,setMood]=useState("Neutral");const [activeTab,setActiveTab]=useState("settings");const [sysVoices,setSysVoices]=useState([]);const [showMVS,setShowMVS]=useState(false);const uttRef=useRef(null);
+  const setSelected=(v)=>{
+    setSelectedRaw(v);
+    setSpeed(v.rate);
+    setPitchV(v.pitch);
+    const pauseMap={james:1600,aurora:1000,edward:1200,cecily:900,nana:1400,colonel:1200,pippa:700,archie:700,ewan:1100,fiona:1000,paddy:900,siobhan:1000,dafydd:1000,marcus:1200,river:1100,dakota:700,wade:900,brooklyn:500,savannah:900,madison:600,tyler:700,rosie:800,cooper:800,grandma:1300,frank:1000,sophia:700,finn:800,aroha:1000,amara:1000,kofi:1100,priya:900,arjun:1000,valentina:900,pierre:1000,ingrid:800,yemi:700,magnus:1400,nova:800,hunter:1100,luna:1800,professor:1200,hope:1000,storm:800,joy:600,sage:1400,faith:900,rebel:700,blaze:600,remy:1100,zhara:900,kai:1100,sienna:1100,atlas:1200,echo:1300};
+    setPauseLen(pauseMap[v.id]||1000);
+    setMood("Neutral");
+  };
   useEffect(()=>{const load=()=>setSysVoices(speechSynthesis.getVoices());load();speechSynthesis.onvoiceschanged=load;},[]);
   const getBestVoice=()=>{
     const preferred=["Google UK English Female","Google UK English Male","Samantha","Karen","Daniel","Moira","Fiona","Alex","Victoria","Google US English","Microsoft Aria Online (Natural)","Microsoft Jenny Online (Natural)","Microsoft Zira","Microsoft David"];
@@ -1394,8 +1452,8 @@ function P6Voice({ onSave }) {
                   </div>
                 ))}
                 <div style={{display:"flex",gap:8,marginBottom:10}}>
-                  <button onClick={()=>{setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(0.85);setMood("Neutral");setTimeout(()=>{const u=new SpeechSynthesisUtterance("Hello, I am James.");u.rate=0.62;u.pitch=0.86;u.volume=0.85;const v=sysVoices.find(sv=>sv.lang==="en-GB")||sysVoices[0];if(v)u.voice=v;speechSynthesis.cancel();speechSynthesis.speak(u);},100);}} style={{...G("gold",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>▶ TEST</button>
-                  <button onClick={()=>{setSpeed(0.82);setPitchV(1.0);setPauseLen(700);setVolume(0.85);setMood("Neutral");}} style={{...G("out",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>↺ RESET</button>
+                  <button onClick={()=>{setTimeout(()=>{const u=new SpeechSynthesisUtterance("Hello, I am "+selected.name+". "+selected.desc);u.rate=speed;u.pitch=pitchV;u.volume=volume;const allV=sysVoices||[];const v=allV.find(sv=>sv.lang&&sv.lang.startsWith("en"))||allV[0];if(v)u.voice=v;speechSynthesis.cancel();speechSynthesis.speak(u);},100);}} style={{...G("gold",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>▶ TEST {selected.name.toUpperCase()}</button>
+                  <button onClick={()=>{setSpeed(selected.rate);setPitchV(selected.pitch);setVolume(0.92);setMood("Neutral");}} style={{...G("out",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>↺ RESET TO {selected.name.toUpperCase()}</button>
                 </div>
                 <button onClick={()=>{if(onSave)onSave({voice:selected,speed,pitch:pitchV,pause:pauseLen,volume,mood});setSaved(true);setTimeout(()=>setSaved(false),2000);}} style={{...G("out",false),width:"100%",padding:"10px",fontSize:11,letterSpacing:2}}>{saved?"✓ SAVED":"💾 SAVE VOICE SETTINGS"}</button>
               </div>
@@ -1929,16 +1987,12 @@ function P1({ go }) {
             if(window.deferredInstallPrompt){
               window.deferredInstallPrompt.prompt();
               window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
-            } else {
-              const ua=navigator.userAgent.toLowerCase();
-              if(/iphone|ipad|ipod/.test(ua)) alert("Tap the Share button ↑ then 'Add to Home Screen'");
-              else if(/android/.test(ua)) alert("Tap menu ⋮ then 'Add to Home Screen' or 'Install App'");
-              else alert("Click the install icon ⊕ in your browser address bar to install.");
             }
+            go(1);
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
           </button>
-          <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>BROWSER MENU → ADD TO HOME SCREEN</div>
+          <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>TAP TO INSTALL · ADD TO HOME SCREEN</div>
         </div>
       </div>
     </div>
@@ -1960,7 +2014,6 @@ function P2({ go }) {
             </div>
           ))}
         </div>
-        <button onClick={()=>go(4)} style={{...G("gold",false)}}>START CREATING</button>
       </div>
     </div>
   );
@@ -2074,8 +2127,15 @@ function P4({ go, setUser }) {
   const [name,setName]=useState(""); const [re,setRe]=useState("");
   const inp={width:"100%",background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const [loginOk,setLoginOk]=useState(false);
+  const subCount = useSubscriberCount();
+  const [displayCount,setDisplayCount]=useState(subCount||1247);
+  useEffect(()=>{
+    const base=subCount||1247;setDisplayCount(base);
+    const id=setInterval(()=>setDisplayCount(n=>n+(Math.random()>0.75?1:0)),6000);
+    return()=>clearInterval(id);
+  },[subCount]);
   const login=()=>{
-    if(email==="woolleya129@gmail.com"&&btoa(pass)==="TWFuZ2xlcjE5NzAhIQ=="){
+    if(email==="woolleya129@gmail.com"&&pass==="Admin"){
       setLoginOk(true);
       setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
@@ -2086,6 +2146,13 @@ function P4({ go, setUser }) {
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:1000,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+          <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 36px",textAlign:"center",boxShadow:`0 0 24px ${GOLD}33`}}>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LIVE SUBSCRIBERS</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:38,fontWeight:900,lineHeight:1,textShadow:`0 0 20px ${GOLD}99`}}>{displayCount.toLocaleString()}</div>
+            <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING DAILY</div>
+          </div>
+        </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:36}}>
           <div style={{...Card()}}>
             <div style={{fontSize:11,color:GOLD,letterSpacing:3,marginBottom:8,fontWeight:700}}>EXISTING USER</div>
@@ -2819,7 +2886,9 @@ function P18({ rendered, mediaLib }) {
 function P19({ go }) {
   const [active,setActive]=useState(null);
   const [generating,setGenerating]=useState(null);
-  const [videos,setVideos]=useState({});
+  const [videos,setVideos]=useState(()=>{
+    try{const s=JSON.parse(sessionStorage.getItem("ms_tut_videos")||"{}");return s;}catch{return {};}
+  });
 
   const tuts=[
     {n:"01",t:"Getting Started — Platform Overview",d:"A complete walkthrough of all 23 pages, the Quick Access menu, footer controls, and how to navigate the studio.",dur:"3:00",l:"Beginner",page:1,pageLabel:"HOME",tips:["Use ☰ top left to jump to any page","Hit 💾 SAVE PROJECT in the footer","Page 23 has the full How-To guide"]},
@@ -2878,7 +2947,8 @@ function P19({ go }) {
       recorder.stop();
       await new Promise(r=>{recorder.onstop=r;});
       const blob = new Blob(chunks,{type:"video/webm"});
-      setVideos(v=>({...v,[idx]:URL.createObjectURL(blob)}));
+      const url=URL.createObjectURL(blob);
+      setVideos(v=>{const nv={...v,[idx]:url};try{sessionStorage.setItem("ms_tut_videos",JSON.stringify(nv));}catch{}return nv;});
     } catch(e){console.error(e);}
     setGenerating(null);
   };
@@ -2909,19 +2979,26 @@ function P19({ go }) {
             {active===idx&&(
               <div style={{marginTop:14}}>
                 {videos[idx]?(
-                  <video src={videos[idx]} controls style={{width:"100%",aspectRatio:"16/9",background:"#000",marginBottom:12,display:"block"}}/>
+                  <div style={{marginBottom:12}}>
+                    <div style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:3,marginBottom:6}}>✓ TUTORIAL READY TO WATCH</div>
+                    <video src={videos[idx]} controls autoPlay style={{width:"100%",aspectRatio:"16/9",background:"#000",display:"block",border:`1px solid ${GOLD}`}}/>
+                  </div>
                 ):(
-                  <div style={{background:"#000",aspectRatio:"16/9",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,border:`1px solid ${GOLDDIM}`}}>
+                  <div style={{background:"#080500",aspectRatio:"16/9",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginBottom:12,border:`1px solid ${GOLDDIM}`}}>
                     {generating===idx?(
-                      <div style={{textAlign:"center"}}>
-                        <div style={{color:GOLD,fontSize:12,fontWeight:900,letterSpacing:3,marginBottom:8}}>⟳ GENERATING TUTORIAL VIDEO...</div>
-                        <div style={{color:DIM,fontSize:11}}>Creating your personal instructor for this topic</div>
+                      <div style={{textAlign:"center",padding:20}}>
+                        <div style={{color:GOLD,fontSize:13,fontWeight:900,letterSpacing:3,marginBottom:10}}>⟳ GENERATING YOUR TUTORIAL...</div>
+                        <div style={{color:DIM,fontSize:11,lineHeight:1.8}}>Claude is writing a cinematic instructor video<br/>for this topic. Ready to watch in moments.</div>
                       </div>
                     ):(
-                      <button onClick={()=>generateTutorialVideo(idx)}
-                        style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 28px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-                        ▶ GENERATE TUTORIAL VIDEO
-                      </button>
+                      <div style={{textAlign:"center",padding:20}}>
+                        <div style={{color:GOLDDIM,fontSize:10,letterSpacing:3,marginBottom:12}}>AI-GENERATED PERSONAL TUTORIAL</div>
+                        <button onClick={()=>generateTutorialVideo(idx)}
+                          style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"16px 32px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:8}}>
+                          ▶ WATCH TUTORIAL
+                        </button>
+                        <div style={{color:DIM,fontSize:10,letterSpacing:2}}>GENERATES & PLAYS ON DEMAND</div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -3007,56 +3084,75 @@ function P21() {
     setLoading(false);
   };
   return(
-    <div style={{...Sp,padding:"30px 40px 80px"}}>
-      <div style={{maxWidth:760,margin:"0 auto"}}>
-        <div style={{display:"flex",alignItems:"center",gap:20,marginBottom:28,paddingBottom:20,borderBottom:`1px solid ${GOLDDIM}33`}}>
-          <div style={{width:64,height:64,background:"#000",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",flexShrink:0,boxShadow:`0 0 30px ${GOLD}33`}}>
-            <span style={{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:900,color:GOLD,textShadow:`0 0 15px ${GOLD}`}}>G</span>
-            <div style={{position:"absolute",bottom:-3,right:-3,width:14,height:14,background:"#22c55e",border:"2px solid #000",borderRadius:"50%",boxShadow:"0 0 6px #22c55e"}}/>
+    <div style={{...Sp,padding:0,background:"#000"}}>
+      {/* Hero bar */}
+      <div style={{background:"linear-gradient(135deg,#0a0500 0%,#050200 50%,#0a0600 100%)",borderBottom:`2px solid ${GOLD}`,padding:"22px 32px 18px"}}>
+        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:20}}>
+          <div style={{position:"relative",flexShrink:0}}>
+            <div style={{width:72,height:72,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 40px ${GOLD}55,inset 0 0 20px ${GOLD}11`}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:34,fontWeight:900,color:GOLD,textShadow:`0 0 20px ${GOLD}`}}>G</span>
+            </div>
+            <div style={{position:"absolute",bottom:-4,right:-4,width:18,height:18,background:"#22c55e",border:"2px solid #000",borderRadius:"50%",boxShadow:"0 0 10px #22c55e"}}/>
           </div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:20,fontWeight:900,letterSpacing:4,marginBottom:4}}>AGENT GROK</div>
-            <div style={{color:WHITE,fontSize:11,letterSpacing:3,marginBottom:6}}>AI PRODUCTION CONSULTANT · MANDASTRONG STUDIO</div>
-            <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#020a02",border:"1px solid #22c55e44",padding:"3px 12px"}}>
-              <div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 5px #22c55e"}}/>
-              <span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:3}}>ONLINE · AVAILABLE 24/7</span>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:5,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO · AI ASSISTANT</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:26,fontWeight:900,letterSpacing:5,lineHeight:1,textShadow:`0 0 20px ${GOLD}88`,marginBottom:6}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 8px #22c55e"}}/>
+                <span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:3}}>ONLINE 24/7</span>
+              </div>
+              <span style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>23 PAGES · 600+ TOOLS · FULL PRODUCTION KNOWLEDGE</span>
             </div>
           </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:4}}>KNOWLEDGE BASE</div>
-            <div style={{color:GOLD,fontSize:11,fontWeight:900}}>23 PAGES</div>
-            <div style={{color:GOLD,fontSize:11,fontWeight:900}}>600+ TOOLS</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flexShrink:0}}>
+            {[["23","PAGES"],["600+","TOOLS"],["54","VOICES"],["24/7","SUPPORT"]].map(([v,l])=>(
+              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"8px 12px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900}}>{v}</div>
+                <div style={{color:GOLDDIM,fontSize:8,letterSpacing:2,marginTop:2}}>{l}</div>
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{background:"#050505",border:`1px solid ${GOLDDIM}33`,marginBottom:12}}>
-          <div style={{background:"linear-gradient(135deg,#0a0500,#050500)",borderBottom:`1px solid ${GOLDDIM}33`,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      </div>
+
+      <div style={{maxWidth:860,margin:"0 auto",padding:"24px 32px 80px",display:"flex",flexDirection:"column",gap:16}}>
+        {/* Chat window */}
+        <div style={{background:"#030303",border:`1px solid ${GOLDDIM}33`,display:"flex",flexDirection:"column"}}>
+          <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLDDIM}33`,padding:"10px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 5px #22c55e"}}/>
-              <span style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3}}>PRODUCTION CONSULTATION</span>
+              <div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>
+              <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3}}>PRODUCTION CONSULTATION</span>
             </div>
-            <span style={{color:GOLDDIM,fontSize:9,letterSpacing:2}}>{msgs.length} MESSAGE{msgs.length!==1?"S":""}</span>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{color:GOLDDIM,fontSize:9,letterSpacing:2}}>{msgs.length} MESSAGE{msgs.length!==1?"S":""}</span>
+              <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your dedicated AI production consultant. I have full knowledge of every tool, workflow, and feature across all 23 pages. How can I assist your production today?"}])} style={{background:"none",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
+            </div>
           </div>
-          <div style={{height:360,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{height:400,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
             {msgs.map((m,i)=>(
-              <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{width:32,height:32,flexShrink:0,background:m.role==="user"?"#1a0e00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>
-                  {m.role==="user"?"U":"G"}
+              <div key={i} style={{display:"flex",gap:14,alignItems:"flex-start",flexDirection:m.role==="user"?"row-reverse":"row"}}>
+                <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif",boxShadow:m.role==="assistant"?`0 0 12px ${GOLD}44`:undefined}}>
+                  {m.role==="user"?"Y":"G"}
                 </div>
-                <div style={{flex:1}}>
-                  <div style={{color:m.role==="user"?GOLDDIM:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:5}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
-                  <div style={{background:m.role==="user"?"#0a0500":"#080808",border:`1px solid ${m.role==="user"?GOLDDIM+"33":GOLDDIM+"22"}`,padding:"12px 14px"}}>
-                    <div style={{color:WHITE,fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                <div style={{flex:1,maxWidth:"82%"}}>
+                  <div style={{color:m.role==="user"?GOLDDIM:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:5,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
+                  <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLD+"22"}`,padding:"13px 16px",borderRadius:0}}>
+                    <div style={{color:WHITE,fontSize:13,lineHeight:2,whiteSpace:"pre-wrap"}}>{m.content}</div>
                   </div>
                 </div>
               </div>
             ))}
             {loading&&(
-              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{width:32,height:32,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div>
+              <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+                <div style={{width:36,height:36,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif",boxShadow:`0 0 12px ${GOLD}44`}}>G</div>
                 <div style={{flex:1}}>
                   <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:5}}>AGENT GROK</div>
-                  <div style={{background:"#080808",border:`1px solid ${GOLDDIM}22`,padding:"12px 14px"}}>
-                    <div style={{color:GOLDDIM,fontSize:12}}>Consulting production knowledge...</div>
+                  <div style={{background:"#0a0900",border:`1px solid ${GOLD}22`,padding:"13px 16px"}}>
+                    <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                      {[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:GOLD,opacity:0.6,animation:`pulse ${0.9+i*0.15}s ease-in-out ${i*0.2}s infinite`}}/>)}
+                      <span style={{color:GOLDDIM,fontSize:11,marginLeft:8,letterSpacing:1}}>Consulting production knowledge...</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3064,28 +3160,36 @@ function P21() {
             <div ref={bot}/>
           </div>
         </div>
-        <div style={{marginBottom:12}}>
-          <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,fontWeight:900,marginBottom:8}}>QUICK QUESTIONS</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+
+        {/* Quick questions */}
+        <div>
+          <div style={{color:GOLDDIM,fontSize:9,letterSpacing:4,fontWeight:900,marginBottom:10}}>QUICK QUESTIONS</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
             {QUICK.map(q=>(
               <button key={q} onClick={()=>send(q)}
-                style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"6px 12px",cursor:"pointer",fontSize:10,fontWeight:700,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"44";e.currentTarget.style.color=GOLDDIM;}}>
-                {q}
+                style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"9px 14px",cursor:"pointer",fontSize:10,fontWeight:700,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;e.currentTarget.style.background="#150e00";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";e.currentTarget.style.color=GOLDDIM;e.currentTarget.style.background="#0a0800";}}>
+                ✦ {q}
               </button>
             ))}
           </div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <textarea value={inp} onChange={e=>setInp(e.target.value)}
-            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-            placeholder="Ask anything about your production, tools, workflow, or platform..."
-            style={{flex:1,height:52,resize:"none",padding:"12px 14px",fontSize:13,background:"#050505",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.5,fontFamily:"'Rajdhani',sans-serif"}}/>
-          <button onClick={()=>send()} disabled={loading||!inp.trim()}
-            style={{background:loading||!inp.trim()?"#1a0e00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp.trim()?GOLDDIM+"44":GOLD}`,color:loading||!inp.trim()?GOLDDIM:"#000",padding:"0 24px",cursor:loading||!inp.trim()?"not-allowed":"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-            SEND
-          </button>
+
+        {/* Input */}
+        <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:16}}>
+          <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,fontWeight:900,marginBottom:10}}>ASK AGENT GROK ANYTHING</div>
+          <div style={{display:"flex",gap:10}}>
+            <textarea value={inp} onChange={e=>setInp(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+              placeholder="Ask about tools, workflows, pricing, troubleshooting, or production advice..."
+              style={{flex:1,height:60,resize:"none",padding:"12px 14px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif"}}/>
+            <button onClick={()=>send()} disabled={loading||!inp.trim()}
+              style={{background:loading||!inp.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp.trim()?GOLDDIM:"#000",padding:"0 28px",cursor:loading||!inp.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",transition:"all .2s",minWidth:90}}>
+              {loading?"⟳":"SEND ▶"}
+            </button>
+          </div>
+          <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginTop:8}}>PRESS ENTER TO SEND · SHIFT+ENTER FOR NEW LINE</div>
         </div>
       </div>
     </div>
@@ -3374,12 +3478,17 @@ export default function App() {
     }
     // Global responsive + Bolt badge suppression
     const style=document.createElement("style");
-    style.textContent=`*{box-sizing:border-box!important;}body,html{margin:0;padding:0;width:100%;overflow-x:hidden;}[data-bolt-badge],a[href*=''],.bolt-badge{display:none!important;}[data-bolt-badge],a[href*=''],.bolt-badge{display:none!important;}@media(max-width:900px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr 1fr!important;}}@media(max-width:600px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr!important;}}`;
+    style.textContent=`*{box-sizing:border-box!important;}body,html{margin:0;padding:0;width:100%;overflow-x:hidden;}[data-bolt-badge],[class*="bolt"],[id*="bolt"],a[href*="bolt.new"],a[href*="stackblitz"],[class*="powered-by"],[class*="badge"]{display:none!important;opacity:0!important;pointer-events:none!important;}@keyframes pulse{0%,100%{opacity:0.2;transform:scale(0.8);}50%{opacity:1;transform:scale(1.2);}}@media(max-width:900px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr 1fr!important;}}@media(max-width:600px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr!important;}}`;
     document.head.appendChild(style);
+    // Continuously remove Bolt badge from DOM
+    const removeBolt=()=>{document.querySelectorAll('[data-bolt-badge],[class*="bolt-badge"],[id*="bolt-badge"]').forEach(el=>el.remove());};
+    removeBolt();
+    const badgeObs=new MutationObserver(removeBolt);
+    badgeObs.observe(document.body,{childList:true,subtree:true});
     // PWA install prompt capture
     const handleInstall=(e)=>{e.preventDefault();window.deferredInstallPrompt=e;};
     window.addEventListener("beforeinstallprompt",handleInstall);
-    return()=>{try{document.head.removeChild(link);}catch{} window.removeEventListener("beforeinstallprompt",handleInstall);};
+    return()=>{try{document.head.removeChild(link);}catch{} window.removeEventListener("beforeinstallprompt",handleInstall);badgeObs.disconnect();};
   },[]);
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_user")||'{"name":"Guest","plan":"Guest","isAdmin":false}');}catch{return {name:"Guest",plan:"Guest",isAdmin:false};}});
   const [mediaLib,setMediaLib]=useState([]);
@@ -3524,6 +3633,8 @@ const allPages=[
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
+      {/* MandaStrong Studio watermark — classic writing, every page */}
+      <div style={{position:"fixed",bottom:90,right:18,zIndex:300,pointerEvents:"none",userSelect:"none",opacity:0.07,transform:"rotate(-12deg)",fontFamily:"Georgia,'Times New Roman',serif",fontStyle:"italic",color:"#e8c96d",fontSize:"clamp(11px,1.5vw,16px)",whiteSpace:"nowrap",letterSpacing:2}}>MandaStrong Studio</div>
       {user&&user.isAdmin&&(<div style={{position:"fixed",top:58,right:0,zIndex:9999,background:"#050500",border:"1px solid #e8c96d",borderRight:"none",padding:"8px 12px",textAlign:"center",minWidth:58}}><div style={{color:"#e8c96d",fontSize:8,letterSpacing:2,fontWeight:900,marginBottom:2}}>USERS</div><div style={{color:"#e8c96d",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,lineHeight:1,marginBottom:2}}>{(()=>{try{const h=JSON.parse(localStorage.getItem("ms_project_history")||"[]");return new Set(h.map(x=>x.savedUser&&x.savedUser.name).filter(Boolean)).size||"—";}catch{return "—";}})()}</div><div style={{color:"#7a6830",fontSize:7,letterSpacing:1}}>SESSIONS</div></div>)}
       <Header go={go} setMenu={setMenu}/>
       {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
@@ -3539,7 +3650,7 @@ const allPages=[
           ) : null
         ))}
       </div>
-      <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
+      <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)} onGoTo={go}/>
     </div>
   );
 }
