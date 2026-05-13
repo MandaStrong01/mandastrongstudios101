@@ -1393,7 +1393,10 @@ function P6Voice({ onSave }) {
                     <input type="range" min={min} max={max} step={step} value={val} onChange={e=>setter(parseFloat(e.target.value))} style={{width:"100%",accentColor:GOLD}}/>
                   </div>
                 ))}
-                <button onClick={()=>{setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(0.85);setMood("Neutral");}} style={{...G("gold",false),width:"100%",padding:"10px",marginBottom:10,fontSize:11,letterSpacing:2}}>✦ APPLY JAMES SETTINGS</button>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <button onClick={()=>{setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(0.85);setMood("Neutral");setTimeout(()=>{const u=new SpeechSynthesisUtterance("Hello, I am James.");u.rate=0.62;u.pitch=0.86;u.volume=0.85;const v=sysVoices.find(sv=>sv.lang==="en-GB")||sysVoices[0];if(v)u.voice=v;speechSynthesis.cancel();speechSynthesis.speak(u);},100);}} style={{...G("gold",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>▶ TEST</button>
+                  <button onClick={()=>{setSpeed(0.82);setPitchV(1.0);setPauseLen(700);setVolume(0.85);setMood("Neutral");}} style={{...G("out",false),flex:1,padding:"10px",fontSize:11,letterSpacing:2}}>↺ RESET</button>
+                </div>
                 <button onClick={()=>{if(onSave)onSave({voice:selected,speed,pitch:pitchV,pause:pauseLen,volume,mood});setSaved(true);setTimeout(()=>setSaved(false),2000);}} style={{...G("out",false),width:"100%",padding:"10px",fontSize:11,letterSpacing:2}}>{saved?"✓ SAVED":"💾 SAVE VOICE SETTINGS"}</button>
               </div>
             )}
