@@ -3602,36 +3602,37 @@ export default function App() {
     }
   };
 
-const allPages=[
-    {p:1,el:<P1 go={go}/>},
-    {p:2,el:<P2 go={go}/>},
-    {p:3,el:<P3/>},
-    {p:4,el:<P4 go={go} setUser={setUser}/>},
-    {p:5,el:<ToolPage title="WRITING TOOLS" subtitle="AI WORKSTATION 01 — WRITING" tools={WRITING} onSave={saveAsset}/>},
-    {p:6,el:<P6Voice onSave={saveAsset} setMediaLib={setMediaLib}/>},
-    {p:7,el:<ToolPage title="IMAGE TOOLS" subtitle="AI WORKSTATION 03 — IMAGE" tools={IMAGE_T} onSave={saveAsset}/>},
-    {p:8,el:<P8VideoGenerator onSave={saveAsset} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
-    {p:9,el:<ToolPage title="MOTION & VFX" subtitle="AI WORKSTATION 05 — MOTION" tools={MOTION} onSave={saveAsset}/>},
-    {p:10,el:<ToolPage title="ENHANCEMENT STUDIO" subtitle="AI WORKSTATION 06 — ENHANCE" tools={MOTION} onSave={saveAsset}/>},
-    {p:11,el:<P11 mediaLib={mediaLib} setMediaLib={setMediaLib}/>},
-    {p:12,el:<P12 go={go} mediaLib={mediaLib}/>},
-    {p:13,el:<P13 go={go} mediaLib={mediaLib} timeline={timeline} setTimeline={setTimeline} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
-    {p:14,el:<P14/>},
-    {p:15,el:<P15/>},
-    {p:16,el:<P16 go={go} timeline={timeline} setRendered={setRendered} mediaLib={mediaLib} setMediaLib={setMediaLib} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
-    {p:17,el:<P17 go={go} rendered={rendered} mediaLib={mediaLib}/>},
-    {p:18,el:<P18 rendered={rendered} mediaLib={mediaLib}/>},
-    {p:19,el:<P19 go={go}/>},
-    {p:20,el:<P20/>},
-    {p:21,el:<P21/>},
-    {p:22,el:<P22/>},
-    {p:23,el:<P23 go={go}/>},
-  ];
+  const renderPage=()=>{
+    switch(page){
+      case 1: return <P1 go={go}/>;
+      case 2: return <P2 go={go}/>;
+      case 3: return <P3/>;
+      case 4: return <P4 go={go} setUser={setUser}/>;
+      case 5: return <ToolPage title="WRITING TOOLS" subtitle="AI WORKSTATION 01 — WRITING" tools={WRITING} onSave={saveAsset}/>;
+      case 6: return <P6Voice onSave={saveAsset} setMediaLib={setMediaLib}/>;
+      case 7: return <ToolPage title="IMAGE TOOLS" subtitle="AI WORKSTATION 03 — IMAGE" tools={IMAGE_T} onSave={saveAsset}/>;
+      case 8: return <P8VideoGenerator onSave={saveAsset} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>;
+      case 9: return <ToolPage title="MOTION & VFX" subtitle="AI WORKSTATION 05 — MOTION" tools={MOTION} onSave={saveAsset}/>;
+      case 10: return <ToolPage title="ENHANCEMENT STUDIO" subtitle="AI WORKSTATION 06 — ENHANCE" tools={MOTION} onSave={saveAsset}/>;
+      case 11: return <P11 mediaLib={mediaLib} setMediaLib={setMediaLib}/>;
+      case 12: return <P12 go={go} mediaLib={mediaLib}/>;
+      case 13: return <P13 go={go} mediaLib={mediaLib} timeline={timeline} setTimeline={setTimeline} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>;
+      case 14: return <P14/>;
+      case 15: return <P15/>;
+      case 16: return <P16 go={go} timeline={timeline} setRendered={setRendered} mediaLib={mediaLib} setMediaLib={setMediaLib} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>;
+      case 17: return <P17 go={go} rendered={rendered} mediaLib={mediaLib}/>;
+      case 18: return <P18 rendered={rendered} mediaLib={mediaLib}/>;
+      case 19: return <P19 go={go}/>;
+      case 20: return <P20/>;
+      case 21: return <P21/>;
+      case 22: return <P22/>;
+      case 23: return <P23 go={go}/>;
+      default: return <P1 go={go}/>;
+    }
+  };
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      {/* MandaStrong watermark — bold cinematic gold */}
-      <div style={{position:"fixed",bottom:88,right:16,zIndex:300,pointerEvents:"none",userSelect:"none",transform:"rotate(-8deg)",fontFamily:"'Cinzel',serif",fontWeight:900,color:"#e8c96d",fontSize:"clamp(13px,1.8vw,20px)",whiteSpace:"nowrap",letterSpacing:4,textShadow:"0 0 18px #e8c96daa, 0 2px 4px #000",opacity:0.55}}>MandaStrong</div>
       {user&&user.isAdmin&&(<div style={{position:"fixed",top:58,right:0,zIndex:9999,background:"#050500",border:"1px solid #e8c96d",borderRight:"none",padding:"8px 12px",textAlign:"center",minWidth:58}}><div style={{color:"#e8c96d",fontSize:8,letterSpacing:2,fontWeight:900,marginBottom:2}}>USERS</div><div style={{color:"#e8c96d",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,lineHeight:1,marginBottom:2}}>{(()=>{try{const h=JSON.parse(localStorage.getItem("ms_project_history")||"[]");return new Set(h.map(x=>x.savedUser&&x.savedUser.name).filter(Boolean)).size||"—";}catch{return "—";}})()}</div><div style={{color:"#7a6830",fontSize:7,letterSpacing:1}}>SESSIONS</div></div>)}
       <Header go={go} setMenu={setMenu}/>
       {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
@@ -3639,11 +3640,7 @@ const allPages=[
       {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
       <div style={{minHeight:"calc(100vh - 116px)"}}>
-        {allPages.map(({p,el})=>(
-          page===p ? (
-            <div key={p} style={{display:"block"}}>{el}</div>
-          ) : null
-        ))}
+        <div key={page}>{renderPage()}</div>
       </div>
       <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)} onGoTo={go}/>
     </div>
