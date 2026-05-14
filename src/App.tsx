@@ -3303,13 +3303,10 @@ function useSubscriberCount() {
     try { return parseInt(localStorage.getItem("ms_sub_count")||"0")||0; } catch{ return 0; }
   });
   useEffect(()=>{
-    // Fetch from Supabase — count of confirmed auth users as proxy for subscribers
-    fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"subscriber_count"})
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/subscriber-count`,{
+      headers:{"apikey":import.meta.env.VITE_SUPABASE_ANON_KEY,"Content-Type":"application/json"}
     }).then(r=>r.json()).then(d=>{
-      if(d&&d.count&&typeof d.count==="number"){
+      if(d&&typeof d.count==="number"){
         setCount(d.count);
         try{localStorage.setItem("ms_sub_count",String(d.count));}catch{}
       }
@@ -3495,6 +3492,20 @@ export default function App() {
   const [savedNotice,setSavedNotice]=useState(false);
   const [showHistory,setShowHistory]=useState(false);
   const [showSaveModal,setShowSaveModal]=useState(false);
+  const [liveSubCount,setLiveSubCount]=useState<number|null>(null);
+
+  // Fetch live subscriber count for admin box
+  useEffect(()=>{
+    if(!user?.isAdmin)return;
+    const fetchCount=()=>{
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/subscriber-count`,{
+        headers:{"apikey":import.meta.env.VITE_SUPABASE_ANON_KEY,"Content-Type":"application/json"}
+      }).then(r=>r.json()).then(d=>{if(typeof d.count==="number")setLiveSubCount(d.count);}).catch(()=>{});
+    };
+    fetchCount();
+    const id=setInterval(fetchCount,30000);
+    return()=>clearInterval(id);
+  },[user?.isAdmin]);
 
   const go=p=>{setPage(p);setVisited(v=>{const n=new Set(v);n.add(p);return n;});window.scrollTo(0,0);try{localStorage.setItem("ms_page",JSON.stringify(p));}catch{}};
 
@@ -3633,7 +3644,7 @@ export default function App() {
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      {user&&user.isAdmin&&(<div style={{position:"fixed",top:58,right:0,zIndex:9999,background:"#050500",border:"1px solid #e8c96d",borderRight:"none",padding:"8px 12px",textAlign:"center",minWidth:58}}><div style={{color:"#e8c96d",fontSize:8,letterSpacing:2,fontWeight:900,marginBottom:2}}>USERS</div><div style={{color:"#e8c96d",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,lineHeight:1,marginBottom:2}}>{(()=>{try{const h=JSON.parse(localStorage.getItem("ms_project_history")||"[]");return new Set(h.map(x=>x.savedUser&&x.savedUser.name).filter(Boolean)).size||"—";}catch{return "—";}})()}</div><div style={{color:"#7a6830",fontSize:7,letterSpacing:1}}>SESSIONS</div></div>)}
+      {user&&user.isAdmin&&(<div style={{position:"fixed",top:58,right:0,zIndex:9999,background:"#050500",border:"1px solid #e8c96d",borderRight:"none",padding:"8px 12px",textAlign:"center",minWidth:58}}><div style={{color:"#e8c96d",fontSize:8,letterSpacing:2,fontWeight:900,marginBottom:2}}>USERS</div><div style={{color:"#e8c96d",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,lineHeight:1,marginBottom:2}}>{liveSubCount!==null?liveSubCount:"…"}</div><div style={{color:"#7a6830",fontSize:7,letterSpacing:1}}>LIVE</div></div>)}
       <Header go={go} setMenu={setMenu}/>
       {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
       {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
