@@ -2025,7 +2025,7 @@ function P1({ go }) {
             }
             go(2);
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"16px 40px",fontSize:15,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:340,boxShadow:`0 0 30px ${GOLD}66`}}>
-            ▶ OPEN APP
+            ⬇ DOWNLOAD APP
           </button>
           <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center",marginTop:4}}>TAP TO LAUNCH · INSTALL VIA BROWSER MENU</div>
         </div>
