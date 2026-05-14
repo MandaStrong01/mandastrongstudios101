@@ -2023,7 +2023,6 @@ function P1({ go }) {
               window.deferredInstallPrompt.prompt();
               window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
             }
-            go(2);
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"16px 40px",fontSize:15,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:340,boxShadow:`0 0 30px ${GOLD}66`}}>
             ⬇ DOWNLOAD APP
           </button>
@@ -3129,46 +3128,183 @@ function P20() {
 }
 
 function P21() {
-  const [msgs,setMsgs]=useState([{role:"assistant",content:"Ask me anything about your production."}]);
-  const [inp,setInp]=useState("");const [loading,setLoading]=useState(false);
+  const SYSTEM_PROMPT="You are Agent Grok — the official 24/7 AI production consultant for MandaStrong Studio. You are an expert in every aspect of the platform: 600+ AI filmmaking tools, the full production pipeline (script → voice → video → timeline → render → export), plans ($20 Creator / $30 Pro / $50 Studio with 7-day free trial), 8K export, films up to 3 hours, and community features. You know every page: Page 5 Writing Tools, Page 6 Voice Engine & Music Video Studio, Page 7 Image Tools, Page 8 Video Generator, Page 9 Motion & VFX, Page 10 Enhancement Studio, Page 11 Upload Media, Page 12 Editor Suite, Page 13 Timeline Editor, Page 14 Enhancement Studio, Page 15 Audio Mixer, Page 16 Render Engine, Page 17 Film Preview, Page 18 Export & Distribute, Page 19 Tutorials, Page 22 Community Hub. Be professional, warm, and concise. Always guide the user to the specific page they need. MandaStrong Studio was founded by Amanda Woolley — author, creative producer, and believer that every person deserves the tools to tell their story.";
+  const SUGGESTED=[
+    "What's the best workflow to make a film?",
+    "How do I export in 8K?",
+    "How does the Timeline Editor work?",
+    "Which voice is best for documentary?",
+    "Tell me about the Music Video Studio",
+    "How do I save my project?",
+    "What's included in each pricing plan?",
+    "How do I use Agent Grok?",
+  ];
+  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I'm Agent Grok — your personal AI production consultant, available 24/7.\n\nI can guide you through every tool, every workflow, and every page of the platform. What would you like to create today?"}]);
+  const [inp,setInp]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [history,setHistory]=useState([]);
+  const [showHistory,setShowHistory]=useState(false);
   const bot=useRef(null);
-  const qs=["How do I export in 8K?","What AI tools do you have?","How does the timeline work?","Tell me about pricing"];
-  useEffect(()=>{bot.current&&bot.current.scrollIntoView({behavior:"smooth"});},[msgs]);
-  const send=async()=>{
-    if(!inp.trim())return;const q=inp.trim();setInp("");setLoading(true);
-    setMsgs(p=>[...p,{role:"user",content:q}]);
+  const textareaRef=useRef(null);
+
+  useEffect(()=>{bot.current&&bot.current.scrollIntoView({behavior:"smooth"});},[msgs,loading]);
+
+  const send=async(override)=>{
+    const q=(override||inp).trim();
+    if(!q)return;
+    setInp("");setLoading(true);
+    const newMsgs=[...msgs,{role:"user",content:q}];
+    setMsgs(newMsgs);
     try{
-      const r=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:"You are Agent Grok, 24/7 assistant for MandaStrong Studio — professional cinema AI platform, 600+ tools, 8K export, films up to 3 hours, plans $20/$30/$50/mo with 7-day free trial. Be helpful and concise.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:q}]})});
-      const d=await r.json();setMsgs(p=>[...p,{role:"assistant",content:d.content&&d.content[0]?d.content[0].text:"Let me help!"}]);
-    }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Unable to connect — check your connection and try again."}]);}
+      const r=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",max_tokens:1200,
+          system:SYSTEM_PROMPT,
+          messages:newMsgs.map(m=>({role:m.role,content:m.content}))
+        })
+      });
+      const d=await r.json();
+      const reply=d.content&&d.content[0]?d.content[0].text:"I'm here to help — please try again.";
+      setMsgs(p=>[...p,{role:"assistant",content:reply}]);
+    }catch(e){
+      setMsgs(p=>[...p,{role:"assistant",content:"Connection issue — please check your internet and try again."}]);
+    }
     setLoading(false);
   };
+
+  const clearChat=()=>{
+    if(msgs.length>1)setHistory(h=>[...h,{id:Date.now(),date:new Date().toLocaleTimeString(),msgs:[...msgs]}]);
+    setMsgs([{role:"assistant",content:"Welcome back. What would you like to work on?"}]);
+  };
+
   return (
-    <div style={{...Sp,padding:40}}>
-      <div style={{maxWidth:680,margin:"0 auto"}}>
-        <div style={{textAlign:"center",marginBottom:20}}>
-          <div style={{width:52,height:52,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontFamily:"'Cinzel',serif",fontSize:26,fontWeight:900,color:"#000"}}>G</div>
-          <h1 style={{...H1,fontSize:24}}>AGENT GROK</h1>
-          <div style={{color:"#22c55e",fontSize:11,letterSpacing:3,marginTop:4,fontWeight:900}}>● ONLINE</div>
+    <div style={{...Sp,padding:0,background:"#000",minHeight:"100vh"}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(180deg,#0a0800,#000)",borderBottom:`1px solid ${GOLD}44`,padding:"20px 32px 16px"}}>
+        <div style={{maxWidth:900,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <div style={{width:56,height:56,background:`linear-gradient(135deg,#3d2800,${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 0 24px ${GOLD}66`,position:"relative"}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:900,color:"#000"}}>G</span>
+              <div style={{position:"absolute",bottom:-3,right:-3,width:14,height:14,background:"#22c55e",borderRadius:"50%",border:"2px solid #000"}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:18,fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
+              <div style={{color:"#22c55e",fontSize:10,letterSpacing:3,fontWeight:900,marginTop:4}}>● ONLINE · YOUR 24/7 PRODUCTION CONSULTANT</div>
+              <div style={{color:DIM,fontSize:9,letterSpacing:2,marginTop:2}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {history.length>0&&(
+              <button onClick={()=>setShowHistory(s=>!s)} style={{...G("out",true),fontSize:10}}>
+                {showHistory?"HIDE":"📂 HISTORY"}
+              </button>
+            )}
+            <button onClick={clearChat} style={{...G("out",true),fontSize:10}}>NEW CHAT</button>
+          </div>
         </div>
-        <div style={{...Card(),height:290,overflowY:"auto",marginBottom:10,display:"flex",flexDirection:"column",gap:8,padding:12}}>
+      </div>
+
+      <div style={{maxWidth:900,margin:"0 auto",padding:"0 32px 120px",display:"flex",flexDirection:"column",gap:0}}>
+
+        {/* Capabilities bar */}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",padding:"14px 0 10px",borderBottom:`1px solid ${GOLDDIM}22`}}>
+          {["Script to Screen","Voice Engine","Video Generator","Timeline Editor","Render Engine","Export & Distribute","Pricing Plans","Tutorials"].map(cap=>(
+            <div key={cap} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"3px 10px",fontSize:9,color:GOLDDIM,letterSpacing:1,fontWeight:700}}>{cap}</div>
+          ))}
+        </div>
+
+        {/* History panel */}
+        {showHistory&&history.length>0&&(
+          <div style={{background:"#050400",border:`1px solid ${GOLDDIM}`,padding:14,margin:"10px 0"}}>
+            <div style={{color:GOLD,fontSize:10,letterSpacing:3,fontWeight:900,marginBottom:10}}>CONVERSATION HISTORY</div>
+            {history.map(h=>(
+              <button key={h.id} onClick={()=>{setMsgs(h.msgs);setShowHistory(false);}}
+                style={{display:"block",width:"100%",textAlign:"left",background:"none",border:`1px solid ${GOLDDIM}44`,color:WHITE,padding:"8px 12px",cursor:"pointer",fontSize:12,marginBottom:4,fontFamily:"'Rajdhani',sans-serif"}}>
+                {h.date} · {h.msgs.filter(m=>m.role==="user").length} questions
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Chat messages */}
+        <div style={{paddingTop:20,display:"flex",flexDirection:"column",gap:12}}>
           {msgs.map((m,i)=>(
-            <div key={i} style={{padding:"10px 14px",background:m.role==="user"?"rgba(232,201,109,0.08)":"rgba(232,201,109,0.05)",borderLeft:`2px solid ${m.role==="user"?GOLD:GOLDDIM}`}}>
-              <span style={{fontSize:11,color:GOLD,display:"block",marginBottom:4,fontWeight:900,letterSpacing:2}}>{m.role==="user"?"YOU":"AGENT GROK"}</span>
-              <span style={{color:WHITE,fontSize:14,lineHeight:1.7}}>{m.content}</span>
+            <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start",flexDirection:m.role==="user"?"row-reverse":"row"}}>
+              <div style={{width:34,height:34,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                background:m.role==="user"?`linear-gradient(135deg,${GOLDDIM}33,${GOLD}22)`:`linear-gradient(135deg,#3d2800,${GOLD})`,
+                border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,fontSize:14,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>
+                {m.role==="user"?"U":"G"}
+              </div>
+              <div style={{flex:1,maxWidth:"82%"}}>
+                <div style={{fontSize:9,color:m.role==="user"?GOLDDIM:GOLD,letterSpacing:2,fontWeight:900,marginBottom:5,textAlign:m.role==="user"?"right":"left"}}>
+                  {m.role==="user"?"YOU":"AGENT GROK"}
+                </div>
+                <div style={{
+                  background:m.role==="user"?"rgba(232,201,109,0.06)":"rgba(20,14,0,0.8)",
+                  border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLDDIM+"88"}`,
+                  padding:"12px 16px",
+                  borderRadius:0,
+                  color:WHITE,fontSize:14,lineHeight:1.85,
+                  whiteSpace:"pre-wrap",wordBreak:"break-word"
+                }}>{m.content}</div>
+              </div>
             </div>
           ))}
-          {loading&&<div style={{padding:"10px 14px",background:"rgba(232,201,109,0.05)",borderLeft:`2px solid ${GOLDDIM}`,color:WHITE,fontSize:13}}>Thinking...</div>}
+          {loading&&(
+            <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+              <div style={{width:34,height:34,flexShrink:0,background:`linear-gradient(135deg,#3d2800,${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:900,color:"#000"}}>G</div>
+              <div style={{background:"rgba(20,14,0,0.8)",border:`1px solid ${GOLDDIM}88`,padding:"14px 18px",display:"flex",gap:6,alignItems:"center"}}>
+                {[0,1,2].map(i=>(
+                  <div key={i} style={{width:6,height:6,background:GOLD,borderRadius:"50%",animation:`dot 1.2s ease-in-out ${i*0.2}s infinite`}}/>
+                ))}
+                <style>{`@keyframes dot{0%,80%,100%{opacity:.2;transform:scale(0.8)}40%{opacity:1;transform:scale(1.2)}}`}</style>
+              </div>
+            </div>
+          )}
           <div ref={bot}/>
         </div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-          {qs.map(q=><button key={q} onClick={()=>setInp(q)} style={{...G("out",true),fontSize:11}}>{q}</button>)}
+
+        {/* Suggested questions */}
+        {msgs.length<=2&&!loading&&(
+          <div style={{marginTop:24}}>
+            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,fontWeight:900,marginBottom:10}}>SUGGESTED QUESTIONS</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {SUGGESTED.map(q=>(
+                <button key={q} onClick={()=>send(q)}
+                  style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:GOLDDIM,padding:"7px 14px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1,transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.color=GOLDDIM;}}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Fixed input bar */}
+      <div style={{position:"fixed",bottom:52,left:0,right:0,background:"#000",borderTop:`1px solid ${GOLD}44`,padding:"12px 32px",zIndex:200}}>
+        <div style={{maxWidth:900,margin:"0 auto",display:"flex",gap:8,alignItems:"flex-end"}}>
+          <textarea
+            ref={textareaRef}
+            value={inp}
+            onChange={e=>setInp(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+            placeholder="Ask Agent Grok anything about your production..."
+            rows={1}
+            style={{flex:1,resize:"none",padding:"12px 16px",fontSize:14,background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",maxHeight:120,overflowY:"auto"}}
+          />
+          <button
+            onClick={()=>send()}
+            disabled={loading||!inp.trim()}
+            style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"12px 28px",fontWeight:900,fontSize:12,letterSpacing:3,cursor:loading||!inp.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!inp.trim()?0.4:1,flexShrink:0,height:48}}
+          >
+            {loading?"...":"SEND"}
+          </button>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <textarea value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-            placeholder="Ask Agent Grok anything..."
-            style={{flex:1,height:50,resize:"none",padding:"10px 12px",fontSize:14,background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,color:WHITE,outline:"none",lineHeight:1.5,fontFamily:"'Rajdhani',sans-serif"}}/>
-          <button onClick={send} disabled={loading||!inp.trim()} style={{...G("gold",false),height:50,padding:"0 22px",opacity:loading||!inp.trim()?0.5:1}}>SEND</button>
+        <div style={{maxWidth:900,margin:"4px auto 0",textAlign:"right"}}>
+          <span style={{color:DIM,fontSize:9,letterSpacing:1}}>ENTER to send · SHIFT+ENTER for new line</span>
         </div>
       </div>
     </div>
@@ -3208,67 +3344,90 @@ function P22() {
 
 function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
+  const GUIDE=[
+    {t:"RECOMMENDED WORKFLOW",c:"Page 8 → Page 6 → Page 13 → Page 15 → Page 16 → Page 17 → Page 18. Hit SAVE PROJECT in the footer at every stage."},
+    {t:"PAGE 8 — VIDEO GENERATOR",c:"Describe any scene. Be specific about genre, lighting, camera, mood. Use the Documentary Recovery panel for your 13 AI For Humanity scenes. Every clip saves automatically."},
+    {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voice characters. Filter by gender, age, origin. Hit TEST. Paste your script, hit PREPARE & SPEAK. Use the mood slider for emotional tone."},
+    {t:"PAGE 6 — MUSIC VIDEO STUDIO",c:"Hit MUSIC VIDEO STUDIO top right. Set song details, style, colour grade. Write a detailed scene. Upload audio or use the red RECORD YOUR OWN SONG button."},
+    {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit SYNC ALL TRACKS to auto-populate all tracks. Set film duration to 60, 90, or 180 minutes. Hit RENDER when ready."},
+    {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85. Music Video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85."},
+    {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality up to 4K. Hit START RENDER. Download or Preview when complete. Missing clips are regenerated automatically."},
+    {t:"PAGE 19 — TUTORIALS",c:"12 lessons. Hit GENERATE TO WATCH for a Claude-written animated tutorial for each lesson."},
+    {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about tools, workflow, pricing or production."},
+  ];
   return(
-    <div style={{...Sp,padding:0}}>
-      {/* background.mp4 — full width top of page */}
+    <div style={{...Sp,padding:0,background:"#000"}}>
+
+      {/* background.mp4 — full width, top of page */}
       <video autoPlay loop playsInline muted preload="auto"
-        style={{width:"100%",display:"block",maxHeight:"70vh",objectFit:"cover",background:"#000"}}
+        style={{width:"100%",display:"block",maxHeight:"72vh",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
-        <source src="./background.mp4" type="video/mp4"/>
       </video>
-      <div style={{padding:"26px 40px 80px"}}>
-        <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
-          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,textShadow:`0 0 30px ${GOLD}99`,marginBottom:6}}>THAT'S ALL FOLKS</h1>
-          <div style={{color:WHITE,fontSize:12,letterSpacing:3,marginBottom:12}}>THANK YOU FOR CREATING WITH US</div>
-          <video autoPlay loop playsInline muted preload="auto"
-            style={{width:"100%",maxWidth:640,display:"block",margin:"0 auto 20px",border:`1px solid ${GOLD}`,background:"#000"}}
-            onError={e=>{e.currentTarget.style.display="none";}}>
-            <source src="/ThatsAllFolks.mp4" type="video/mp4"/>
-            <source src="ThatsAllFolks.mp4" type="video/mp4"/>
-          </video>
-          <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:24}}/>
 
-          {/* Home and Exit buttons only */}
-          <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:28}}>
-            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
-            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
+      <div style={{padding:"32px 40px 40px"}}>
+        <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
+
+          {/* Title */}
+          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(24px,4vw,38px)",fontWeight:900,letterSpacing:5,textShadow:`0 0 40px ${GOLD}99`,marginBottom:6,lineHeight:1.1}}>THAT'S ALL FOLKS</h1>
+          <div style={{color:WHITE,fontSize:12,letterSpacing:4,marginBottom:24}}>THANK YOU FOR CREATING WITH US</div>
+
+          {/* ThatsAllFolks video */}
+          <video autoPlay loop playsInline muted preload="auto"
+            style={{width:"100%",maxWidth:640,display:"block",margin:"0 auto 28px",border:`1px solid ${GOLD}`,background:"#000"}}
+            onError={e=>{e.currentTarget.style.display="none";}}>
+            <source src="/thatsallfolks.mp4" type="video/mp4"/>
+            <source src="thatsallfolks.mp4" type="video/mp4"/>
+          </video>
+
+          <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:28}}/>
+
+          {/* Personal Thank-You Letter */}
+          <div style={{...Card(),textAlign:"left",marginBottom:24,background:"#050400",border:`2px solid ${GOLD}`,padding:"28px 32px"}}>
+            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:4,marginBottom:20,textAlign:"center",fontFamily:"'Cinzel',serif"}}>✦ A PERSONAL THANK YOU ✦</div>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 16px 0",fontStyle:"italic"}}>
+              "To every creator who opened this app — thank you from the bottom of my heart.
+            </p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 16px 0"}}>
+              I built MandaStrong Studio because I believe <strong style={{color:GOLD}}>every person deserves the tools to tell their story</strong> — not just the wealthy, not just the technically gifted. Everyone. Every dream. Every voice.
+            </p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 16px 0"}}>
+              This platform was built with love, with late nights, with the belief that art should serve truth and technology should serve humanity. You now have access to <strong style={{color:GOLD}}>600+ professional AI filmmaking tools</strong>, a complete production pipeline from script to screen, and the ability to create films up to 3 hours long — all from right here.
+            </p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 16px 0"}}>
+              Whether you're making a family movie, a documentary, a music video, or a full feature film — <strong style={{color:GOLD}}>your story matters</strong>. The world needs it. Go create something extraordinary.
+            </p>
+            <p style={{color:GOLD,fontSize:14,lineHeight:2,margin:"0",fontStyle:"italic",fontWeight:700}}>
+              With love and belief in you,<br/>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:16,letterSpacing:2}}>Amanda Woolley</span><br/>
+              <span style={{fontSize:11,letterSpacing:3,color:GOLDDIM}}>FOUNDER · MANDASTRONG STUDIO · woolleya129@gmail.com</span>
+            </p>
           </div>
 
-          {/* Etsy store - support the mission */}
+          {/* Etsy store */}
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
-            style={{display:"block",background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,color:"#000",padding:"20px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",marginBottom:20,width:"100%",boxSizing:"border-box",boxShadow:`0 0 30px ${GOLD}44`}}>
-            🛍 VISIT MANDASTRONG1.ETSY.COM · BOOKS · MERCH · SUPPORT THIS MISSION
+            style={{display:"block",background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,color:"#000",padding:"20px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",marginBottom:20,boxSizing:"border-box",boxShadow:`0 0 30px ${GOLD}44`}}>
+            VISIT MANDASTRONG1.ETSY.COM · BOOKS · MERCH · SUPPORT THIS MISSION
           </a>
 
           {/* Our Mission */}
-          <div style={{...Card(),textAlign:"left",marginBottom:16,background:"#050500",border:`2px solid ${GOLD}`}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:14,textAlign:"center"}}>✦ OUR MISSION ✦</div>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>MandaStrong Studio was built with one belief: <strong style={{color:GOLD}}>that every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>We are a professional cinema intelligence platform giving creators access to <strong style={{color:GOLD}}>600+ AI filmmaking tools</strong>, a full production pipeline from script to screen, and films up to 3 hours long — all from a single platform.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio. I built this because I believe technology should serve humanity, and art should serve truth.</p>
+          <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#030300",border:`1px solid ${GOLDDIM}`}}>
+            <div style={{color:GOLD,fontWeight:900,fontSize:11,letterSpacing:3,marginBottom:12,textAlign:"center"}}>✦ OUR MISSION ✦</div>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.95,margin:"0 0 10px 0"}}>MandaStrong Studio is a professional cinema intelligence platform giving creators access to 600+ AI filmmaking tools, a full production pipeline from script to screen, and films up to 3 hours long — all from a single platform.</p>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.95,margin:0}}>We are building the future of independent filmmaking — where technology serves creativity, and every story finds its voice.</p>
           </div>
 
           {/* How To Guide */}
-          <div onClick={()=>setGuideOpen(g=>!g)} style={{...Card(),marginBottom:0,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",textAlign:"left",border:`2px solid ${GOLD}`,background:"#0a0800"}}>
-            <span style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3}}>📖 COMPLETE HOW TO USE GUIDE</span>
+          <div onClick={()=>setGuideOpen(g=>!g)}
+            style={{...Card(),marginBottom:0,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",textAlign:"left",border:`2px solid ${GOLD}`,background:"#0a0800"}}>
+            <span style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3}}>COMPLETE HOW TO USE GUIDE</span>
             <span style={{color:GOLD,fontSize:18}}>{guideOpen?"▲":"▼"}</span>
           </div>
           {guideOpen&&(
             <div style={{...Card(),textAlign:"left",padding:"24px 28px",border:`2px solid ${GOLD}`,borderTopWidth:0}}>
-              {[
-                {t:"RECOMMENDED WORKFLOW",c2:"Page 8 → Page 6 → Page 13 → Page 15 → Page 16 → Page 17 → Page 18. Hit 💾 SAVE PROJECT at every stage."},
-                {t:"PAGE 8 — VIDEO GENERATOR",c:"Describe any scene. Be specific about genre, lighting, camera, mood. Use the Documentary Recovery panel for your 13 AI For Humanity scenes. Every clip saves automatically."},
-                {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voice characters. Filter by gender, age, origin. Hit TEST. Go to SPEAK tab, paste your script, hit PREPARE & SPEAK. Use mood slider for emotional tone."},
-                {t:"PAGE 6 — MUSIC VIDEO STUDIO",c:"Hit MUSIC VIDEO STUDIO top right. Set song details, style, colour grade. Write a detailed scene. Upload audio or use the red RECORD YOUR OWN SONG button."},
-                {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit SYNC ALL TRACKS to auto-populate all tracks. Set film duration. Hit RENDER when ready."},
-                {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85."},
-                {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality up to 4K. Hit START RENDER. Download or Preview when complete."},
-                {t:"PAGE 19 — TUTORIALS",c:"12 lessons. Hit GENERATE TO WATCH for a Claude-written animated tutorial for each lesson."},
-                {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about tools, workflow, pricing or production."},
-              ].map(({t,c:c2})=>(
+              {GUIDE.map(({t,c})=>(
                 <div key={t} style={{borderBottom:`1px solid ${GOLDDIM}33`,paddingBottom:14,marginBottom:14}}>
                   <div style={{color:GOLD,fontWeight:900,fontSize:11,letterSpacing:2,marginBottom:5}}>✦ {t}</div>
                   <div style={{color:WHITE,fontSize:13,lineHeight:1.8}}>{c}</div>
@@ -3276,6 +3435,16 @@ function P23({ go }) {
               ))}
             </div>
           )}
+
+          {/* Divider */}
+          <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,margin:"32px 0"}}/>
+
+          {/* Home and Exit buttons — BOTTOM of page */}
+          <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",paddingBottom:20}}>
+            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"16px 48px",fontSize:14,letterSpacing:4}}>HOME</button>
+            <button onClick={()=>{if(window.confirm("Exit MandaStrong Studio?"))window.close();}} style={{...G("out",false),padding:"16px 48px",fontSize:14,letterSpacing:4}}>EXIT APP</button>
+          </div>
+
         </div>
       </div>
     </div>
