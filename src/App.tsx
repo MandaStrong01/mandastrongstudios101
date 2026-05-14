@@ -3450,7 +3450,7 @@ const allPages=[
     {p:16,el:<P16 go={go} timeline={timeline} setRendered={setRendered} mediaLib={mediaLib} setMediaLib={setMediaLib} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
     {p:17,el:<P17 go={go} rendered={rendered} mediaLib={mediaLib}/>},
     {p:18,el:<P18 rendered={rendered} mediaLib={mediaLib}/>},
-    {p:19,el:<P19/>},
+    {p:19,el:<P19 go={go}/>},
     {p:20,el:<P20/>},
     {p:21,el:<P21/>},
     {p:22,el:<P22/>},
@@ -3466,11 +3466,7 @@ const allPages=[
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
       <div style={{minHeight:"calc(100vh - 116px)"}}>
         {allPages.map(({p,el})=>(
-          page===p ? (
-            <div key={p} style={{display:"block"}}>{el}</div>
-          ) : visited.has(p) ? (
-            <div key={p} style={{display:"none"}}>{el}</div>
-          ) : null
+          <div key={p} style={{display:page===p?"block":"none"}}>{el}</div>
         ))}
       </div>
       <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
