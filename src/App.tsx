@@ -1629,59 +1629,71 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 The user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.`
         : "";
 
-      const directorPrompt=`You are the MandaStrong Cinema Engine. Write a complete working JavaScript drawFrame(ctx,W,H,t,sec) function.
+      const directorPrompt=`You are the MandaStrong Cinema Engine.
+
+Your job: read the SCENE description word by word and write JavaScript Canvas 2D code that renders EXACTLY what is described — cinematic, photorealistic in tone, NOT cartoon.
 
 SCENE: "${prompt}"
 DURATION: ${duration}s${refInstruction}
-W=1920 H=1080 t=0to1 sec=elapsed seconds
+W=1920 H=1080   t=0→1 (scene progress)   sec=elapsed seconds
 
-CRITICAL RULES — YOU MUST FOLLOW THESE:
-1. If the scene mentions a person, human, figure, man, woman, character — you MUST use the HUMAN FIGURE code block below verbatim. The figure MUST breathe (chest rises/falls with Math.sin), blink (eyes close briefly using Math.sin), and have skin-tone coloured face+hands.
-2. If the scene mentions ocean, sea, water, waves, river, lake — you MUST use the OCEAN code block below verbatim. The waves MUST animate with Math.sin(x*0.007+sec*...) so they move in real time.
-3. Every scene MUST end with: Fade in, Fade out, Vignette, Colour grade, Grain — in that order.
-4. All motion MUST use 'sec' (elapsed seconds) so the animation runs continuously, not frozen.
+PHOTOREALISM RULES — these override everything:
+- No cartoon outlines. No thick black strokes. No cell-shading. No comic borders.
+- Shapes built from gradients, not flat fills. Every surface has a light side and a shadow side.
+- Humans: skin is a radialGradient (warm highlight centre, cooler edge). No flat face-coloured rectangles.
+- Sky: multi-stop linearGradient matching exact time of day described. Never a single flat colour.
+- Depth: foreground elements larger/darker, background smaller/lighter. Parallax layers using t.
+- All motion driven by sec (continuous) and t (scene-long arc). Nothing static.
 
-INSTRUCTIONS: Read the scene. Detect the genre/tone/environment. Copy the EXACT code patterns below that match. Combine them into a complete animated scene.
+HUMAN FIGURES — whenever any person is described:
+- Read exact descriptors: gender, skin tone, hair colour, clothing colour/type.
+- Skin tones: Fair=rgb(245,215,185) Medium=rgb(200,155,110) Tan=rgb(175,120,75) Brown=rgb(100,65,35) DeepBrown=rgb(60,35,18). Apply radialGradient on face (lighter centre, darker edge).
+- Head: ctx.ellipse for skull. Defined jaw, chin. Neck below.
+- Hair: exact colour named. Long hair = multiple bezier curves swaying Math.sin(sec*0.5). Short = tight arc cap. Afro = large ellipse + fringe arcs. Use real RGB for the named colour.
+- Eyes: white sclera ellipse. Coloured iris circle. Dark pupil dot. Blink: Math.sin(sec*0.4+1.2)>0.94 collapses eye height to near zero.
+- Nose: quadraticCurveTo for bridge + nostrils.
+- Mouth/lips: two separate arc shapes (upper lip, lower lip) with lip-tone fill.
+- Eyebrows: filled arcs above eyes, darker than hair.
+- Torso: gradient rect. Clothing colour exact to description with shading (left side darker).
+- Arms and hands: skin-tone rects/ellipses. Fingers if close-up.
+- Legs: appropriate clothing or skin.
+- Breathing: Math.sin(sec*0.85)*3 on chest height.
+- Multiple people: each at unique x, unique skin, unique clothing.
+- Shadow beneath feet: radialGradient ellipse.
 
-BACKGROUNDS (pick one):
-Night sky: const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"rgb(2,4,15)");g.addColorStop(0.5,"rgb(5,12,40)");g.addColorStop(1,"rgb(8,20,55)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);for(let i=0;i<200;i++){ctx.fillStyle="rgba(255,255,255,"+(0.3+Math.sin(i*127+sec)*0.4)+")";ctx.fillRect((i*173)%W,(i*97)%H,1,1);}
-Day sky: const g=ctx.createLinearGradient(0,0,0,H*0.6);g.addColorStop(0,"rgb(15,60,150)");g.addColorStop(0.7,"rgb(80,150,220)");g.addColorStop(1,"rgb(180,215,245)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H*0.65);
-Sunset: const g=ctx.createLinearGradient(0,0,0,H*0.7);g.addColorStop(0,"rgb(20,10,40)");g.addColorStop(0.3,"rgb(180,50,10)");g.addColorStop(0.7,"rgb(240,130,20)");g.addColorStop(1,"rgb(255,200,80)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H*0.7);
-Interior room: const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"rgb(8,4,2)");g.addColorStop(1,"rgb(2,1,0)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ENVIRONMENTS — read the description exactly:
+Sky/time: Dawn=orange-pink-blue gradient. Midday=bright blue-white. Dusk=red-orange-violet. Night=near black rgb(2,4,15) to rgb(8,20,55) with 180 twinkling star dots.
+Sun: radialGradient white-yellow placed logically. Light rays if bright.
+Moon: soft white radialGradient glow. Vertical shimmer column below it.
+Landscape: Hills = layered bezier wave filled paths, greens in front brighter. Trees = trunk rect + foliage ellipse clusters. Mountains = jagged filled paths in greys/blues. Desert = sandy gradient + dune bezier curves.
+Water (ocean/lake/river): colour matches type. Always animated: multiple wave layers with Math.sin(x*freq+sec*speed) filled paths. Ocean = deep blue-black. Tropical = turquoise. River = grey-green.
+City/buildings: rows of building rects, height variation, window grids with some lit rgba(255,240,180,0.9) and some dark.
+Interiors: walls, floor, ceiling drawn. Furniture shapes. Lamp glow radialGradients. Correct room-type atmosphere.
+Fire: 5-7 overlapping radialGradients with Math.sin(sec*3+i) flicker, orange to yellow to white centre.
+Rain: 120 angled strokeStyle lines moving with sec.
+Snow: white specks drifting with Math.sin.
+Fog: rgba(200,210,220,0.12) layer.
 
-OCEAN (animated): for(let w=0;w<10;w++){const wg=ctx.createLinearGradient(0,H*0.54,0,H);wg.addColorStop(0,"rgba("+(6+w*5)+","+(22+w*9)+","+(65+w*14)+","+(0.5+w*0.05)+")");wg.addColorStop(1,"rgba(2,7,22,1)");ctx.fillStyle=wg;ctx.beginPath();ctx.moveTo(0,H*0.56+w*11);for(let x=0;x<=W;x+=3){ctx.lineTo(x,H*0.56+w*11+Math.sin(x*0.007+sec*(0.18+w*0.06)+w*0.9)*17+Math.sin(x*0.02+sec*0.45)*6);}ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();}
+CINEMATIC POST-PROCESSING — always, always this exact order at the end:
+1. Genre atmosphere overlay (match scene tone — documentary: rgba(255,200,150,0.025) warm; night: no extra; thriller: rgba(0,0,0,0.15) dark red tint)
+2. Slow zoom: ctx.save();ctx.translate(W/2,H/2);ctx.scale(1+t*0.025,1+t*0.025);ctx.translate(-W/2,-H/2); [redraw nothing — wrap entire scene in this] ctx.restore(); — OR apply as final pass: skip if already used transform.
+3. Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.18,W/2,H/2,W*0.82);vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,0.90)');ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+4. Colour grade: ctx.fillStyle='rgba(0,10,30,0.06)';ctx.fillRect(0,0,W,H);ctx.fillStyle='rgba(15,4,0,0.04)';ctx.fillRect(0,H*0.6,W,H*0.4);
+5. Letterbox: ctx.fillStyle='#000';ctx.fillRect(0,0,W,H*0.074);ctx.fillRect(0,H*0.926,W,H*0.074);
+6. Grain: for(let gn=0;gn<28;gn++){ctx.fillStyle='rgba(200,200,200,0.008)';ctx.fillRect(Math.random()*W,Math.random()*H,1+(Math.random()*1.2),1);}
+7. Fade in: if(t<0.04){ctx.fillStyle='rgba(0,0,0,'+(1-t*25)+')';ctx.fillRect(0,0,W,H);}
+8. Fade out: if(t>0.93){ctx.fillStyle='rgba(0,0,0,'+((t-0.93)*14.3)+')';ctx.fillRect(0,0,W,H);}
 
-MOON: const moonX=W*0.72,moonY=H*0.14;const mg=ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,H*0.11);mg.addColorStop(0,"rgba(255,255,248,1)");mg.addColorStop(0.3,"rgba(238,233,208,0.7)");mg.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=mg;ctx.fillRect(0,0,W,H*0.5);const ml=ctx.createLinearGradient(moonX-W*0.07,0,moonX+W*0.07,0);ml.addColorStop(0,"rgba(0,0,0,0)");ml.addColorStop(0.5,"rgba(255,255,235,0.12)");ml.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=ml;ctx.fillRect(moonX-W*0.07,moonY,W*0.14,H);
+ABSOLUTE RULES:
+- Return ONLY the complete JavaScript function. Zero markdown. Zero comments. Zero explanation.
+- All variables declared with const/let inside the function.
+- ctx.save()/ctx.restore() around every transform.
+- No external dependencies. HTML Canvas 2D API only.
+- Must run error-free at 30fps in a browser.
+- NEVER use flat solid colour for any major surface — always a gradient.
+- NEVER draw cartoonish outlines around shapes.
 
-CANDLE at position cx,cy: const flk=0.93+Math.sin(sec*9.1)*0.05+Math.sin(sec*13.7)*0.02;const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,H*0.3*flk);cg.addColorStop(0,"rgba(255,255,195,0.95)");cg.addColorStop(0.18,"rgba(255,185,42,0.72)");cg.addColorStop(0.55,"rgba(255,80,0,0.32)");cg.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=cg;ctx.fillRect(0,0,W,H);
-
-HUMAN FIGURE (breathing, blinking): const hh=H*0.38,hx=W*0.45,hy=H*0.78;const breath=Math.sin(sec*0.9)*0.008;const shd=ctx.createRadialGradient(hx,hy,0,hx,hy,hh*0.18);shd.addColorStop(0,"rgba(0,0,0,0.45)");shd.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=shd;ctx.beginPath();ctx.ellipse(hx,hy,hh*0.17,hh*0.045,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="rgba(30,25,50,0.95)";ctx.fillRect(hx-hh*0.09,hy-hh*0.09,hh*0.085,hh*0.32);ctx.fillRect(hx+hh*0.005,hy-hh*0.09,hh*0.085,hh*0.32);const tg=ctx.createLinearGradient(hx-hh*0.15,hy-hh*0.53,hx+hh*0.15,hy-hh*0.1);tg.addColorStop(0,"rgba(35,28,55,0.96)");tg.addColorStop(0.5,"rgba(55,44,85,1)");tg.addColorStop(1,"rgba(28,22,44,0.96)");ctx.fillStyle=tg;ctx.fillRect(hx-hh*0.15,hy-hh*0.53*(1+breath),hh*0.30,hh*0.44);ctx.fillStyle="rgba(218,172,130,0.95)";ctx.fillRect(hx-hh*0.22,hy-hh*0.51,hh*0.075,hh*0.3);ctx.fillRect(hx+hh*0.145,hy-hh*0.51,hh*0.075,hh*0.3);ctx.fillStyle="rgba(212,167,126,0.95)";ctx.fillRect(hx-hh*0.044,hy-hh*0.585,hh*0.088,hh*0.075);const hfg=ctx.createRadialGradient(hx,hy-hh*0.695,0,hx,hy-hh*0.675,hh*0.115);hfg.addColorStop(0,"rgba(234,184,142,1)");hfg.addColorStop(0.7,"rgba(215,166,124,0.97)");hfg.addColorStop(1,"rgba(185,140,98,0.8)");ctx.fillStyle=hfg;ctx.beginPath();ctx.ellipse(hx,hy-hh*0.675,hh*0.096,hh*0.118,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="rgba(35,22,8,0.96)";ctx.beginPath();ctx.ellipse(hx,hy-hh*0.77,hh*0.106,hh*0.068,0,Math.PI,Math.PI*2);ctx.fill();ctx.fillRect(hx-hh*0.106,hy-hh*0.77,hh*0.04,hh*0.1);ctx.fillRect(hx+hh*0.066,hy-hh*0.77,hh*0.04,hh*0.1);const blink=Math.sin(sec*0.4)>0.93?0.04:1;ctx.fillStyle="rgba(25,15,10,0.92)";ctx.beginPath();ctx.ellipse(hx-hh*0.033,hy-hh*0.698,hh*0.017,hh*0.013*blink,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(hx+hh*0.033,hy-hh*0.698,hh*0.017,hh*0.013*blink,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle="rgba(150,82,62,0.8)";ctx.lineWidth=2;ctx.beginPath();ctx.arc(hx,hy-hh*0.65,hh*0.025,0.15,Math.PI-0.15);ctx.stroke();
-
-WALKING FIGURE: const walk=Math.sin(sec*3);const hh=H*0.38,hx=W*0.45+t*W*0.3,hy=H*0.78;ctx.save();ctx.translate(hx-hh*0.05,hy-hh*0.09);ctx.rotate(walk*0.3);ctx.fillStyle="rgba(30,25,50,0.95)";ctx.fillRect(-hh*0.04,0,hh*0.08,hh*0.32);ctx.restore();ctx.save();ctx.translate(hx+hh*0.05,hy-hh*0.09);ctx.rotate(-walk*0.3);ctx.fillRect(-hh*0.04,0,hh*0.08,hh*0.32);ctx.restore();ctx.save();ctx.translate(hx-hh*0.15,hy-hh*0.5);ctx.rotate(-walk*0.25);ctx.fillStyle="rgba(218,172,130,0.95)";ctx.fillRect(-hh*0.035,0,hh*0.07,hh*0.28);ctx.restore();ctx.save();ctx.translate(hx+hh*0.08,hy-hh*0.5);ctx.rotate(walk*0.25);ctx.fillRect(-hh*0.035,0,hh*0.07,hh*0.28);ctx.restore();
-
-GENRE GRADES (apply after scene, before vignette):
-HORROR: ctx.fillStyle="rgba(0,0,0,0.18)";ctx.fillRect(0,0,W,H);ctx.fillStyle="rgba(70,0,0,0.09)";ctx.fillRect(0,0,W,H);if(Math.sin(sec*7.3)>0.88){ctx.fillStyle="rgba(0,0,0,0.12)";ctx.fillRect(0,0,W,H);}if(Math.sin(sec*2.1)>0.94){ctx.fillStyle="rgba(180,180,255,0.1)";ctx.fillRect(0,0,W,H);}
-NOIR: ctx.fillStyle="rgba(0,0,0,0.22)";ctx.fillRect(0,0,W,H);for(let b=0;b<8;b++){ctx.fillStyle=b%2===0?"rgba(255,220,160,0.06)":"rgba(0,0,0,0.1)";ctx.fillRect(0,H*(0.1+b*0.1),W,H*0.1);}for(let r=0;r<120;r++){ctx.strokeStyle="rgba(150,170,200,0.25)";ctx.lineWidth=0.7;ctx.beginPath();const rx=((r*173+sec*280)%W);const ry=((r*97+sec*420)%(H+40))-40;ctx.moveTo(rx,ry);ctx.lineTo(rx+4,ry+18);ctx.stroke();}
-BLACK AND WHITE: ctx.save();ctx.globalCompositeOperation="saturation";ctx.fillStyle="rgba(0,0,0,1)";ctx.fillRect(0,0,W,H);ctx.restore();if(Math.random()>0.96){ctx.strokeStyle="rgba(255,255,255,0.07)";ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(Math.random()*W,0);ctx.lineTo(Math.random()*W,H);ctx.stroke();}
-ROMANCE: const rg=ctx.createRadialGradient(W/2,H*0.3,0,W/2,H*0.3,W*0.7);rg.addColorStop(0,"rgba(255,180,120,0.07)");rg.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=rg;ctx.fillRect(0,0,W,H);
-ACTION: ctx.save();ctx.translate(Math.sin(sec*18)*1.5,0);
-SCI-FI: ctx.fillStyle="rgba(0,40,65,0.09)";ctx.fillRect(0,0,W,H);ctx.shadowColor="#00ffff";ctx.shadowBlur=15;
-WESTERN: ctx.fillStyle="rgba(130,75,15,0.09)";ctx.fillRect(0,0,W,H);for(let d=0;d<50;d++){ctx.fillStyle="rgba(210,170,90,0.06)";ctx.fillRect(((d*173+sec*20)%W),((d*97+sec*12)%H),2,1);}
-FANTASY: ctx.fillStyle="rgba(40,0,60,0.07)";ctx.fillRect(0,0,W,H);for(let m=0;m<30;m++){const mg2=ctx.createRadialGradient((m*173+sec*40)%W,((m*97+sec*30)%H),0,(m*173+sec*40)%W,((m*97+sec*30)%H),3+Math.sin(m+sec)*2);mg2.addColorStop(0,"rgba(255,200,80,0.7)");mg2.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=mg2;ctx.fillRect(0,0,W,H);}
-COMEDY: ctx.fillStyle="rgba(255,240,0,0.04)";ctx.fillRect(0,0,W,H);
-DOCUMENTARY: ctx.fillStyle="rgba(255,200,150,0.03)";ctx.fillRect(0,0,W,H);
-
-// always add last:
-Parallax: ctx.save();ctx.translate(-t*W*0.018,0);[far elements]ctx.restore();ctx.save();ctx.translate(-t*W*0.038,0);[mid]ctx.restore();
-Zoom: ctx.save();ctx.translate(W/2,H/2);ctx.scale(1+t*0.04,1+t*0.04);ctx.translate(-W/2,-H/2);
-Fade in: if(t<0.05){ctx.fillStyle="rgba(0,0,0,"+(1-t*20)+")";ctx.fillRect(0,0,W,H);}
-Fade out: if(t>0.92){ctx.fillStyle="rgba(0,0,0,"+((t-0.92)*12.5)+")";ctx.fillRect(0,0,W,H);}
-Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.12,W/2,H/2,W*0.88);vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.92)");ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
-Colour grade: ctx.fillStyle="rgba(0,12,35,0.07)";ctx.fillRect(0,0,W,H);ctx.fillStyle="rgba(18,4,0,0.05)";ctx.fillRect(0,H*0.6,W,H*0.4);
-Letterbox: ctx.fillStyle="#000";ctx.fillRect(0,0,W,H*0.074);ctx.fillRect(0,H*0.926,W,H*0.074);
-Grain: for(let g=0;g<25;g++){ctx.fillStyle="rgba(200,200,200,0.008)";ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
-
-Return ONLY the complete function:
+Return ONLY:
 function drawFrame(ctx, W, H, t, sec) {`;
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",
