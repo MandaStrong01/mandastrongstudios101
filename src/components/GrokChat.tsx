@@ -91,7 +91,7 @@ const KB: QA[] = [
   },
   {
     keywords: ["tutorial", "learn", "guide", "how to", "lesson", "page 19"],
-    answer: "Tutorials are on Page 19 — 12 step-by-step production lessons covering every part of the platform. Click any tutorial to expand and watch inline. Each includes expert pro tips for that specific workflow stage. The complete platform guide is also available on Page 23.",
+    answer: "Tutorials are on Page 19 — 13 step-by-step production lessons covering every part of the platform. Click any tutorial to expand and watch inline. Each includes expert pro tips for that specific workflow stage. The complete platform guide is also available on Page 23.",
     followUps: ["Tell me about the full platform workflow", "How do I get started?", "Where is the How-To Guide?"],
   },
   {
@@ -192,34 +192,60 @@ export default function GrokChat({ onNavigate }: GrokChatProps) {
 
   return (
     <>
+      <style>{`
+        @keyframes grok-pulse {
+          0%, 100% { opacity: .35; transform: scale(.85); }
+          50% { opacity: 1; transform: scale(1.1); }
+        }
+        @keyframes grok-dot {
+          0%, 100% { box-shadow: 0 0 5px #22c55e44; }
+          50% { box-shadow: 0 0 12px #22c55e; }
+        }
+        @keyframes grok-open {
+          from { opacity: 0; transform: translateY(12px) scale(.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .grok-btn:hover { filter: brightness(1.15); transform: scale(1.03); }
+        .grok-sugg:hover { border-color: ${GOLD} !important; color: ${GOLD} !important; background: #0d0a00 !important; }
+        .grok-follow:hover { border-color: ${GOLDDIM} !important; color: ${WHITE} !important; }
+        .grok-send:hover:not(:disabled) { filter: brightness(1.1); }
+      `}</style>
+
       {/* Toggle button */}
       <button
+        className="grok-btn"
         onClick={() => setIsOpen(o => !o)}
         aria-label="Agent Grok"
         style={{
           position: 'fixed', bottom: 24, left: 24, zIndex: 9000,
-          width: 56, height: 56,
-          background: isOpen ? '#0a0800' : `linear-gradient(135deg,${GOLDDIM},${GOLD})`,
-          border: `2px solid ${GOLD}`,
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: isOpen ? 'none' : `0 0 28px ${GOLD}55`,
-          transition: 'all .2s',
+          width: 58, height: 58,
+          background: isOpen
+            ? 'linear-gradient(135deg,#0a0800,#050400)'
+            : `linear-gradient(135deg,#7a5200,${GOLDDIM},${GOLD})`,
+          border: `2px solid ${isOpen ? GOLDDIM : GOLD}`,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: isOpen ? 'none' : `0 0 32px ${GOLD}55, 0 4px 24px rgba(0,0,0,.7)`,
+          transition: 'all .25s',
           borderRadius: 0,
+          flexShrink: 0,
         }}
       >
         {isOpen
-          ? <X size={20} color={GOLD} />
-          : <span style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 900, color: '#000', lineHeight: 1 }}>G</span>
+          ? <X size={20} color={GOLD} strokeWidth={2.5} />
+          : <span style={{ fontFamily: "'Cinzel',serif", fontSize: 24, fontWeight: 900, color: '#000', lineHeight: 1, letterSpacing: -1 }}>G</span>
         }
       </button>
 
-      {/* Unread badge when closed and has messages */}
+      {/* Unread badge */}
       {!isOpen && messages.length > 0 && (
         <div style={{
-          position: 'fixed', bottom: 68, left: 58, zIndex: 9001,
-          background: GREEN, borderRadius: '50%', width: 16, height: 16,
+          position: 'fixed', bottom: 70, left: 62, zIndex: 9001,
+          background: GREEN, width: 17, height: 17, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 9, fontWeight: 900, color: '#000',
+          boxShadow: `0 0 8px ${GREEN}88`,
+          fontFamily: "'Rajdhani',sans-serif",
         }}>
           {messages.filter(m => !m.isUser).length}
         </div>
@@ -230,71 +256,100 @@ export default function GrokChat({ onNavigate }: GrokChatProps) {
           {/* Backdrop */}
           <div
             onClick={() => setIsOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 8990, backdropFilter: 'blur(2px)' }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 8990, backdropFilter: 'blur(3px)' }}
           />
 
           {/* Chat panel */}
           <div style={{
-            position: 'fixed', bottom: 92, left: 24, zIndex: 9000,
-            width: 'min(420px, calc(100vw - 48px))',
-            maxHeight: 580,
-            background: '#050500',
+            position: 'fixed', bottom: 94, left: 24, zIndex: 9000,
+            width: 'min(430px, calc(100vw - 48px))',
+            maxHeight: 600,
+            background: '#030200',
             border: `2px solid ${GOLD}`,
             display: 'flex', flexDirection: 'column',
             fontFamily: "'Rajdhani',sans-serif",
-            boxShadow: `0 8px 60px ${GOLD}22, 0 2px 20px rgba(0,0,0,.8)`,
+            boxShadow: `0 12px 80px ${GOLD}25, 0 4px 30px rgba(0,0,0,.9), inset 0 1px 0 ${GOLD}22`,
+            animation: 'grok-open .22s ease-out both',
           }}>
 
             {/* Header */}
             <div style={{
-              background: `linear-gradient(135deg,#0d0a00,#0a0800)`,
-              borderBottom: `1px solid ${GOLDDIM}66`,
-              padding: '14px 16px',
-              display: 'flex', alignItems: 'center', gap: 12,
+              background: `linear-gradient(135deg,#0e0900,#080600,#0a0800)`,
+              borderBottom: `1px solid ${GOLD}55`,
+              padding: '16px 18px',
+              display: 'flex', alignItems: 'center', gap: 14,
+              position: 'relative', overflow: 'hidden',
             }}>
+              {/* Subtle gold shimmer line */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${GOLD},transparent)` }} />
+
+              {/* Avatar */}
               <div style={{
-                width: 36, height: 36,
-                background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                boxShadow: `0 0 12px ${GOLD}44`,
+                width: 42, height: 42, flexShrink: 0,
+                background: `linear-gradient(135deg,#4a3200,${GOLDDIM},${GOLD})`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 0 18px ${GOLD}55`,
+                border: `1px solid ${GOLD}66`,
               }}>
-                <span style={{ fontFamily: "'Cinzel',serif", fontSize: 17, fontWeight: 900, color: '#000' }}>G</span>
+                <span style={{ fontFamily: "'Cinzel',serif", fontSize: 20, fontWeight: 900, color: '#000' }}>G</span>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: GOLD, fontWeight: 900, fontSize: 14, letterSpacing: 3 }}>AGENT GROK</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: GREEN, boxShadow: `0 0 8px ${GREEN}` }} />
-                  <span style={{ color: GREEN, fontSize: 9, fontWeight: 900, letterSpacing: 2 }}>ONLINE · MANDASTRONG STUDIO ASSISTANT</span>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: GOLD, fontWeight: 900, fontSize: 15, letterSpacing: 4, fontFamily: "'Cinzel',serif" }}>AGENT GROK</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3 }}>
+                  <div style={{
+                    width: 7, height: 7, borderRadius: '50%', background: GREEN,
+                    animation: 'grok-dot 2s ease-in-out infinite',
+                  }} />
+                  <span style={{ color: GREEN, fontSize: 9, fontWeight: 900, letterSpacing: 2 }}>ONLINE · 24/7 STUDIO ASSISTANT</span>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', opacity: .6, transition: 'opacity .15s' }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '.6')}>
-                <X size={16} color={GOLD} />
+
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: 'none', border: `1px solid ${GOLDDIM}55`, cursor: 'pointer',
+                  padding: 6, display: 'flex', opacity: .55, transition: 'opacity .15s, border-color .15s',
+                  borderRadius: 0,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = GOLD; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '.55'; e.currentTarget.style.borderColor = GOLDDIM + '55'; }}>
+                <X size={14} color={GOLD} />
               </button>
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 260 }}>
+            <div style={{
+              flex: 1, overflowY: 'auto', padding: '16px 14px 8px',
+              display: 'flex', flexDirection: 'column', gap: 12, minHeight: 280,
+              scrollbarWidth: 'thin', scrollbarColor: `${GOLDDIM}44 transparent`,
+            }}>
 
-              {/* Welcome */}
+              {/* Welcome state */}
               {messages.length === 0 && (
-                <div style={{ background: '#0a0800', border: `1px solid ${GOLDDIM}55`, padding: '14px 16px' }}>
-                  <div style={{ color: GREEN, fontSize: 10, fontWeight: 900, letterSpacing: 2, marginBottom: 8 }}>AGENT GROK · STUDIO ASSISTANT</div>
-                  <p style={{ color: WHITE, fontSize: 13, lineHeight: 1.75, margin: '0 0 14px' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg,#0a0800,#060500)',
+                  border: `1px solid ${GOLD}44`,
+                  padding: '18px 18px 14px',
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg,transparent,${GOLDDIM},transparent)` }} />
+                  <div style={{ color: GREEN, fontSize: 9, fontWeight: 900, letterSpacing: 3, marginBottom: 10 }}>AGENT GROK · STUDIO ASSISTANT</div>
+                  <p style={{ color: WHITE, fontSize: 13, lineHeight: 1.85, margin: '0 0 16px' }}>
                     Good day. I have complete knowledge of every tool, workflow, and feature across all 23 pages of MandaStrong Studio. Ask me anything.
                   </p>
-                  <div style={{ color: DIM, fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>QUICK START</div>
+                  <div style={{ color: GOLDDIM, fontSize: 9, fontWeight: 900, letterSpacing: 3, marginBottom: 10 }}>QUICK START</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {SUGGESTIONS.map(s => (
-                      <button key={s} onClick={() => sendMessage(s)} style={{
-                        background: 'transparent', border: `1px solid ${GOLDDIM}55`, color: WHITE,
-                        padding: '5px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                        fontFamily: "'Rajdhani',sans-serif", letterSpacing: 1,
-                        transition: 'border-color .15s, color .15s',
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = GOLD; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = GOLDDIM + '55'; e.currentTarget.style.color = WHITE; }}>
+                      <button
+                        key={s}
+                        className="grok-sugg"
+                        onClick={() => sendMessage(s)}
+                        style={{
+                          background: 'transparent', border: `1px solid ${GOLDDIM}44`, color: WHITE,
+                          padding: '6px 11px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                          fontFamily: "'Rajdhani',sans-serif", letterSpacing: 1, transition: 'all .15s',
+                        }}>
                         {s}
                       </button>
                     ))}
@@ -302,34 +357,41 @@ export default function GrokChat({ onNavigate }: GrokChatProps) {
                 </div>
               )}
 
-              {/* Message history */}
+              {/* Messages */}
               {messages.map((msg, i) => (
                 <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.isUser ? 'flex-end' : 'flex-start', gap: 6 }}>
                   <div style={{
-                    background: msg.isUser ? `linear-gradient(135deg,${GOLDDIM}22,${GOLD}11)` : '#0a0800',
-                    border: `1px solid ${msg.isUser ? GOLDDIM + '88' : GOLDDIM + '44'}`,
-                    padding: '11px 14px',
-                    maxWidth: '90%',
+                    background: msg.isUser
+                      ? `linear-gradient(135deg,${GOLDDIM}28,${GOLD}14)`
+                      : 'linear-gradient(135deg,#0c0900,#070500)',
+                    border: `1px solid ${msg.isUser ? GOLDDIM + '99' : GOLD + '33'}`,
+                    padding: '12px 15px',
+                    maxWidth: '92%',
+                    position: 'relative', overflow: 'hidden',
                   }}>
-                    <div style={{ color: msg.isUser ? GOLD : GREEN, fontSize: 9, fontWeight: 900, letterSpacing: 2, marginBottom: 6 }}>
+                    {!msg.isUser && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg,${GOLD}44,transparent)` }} />}
+                    <div style={{ color: msg.isUser ? GOLD : GREEN, fontSize: 9, fontWeight: 900, letterSpacing: 2, marginBottom: 7 }}>
                       {msg.isUser ? 'YOU' : 'AGENT GROK'}
                     </div>
-                    <p style={{ color: WHITE, fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-line' }}>{msg.text}</p>
+                    <p style={{ color: WHITE, fontSize: 13, lineHeight: 1.8, margin: 0, whiteSpace: 'pre-line' }}>{msg.text}</p>
                   </div>
-                  {/* Follow-up suggestions */}
+
+                  {/* Follow-ups */}
                   {!msg.isUser && msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'stretch' }}>
                       {msg.followUps.map(f => (
-                        <button key={f} onClick={() => sendMessage(f)} style={{
-                          background: 'transparent', border: `1px solid ${GOLDDIM}33`,
-                          color: DIM, padding: '5px 10px', cursor: 'pointer',
-                          fontSize: 11, fontWeight: 700, fontFamily: "'Rajdhani',sans-serif",
-                          letterSpacing: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6,
-                          transition: 'border-color .15s, color .15s',
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = GOLDDIM; e.currentTarget.style.color = WHITE; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = GOLDDIM + '33'; e.currentTarget.style.color = DIM; }}>
-                          <ChevronRight size={10} />
+                        <button
+                          key={f}
+                          className="grok-follow"
+                          onClick={() => sendMessage(f)}
+                          style={{
+                            background: 'transparent', border: `1px solid ${GOLDDIM}33`,
+                            color: DIM, padding: '6px 12px', cursor: 'pointer',
+                            fontSize: 11, fontWeight: 700, fontFamily: "'Rajdhani',sans-serif",
+                            letterSpacing: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 7,
+                            transition: 'all .15s',
+                          }}>
+                          <ChevronRight size={10} strokeWidth={2.5} />
                           {f}
                         </button>
                       ))}
@@ -340,13 +402,19 @@ export default function GrokChat({ onNavigate }: GrokChatProps) {
 
               {/* Typing indicator */}
               {typing && (
-                <div style={{ background: '#0a0800', border: `1px solid ${GOLDDIM}44`, padding: '11px 16px', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  background: 'linear-gradient(135deg,#0c0900,#070500)',
+                  border: `1px solid ${GOLD}33`,
+                  padding: '12px 16px',
+                  alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 10,
+                }}>
                   <div style={{ color: GREEN, fontSize: 9, fontWeight: 900, letterSpacing: 2 }}>AGENT GROK</div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', gap: 5 }}>
                     {[0, 1, 2].map(d => (
                       <div key={d} style={{
-                        width: 5, height: 5, borderRadius: '50%', background: GOLD,
-                        animation: `pulse 1.2s ease-in-out ${d * 0.2}s infinite`,
+                        width: 5, height: 5, borderRadius: '50%',
+                        background: GOLD,
+                        animation: `grok-pulse 1.2s ease-in-out ${d * 0.22}s infinite`,
                       }} />
                     ))}
                   </div>
@@ -356,8 +424,13 @@ export default function GrokChat({ onNavigate }: GrokChatProps) {
               <div ref={bot} />
             </div>
 
-            {/* Input */}
-            <div style={{ borderTop: `1px solid ${GOLDDIM}55`, padding: '10px 12px', display: 'flex', gap: 8, background: '#070600' }}>
+            {/* Input area */}
+            <div style={{
+              borderTop: `1px solid ${GOLD}44`,
+              padding: '11px 13px',
+              display: 'flex', gap: 8,
+              background: 'linear-gradient(135deg,#060500,#040300)',
+            }}>
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -365,44 +438,50 @@ export default function GrokChat({ onNavigate }: GrokChatProps) {
                 placeholder="Ask about any tool, workflow, or feature..."
                 disabled={typing}
                 style={{
-                  flex: 1, padding: '10px 13px', background: '#0a0800',
-                  border: `1px solid ${GOLDDIM}66`, color: WHITE, fontSize: 13,
+                  flex: 1, padding: '10px 14px',
+                  background: '#0a0800',
+                  border: `1px solid ${GOLDDIM}55`, color: WHITE, fontSize: 13,
                   outline: 'none', fontFamily: "'Rajdhani',sans-serif",
                   transition: 'border-color .15s',
                 }}
                 onFocus={e => (e.currentTarget.style.borderColor = GOLD)}
-                onBlur={e => (e.currentTarget.style.borderColor = GOLDDIM + '66')}
+                onBlur={e => (e.currentTarget.style.borderColor = GOLDDIM + '55')}
               />
               <button
+                className="grok-send"
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || typing}
                 style={{
-                  background: input.trim() && !typing ? `linear-gradient(135deg,${GOLDDIM},${GOLD})` : '#0a0800',
-                  border: `1px solid ${input.trim() && !typing ? GOLD : GOLDDIM + '44'}`,
+                  background: input.trim() && !typing
+                    ? `linear-gradient(135deg,${GOLDDIM},${GOLD})`
+                    : '#0a0800',
+                  border: `1px solid ${input.trim() && !typing ? GOLD : GOLDDIM + '33'}`,
                   color: input.trim() && !typing ? '#000' : GOLDDIM,
-                  padding: '0 15px', cursor: input.trim() && !typing ? 'pointer' : 'not-allowed',
-                  display: 'flex', alignItems: 'center', transition: 'all .15s',
-                  boxShadow: input.trim() && !typing ? `0 0 12px ${GOLD}33` : 'none',
+                  padding: '0 16px', cursor: input.trim() && !typing ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all .15s',
+                  boxShadow: input.trim() && !typing ? `0 0 16px ${GOLD}44` : 'none',
+                  flexShrink: 0,
                 }}
               >
-                <Send size={15} />
+                <Send size={15} strokeWidth={2.5} />
               </button>
             </div>
 
-            {/* Footer */}
-            <div style={{ padding: '6px 14px 8px', borderTop: `1px solid ${GOLDDIM}22`, textAlign: 'center' }}>
-              <span style={{ color: DIM, fontSize: 9, letterSpacing: 2, fontWeight: 700 }}>MANDASTRONG STUDIO · ALL 23 PAGES · FULL KNOWLEDGE BASE</span>
+            {/* Footer bar */}
+            <div style={{
+              padding: '6px 14px 8px',
+              borderTop: `1px solid ${GOLDDIM}22`,
+              textAlign: 'center',
+              background: '#020100',
+            }}>
+              <span style={{ color: GOLDDIM, fontSize: 8, letterSpacing: 3, fontWeight: 900 }}>
+                MANDASTRONG STUDIO · ALL 23 PAGES · FULL KNOWLEDGE BASE
+              </span>
             </div>
           </div>
         </>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: .3; transform: scale(.8); }
-          50% { opacity: 1; transform: scale(1.1); }
-        }
-      `}</style>
     </>
   );
 }
