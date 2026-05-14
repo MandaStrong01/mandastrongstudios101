@@ -3224,7 +3224,7 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      {/* background.mp4 locked at very top */}
+      {/* background.mp4 — full width top of page */}
       <video autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",maxHeight:"70vh",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
@@ -3236,7 +3236,13 @@ function P23({ go }) {
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,textShadow:`0 0 30px ${GOLD}99`,marginBottom:6}}>THAT'S ALL FOLKS</h1>
-          <div style={{color:WHITE,fontSize:12,letterSpacing:3,marginBottom:6}}>THANK YOU FOR CREATING WITH US</div>
+          <div style={{color:WHITE,fontSize:12,letterSpacing:3,marginBottom:12}}>THANK YOU FOR CREATING WITH US</div>
+          <video autoPlay loop playsInline muted preload="auto"
+            style={{width:"100%",maxWidth:640,display:"block",margin:"0 auto 20px",border:`1px solid ${GOLD}`,background:"#000"}}
+            onError={e=>{e.currentTarget.style.display="none";}}>
+            <source src="/ThatsAllFolks.mp4" type="video/mp4"/>
+            <source src="ThatsAllFolks.mp4" type="video/mp4"/>
+          </video>
           <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:24}}/>
 
           {/* Home and Exit buttons only */}
