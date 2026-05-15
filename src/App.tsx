@@ -513,7 +513,7 @@ function MusicVideoStudio({ onClose, onSave }) {
     mood:"Melancholic", tempo:"Slow (60-80 BPM)",
     videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
     effects:["Slow Motion","Film Grain","Vignette"],
-    cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",durationMins:3,
+    cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",
     visualDesc:"",
   });
   const set = (k,v) => setConfig(p=>({...p,[k]:v}));
@@ -551,7 +551,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(4);
 
       // ── BEAT ANALYSIS ─────────────────────────────────────────────
-      let totalDur = Math.max(10,(config.durationMins||3)*60);
+      let totalDur = 180;
       let beatGrid = [];
       let audioCtx = null, audioDest = null, audioSource = null;
 
@@ -1015,14 +1015,14 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                     <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG · PNG · matches style and mood</div>
                   </div>
                 )}
-                {label("DURATION — "+config.durationMins+" MINUTES")}
-                <input type="range" min={0} max={180} step={1}
-                  value={config.durationMins||3}
-                  onChange={e=>set("durationMins",+e.target.value)}
-                  style={{width:"100%",accentColor:GOLD,marginBottom:4}}/>
-                <div style={{display:"flex",justifyContent:"space-between"}}>
-                  <span style={{color:DIM,fontSize:10}}>0 min</span>
-                  <span style={{color:DIM,fontSize:10}}>180 min</span>
+                {label("DURATION")}
+                <div style={{display:"flex",gap:6}}>
+                  {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
+                    <button key={d} onClick={()=>set("duration",d)}
+                      style={{background:config.duration===d?GOLD:"#111",border:`1px solid ${config.duration===d?"#000":GOLDDIM}`,color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
+                      {d}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -2805,7 +2805,7 @@ function P17({ go, rendered, mediaLib }) {
   const [currentTime,setCurrentTime]=useState(0);
   const [duration,setDuration]=useState(0);
   const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
-  const fmt=s=>{if(!s||!isFinite(s)||isNaN(s))return "00:00";const m=Math.floor(s/60);const sc=Math.floor(s%60);return `${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;};
+  const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return `${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;};
   const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
   return (
     <div style={{...Sp,padding:40}}>
