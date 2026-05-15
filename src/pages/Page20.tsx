@@ -14,7 +14,7 @@ interface PageProps {
 }
 
 export default function Page20({ onNavigate }: PageProps) {
-  const [tab, setTab] = useState("about");
+  const [tab, setTab] = useState("tos");
 
   const sec = (title: string, body: React.ReactNode) => (
     <div style={{ marginBottom: 20 }}>
@@ -28,11 +28,11 @@ export default function Page20({ onNavigate }: PageProps) {
     <div style={{ ...Sp, padding: "30px 40px 80px" }}>
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
         <div style={{ fontSize: 11, color: GOLD, letterSpacing: 4, marginBottom: 4, fontWeight: 700 }}>MANDASTRONG STUDIO</div>
-        <h1 style={{ fontFamily: "'Cinzel',serif", color: GOLD, fontSize: 28, fontWeight: 900, letterSpacing: 4, marginBottom: 4 }}>ABOUT & LEGAL</h1>
-        <div style={{ color: DIM, fontSize: 11, marginBottom: 24, letterSpacing: 2 }}>AMANDA WOOLLEY · FOUNDER · MARCH 2026</div>
+        <h1 style={{ fontFamily: "'Cinzel',serif", color: GOLD, fontSize: 28, fontWeight: 900, letterSpacing: 4, marginBottom: 4 }}>TERMS & DISCLAIMER</h1>
+        <div style={{ color: DIM, fontSize: 11, marginBottom: 24, letterSpacing: 2 }}>EFFECTIVE MARCH 2026 · MANDASTRONG STUDIO LLC</div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", marginBottom: 28, border: `1px solid ${GOLDDIM}` }}>
-          {([["about", "ABOUT"], ["terms", "TERMS"], ["disc", "DISCLAIMER"]] as [string, string][]).map(([id, label]) => (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", marginBottom: 28, border: `1px solid ${GOLDDIM}` }}>
+          {([["tos", "TERMS OF SERVICE"], ["disc", "DISCLAIMER"]] as [string, string][]).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
               style={{ background: tab === id ? `linear-gradient(135deg,#0a0500,#1a0800)` : "#000", border: "none", borderBottom: tab === id ? `2px solid ${GOLD}` : "2px solid transparent", color: tab === id ? GOLD : WHITE, padding: "14px", cursor: "pointer", fontSize: 12, fontWeight: 900, letterSpacing: 3, fontFamily: "'Rajdhani',sans-serif" }}>
               {label}
@@ -40,41 +40,7 @@ export default function Page20({ onNavigate }: PageProps) {
           ))}
         </div>
 
-        {tab === "about" && (
-          <div>
-            <div style={{ background: "#050500", border: `2px solid ${GOLD}`, padding: "20px 24px", marginBottom: 20, textAlign: "center" }}>
-              <div style={{ fontFamily: "'Cinzel',serif", color: GOLD, fontSize: 18, fontWeight: 900, letterSpacing: 4, marginBottom: 8 }}>MANDASTRONG STUDIO</div>
-              <div style={{ color: WHITE, fontSize: 13, lineHeight: 1.9 }}>Professional Cinema Intelligence Platform · Built by a creator, for creators.</div>
-            </div>
-
-            {sec("WHO BUILT THIS", <>
-              {p("My name is Amanda Woolley. I am not a tech company. I am not a corporation with a legal team and a PR department. I am a writer, a creative producer, and a self-taught developer who spent years learning to code this platform from scratch.")}
-              {p("I built MandaStrong Studio because I was frustrated. I had stories to tell and no tools I could afford. Every professional filmmaking tool was either out of reach financially or required a team of specialists. That felt wrong to me — and still does.")}
-              {p("So I built the tools I needed. And then I kept building. What started as a personal project became a full production platform with 600+ AI filmmaking tools, a complete production pipeline from script to screen, and the ability to produce films up to three hours long — on any device, by any person.")}
-            </>)}
-
-            {sec("WHY THIS EXISTS", <>
-              {p("MandaStrong Studio exists for one reason: every person deserves the tools to tell their story. Not just the wealthy. Not just the technically skilled. Everyone.")}
-              {p("Two causes sit at the heart of this project. A meaningful portion of every subscription goes to veterans' mental health programmes and school anti-bullying initiatives. These are not marketing statements. They are the reason I kept going on the days when this felt impossible.")}
-            </>)}
-
-            {sec("WHAT THIS PLATFORM IS", <>
-              {p("MandaStrong Studio is a browser-based AI filmmaking platform. It uses Claude (Anthropic's AI) to generate scripts, format narration, render cinematic scenes, and power the Agent Grok assistant. It uses the Web Speech API for text-to-speech. It uses your browser's canvas and MediaRecorder for video rendering.")}
-              {p("Everything runs in your browser. Nothing is stored on a server by default. Your projects are saved locally using your browser's storage. The platform works on desktop, tablet, and mobile.")}
-            </>)}
-
-            {sec("SUBSCRIPTIONS", <>
-              {p("Creator Plan — $20/month. Pro Plan — $30/month. Studio Plan — $50/month with a 7-day free trial. All payments are processed by Stripe. I do not store your card details.")}
-              {p("Subscriptions auto-renew monthly. You can cancel at any time. I do not issue refunds for partial billing periods — if you cancel mid-month, your access continues until the end of that period.")}
-            </>)}
-
-            <div style={{ background: "#050500", border: `1px solid ${GOLDDIM}`, padding: "14px 18px", marginTop: 8 }}>
-              <p style={{ color: GOLDDIM, fontSize: 11, margin: 0, letterSpacing: 1 }}>Questions? Use Agent Grok on Page 21 or visit MandaStrong1.Etsy.com</p>
-            </div>
-          </div>
-        )}
-
-        {tab === "terms" && (
+        {tab === "tos" && (
           <div>
             <div style={{ background: "#050500", border: `2px solid ${GOLD}`, padding: "14px 20px", marginBottom: 20, textAlign: "center" }}>
               <div style={{ color: GOLD, fontSize: 11, letterSpacing: 3, fontWeight: 900 }}>TERMS OF SERVICE · MANDASTRONG STUDIO LLC · MARCH 2026</div>

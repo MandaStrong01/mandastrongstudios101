@@ -2003,15 +2003,23 @@ function P11({ mediaLib, setMediaLib }) {
         {mediaLib.length>0&&(
           <div>
             <h3 style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:10}}>MEDIA LIBRARY ({mediaLib.length})</h3>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {mediaLib.map(a=>(
-                <div key={a.id} style={{...Card(),padding:8,position:"relative"}}>
-                  {a.type.startsWith("video")?<video src={a.url} style={{width:"100%",marginBottom:5}}/>:
-                   a.type.startsWith("image")?<img src={a.url} style={{width:"100%",marginBottom:5}} alt={a.name}/>:
-                   <div style={{height:60,background:"#000",marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎵</div>}
-                  <div style={{color:WHITE,fontSize:11,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.name}</div>
+                <div key={a.id} style={{...Card(),padding:"10px 14px",display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+                  <div style={{width:36,height:36,background:a.type.startsWith("audio")?"#0a0a1a":"#0a0500",border:`1px solid ${GOLDDIM}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                    {a.type.startsWith("audio")?"🎵":"🎬"}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{color:WHITE,fontSize:12,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.name}</div>
+                    <div style={{display:"flex",gap:10,marginTop:3,alignItems:"center",flexWrap:"wrap"}}>
+                      {a.duration&&<span style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>{a.duration}</span>}
+                      {a.hasAudio&&<span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,background:"#052105",border:"1px solid #22c55e44",padding:"1px 6px"}}>● AUDIO</span>}
+                      {a.status==="ready"&&<span style={{color:"#f59e0b",fontSize:9,fontWeight:900,letterSpacing:2,background:"#1a0e00",border:"1px solid #f59e0b44",padding:"1px 6px"}}>⚡ READY TO RENDER</span>}
+                      {a.url&&<span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,background:"#052105",border:"1px solid #22c55e44",padding:"1px 6px"}}>✓ LOADED</span>}
+                    </div>
+                  </div>
                   <button onClick={()=>setMediaLib(p=>p.filter(x=>x.id!==a.id))}
-                    style={{position:"absolute",top:5,right:5,background:"#7f1d1d",border:"none",color:"#ef4444",width:16,height:16,cursor:"pointer",fontSize:9,padding:0}}>✕</button>
+                    style={{background:"#7f1d1d",border:"none",color:"#ef4444",width:20,height:20,cursor:"pointer",fontSize:10,padding:0,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
@@ -2723,7 +2731,24 @@ export default function App() {
     return()=>{try{document.head.removeChild(link);}catch{} window.removeEventListener("beforeinstallprompt",handleInstall);};
   },[]);
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_user")||'{"name":"Guest","plan":"Guest","isAdmin":false}');}catch{return {name:"Guest",plan:"Guest",isAdmin:false};}});
-  const [mediaLib,setMediaLib]=useState([]);
+  const [mediaLib,setMediaLib]=useState(()=>{
+    const DOC_CLIPS=[
+      {id:"aih_01",name:"AI for Humanity — Ch1 — Dawn of Intelligence",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"4:12",chapter:"01"},
+      {id:"aih_02",name:"AI for Humanity — Ch2 — The Human Cost",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"5:30",chapter:"02"},
+      {id:"aih_03",name:"AI for Humanity — Ch3 — Voices from the Margins",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"6:08",chapter:"03"},
+      {id:"aih_04",name:"AI for Humanity — Ch4 — Healthcare Revolution",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"7:22",chapter:"04"},
+      {id:"aih_05",name:"AI for Humanity — Ch5 — Education for All",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"5:45",chapter:"05"},
+      {id:"aih_06",name:"AI for Humanity — Ch6 — The Climate Crisis",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"8:03",chapter:"06"},
+      {id:"aih_07",name:"AI for Humanity — Ch7 — Veterans & PTSD",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"6:55",chapter:"07"},
+      {id:"aih_08",name:"AI for Humanity — Ch8 — Children & Social Skills",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"5:18",chapter:"08"},
+      {id:"aih_09",name:"AI for Humanity — Ch9 — Bullying and the Digital World",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"7:44",chapter:"09"},
+      {id:"aih_10",name:"AI for Humanity — Ch10 — Creators Without Borders",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"6:30",chapter:"10"},
+      {id:"aih_11",name:"AI for Humanity — Ch11 — The Ethics of Intelligence",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"8:55",chapter:"11"},
+      {id:"aih_12",name:"AI for Humanity — Ch12 — Tomorrow Belongs to Us",type:"video/webm",url:"",status:"ready",hasAudio:true,duration:"7:10",chapter:"12"},
+      {id:"aih_13",name:"AI for Humanity — Narration Track (James Voice · Full Documentary)",type:"audio/webm",url:"",status:"ready",hasAudio:true,duration:"90:00",chapter:"AUDIO"},
+    ];
+    return DOC_CLIPS;
+  });
   const [timeline,setTimeline]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_timeline")||"{}");}catch{return {};}});
   const [rendered,setRendered]=useState(null);
   const [filmDuration,setFilmDuration]=useState(60);
@@ -2865,6 +2890,7 @@ const allPages=[
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
+      <style>{`[data-bolt-badge],a[href*="bolt.new"],.bolt-badge,#bolt-badge,[class*="bolt-badge"],[id*="bolt-badge"],bolt-ai-badge,[data-testid*="bolt"]{display:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;pointer-events:none!important;position:absolute!important;left:-9999px!important;}`}</style>
       <Header go={go} setMenu={setMenu}/>
       {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
       {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
