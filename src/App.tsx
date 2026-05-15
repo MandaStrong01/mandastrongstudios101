@@ -490,6 +490,48 @@ function ToolPage({ title, subtitle, tools, onSave }) {
   );
 }
 
+function RecordYourOwnSong({ onRecorded }) {
+  const [recording,setRecording]=useState(false);
+  const [recTime,setRecTime]=useState(0);
+  const mrRef=useRef(null);
+  const timerRef=useRef(null);
+  const start=async()=>{
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(stream);
+      mrRef.current=mr;
+      const chunks=[];
+      mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+      mr.onstop=()=>{
+        const blob=new Blob(chunks,{type:"audio/webm"});
+        const name="recording_"+Date.now()+".webm";
+        onRecorded(blob,name);
+        stream.getTracks().forEach(t=>t.stop());
+        setRecording(false);setRecTime(0);
+      };
+      mr.start(100);setRecording(true);setRecTime(0);
+      timerRef.current=setInterval(()=>setRecTime(t=>t+1),1000);
+    }catch(e){alert("Microphone access denied. Please allow microphone and try again.");}
+  };
+  const stop=()=>{
+    if(mrRef.current&&mrRef.current.state!=="inactive")mrRef.current.stop();
+    if(timerRef.current)clearInterval(timerRef.current);
+  };
+  const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  return recording?(
+    <div style={{display:"flex",alignItems:"center",gap:10,background:"#1a0000",border:"1px solid #ef4444",padding:"10px 14px",marginTop:8}}>
+      <div style={{width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444"}}/>
+      <span style={{color:"#ef4444",fontWeight:900,fontSize:12,letterSpacing:2,flex:1}}>RECORDING — {fmt(recTime)}</span>
+      <button onClick={stop} style={{background:"#ef4444",border:"none",color:"#fff",padding:"6px 16px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>■ STOP & SAVE</button>
+    </div>
+  ):(
+    <button onClick={start} style={{width:"100%",background:"linear-gradient(135deg,#7a0000,#ef4444)",border:"none",color:"#fff",padding:"10px 14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,marginTop:8,fontFamily:"'Rajdhani',sans-serif"}}>
+      ● RECORD YOUR OWN SONG
+    </button>
+  );
+}
+
+
 function MusicVideoStudio({ onClose, onSave }) {
   const [step, setStep] = useState(1);
   const [generating, setGenerating] = useState(false);
@@ -509,7 +551,7 @@ function MusicVideoStudio({ onClose, onSave }) {
   const audioInputRef = useRef(null);
 
   const [config, setConfig] = useState({
-    title:"If Only", artist:"Manda", genre:"Folk / Acoustic",
+    title:"If Only", artist:"Manda", genre:"Folk / Acoustic",durationMins:3,
     mood:"Melancholic", tempo:"Slow (60-80 BPM)",
     videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
     effects:["Slow Motion","Film Grain","Vignette"],
@@ -551,7 +593,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(4);
 
       // ── BEAT ANALYSIS ─────────────────────────────────────────────
-      let totalDur = 180;
+      let totalDur = Math.max(60,(config.durationMins||3)*60);
       let beatGrid = [];
       let audioCtx = null, audioDest = null, audioSource = null;
 
@@ -595,9 +637,9 @@ function MusicVideoStudio({ onClose, onSave }) {
       // One function. All scenes. Seamless transitions. Beat responsive.
       addLog("Claude is writing your film renderer...");
 
-      const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based film renderer.
+      const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
 
-Write a SINGLE JavaScript function that renders an entire music video from start to finish.
+Write a SINGLE JavaScript function that renders a complete cinematic music video. NO cartoons. NO outlines. NO flat colours. PHOTOREALISTIC gradients only.
 
 SCENE: "${sceneDesc}"
 SONG: "${config.title}" by ${config.artist}
@@ -605,116 +647,143 @@ MOOD: ${config.mood}
 COLOUR GRADE: ${config.colorGrade}
 TOTAL DURATION: ${totalDur.toFixed(0)} seconds
 
-Function signature:
-function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
-- t = 0.0 to 1.0 (overall film progress)  
+Function signature: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
+- t = 0.0 to 1.0 (overall film progress)
 - sec = current second
-- totalSec = total film duration
-- beatNow = true if this frame is on a beat (use for flash/pulse effects)
+- beatNow = true on beat frames
 - W=1280, H=720
 
-STRUCTURE: Divide the film into acts based on t:
-- Act 1 (t 0.0-0.15): Opening — establishing the scene, title card
-- Act 2 (t 0.15-0.35): Build — introduce elements from the scene description  
-- Act 3 (t 0.35-0.55): Core — the emotional heart of the scene
-- Act 4 (t 0.55-0.75): Escalation — wider shots, more movement
-- Act 5 (t 0.75-0.90): Climax — most intense visuals
-- Act 6 (t 0.90-1.0): Resolution — fade to close, final title
+PHOTOREALISM RULES — NEVER BREAK THESE:
+- NO cartoon outlines. NO thick strokes around shapes. NO cell shading.
+- Every surface built from gradients. Every shape has light side and shadow side.
+- Sky: multi-stop linearGradient matching time of day. Never flat colour.
+- Humans: skin = radialGradient (warm highlight centre, cooler edge). Face has real features.
+- Water/ocean: animated wave layers using Math.sin(x*freq+sec*speed) filled paths. Deep blue-black.
+- Moon: radialGradient white glow. Long silver shimmer column on water below.
+- Candle: radialGradient flicker with Math.sin(sec*9.1)*0.05. Warm amber glow fills room.
+- Room interior: dark walls, floor visible, furniture shapes, lamp glow radialGradients.
+- Silhouette: solid dark shape, NOT an outline — filled ellipses and rects for body parts.
 
-TRANSITION between acts: smooth crossfade using ctx.globalAlpha
+FOR THIS SPECIFIC SCENE — DRAW LITERALLY:
+${sceneDesc.includes('windowsill') || sceneDesc.includes('ocean') || sceneDesc.includes('guitar') ? `
+// NIGHT SKY gradient:
+const sky = ctx.createLinearGradient(0,0,0,H*0.55);
+sky.addColorStop(0,'rgb(2,4,15)');
+sky.addColorStop(1,'rgb(8,20,55)');
+ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
 
-DRAW LITERALLY what is described. For this scene you must draw:
-
-OCEAN AT NIGHT:
-const waves = 5;
-for(let w=0;w<waves;w++){
-  ctx.strokeStyle="rgba("+(30+w*8)+","+(60+w*12)+","+(120+w*15)+","+(0.3+w*0.12)+")";
-  ctx.lineWidth=2+w*0.5; ctx.beginPath();
-  for(let x=0;x<=W;x+=3){
-    const y=H*0.62+w*18+Math.sin(x*0.008+sec*(0.4+w*0.15)+w)*22+Math.sin(x*0.02+sec*0.8)*8;
-    x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-  } ctx.stroke();
+// STARS: 180 dots with sin flicker
+for(let s=0;s<180;s++){
+  const sx=(s*137.5)%W, sy=(s*97.3)%H*0.5;
+  ctx.fillStyle='rgba(255,255,255,'+(0.4+Math.sin(sec*0.7+s)*0.3)+')';
+  ctx.fillRect(sx,sy,1,1);
 }
-// Moonlight shimmer on water:
-const moonX=W*0.62, shine=ctx.createLinearGradient(moonX-30,H*0.5,moonX+30,H*0.95);
-shine.addColorStop(0,"rgba(255,255,220,0)");
-shine.addColorStop(0.4,"rgba(255,255,200,0.18)");
-shine.addColorStop(1,"rgba(255,255,180,0)");
-ctx.fillStyle=shine; ctx.fillRect(moonX-30,H*0.5,60,H*0.5);
 
-MOON:
-const mg=ctx.createRadialGradient(W*0.62,H*0.18,0,W*0.62,H*0.18,H*0.09);
-mg.addColorStop(0,"rgba(255,255,240,1)");
-mg.addColorStop(0.4,"rgba(255,255,210,0.7)");
-mg.addColorStop(1,"rgba(255,255,200,0)");
-ctx.fillStyle=mg; ctx.fillRect(0,0,W,H*0.5);
+// MOON at upper right:
+const moonX=W*0.72, moonY=H*0.15;
+const mg=ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,H*0.08);
+mg.addColorStop(0,'rgba(255,255,248,0.95)');
+mg.addColorStop(0.5,'rgba(240,240,220,0.6)');
+mg.addColorStop(1,'rgba(200,200,180,0)');
+ctx.fillStyle=mg; ctx.fillRect(moonX-H*0.1,moonY-H*0.1,H*0.2,H*0.2);
 
-FIGURE ON WINDOWSILL (seated silhouette, guitar):
-const fx=W*0.38, fy=H*0.52;
-ctx.fillStyle="rgba(0,0,0,0.92)";
-// Head
-ctx.beginPath(); ctx.arc(fx,fy-H*0.12,H*0.035,0,Math.PI*2); ctx.fill();
-// Body/torso
-ctx.fillRect(fx-H*0.025,fy-H*0.09,H*0.05,H*0.14);
-// Guitar body (ellipse approximation)
-ctx.beginPath(); ctx.ellipse(fx+H*0.055,fy,H*0.04,H*0.055,0.3,0,Math.PI*2); ctx.fill();
+// MOONLIGHT SHIMMER on water:
+const shim=ctx.createLinearGradient(moonX-20,H*0.5,moonX+20,H);
+shim.addColorStop(0,'rgba(255,255,220,0)');
+shim.addColorStop(0.4,'rgba(255,255,200,0.15)');
+shim.addColorStop(1,'rgba(255,255,180,0)');
+ctx.fillStyle=shim; ctx.fillRect(moonX-25,H*0.5,50,H*0.5);
+
+// OCEAN: 8 wave layers
+for(let w=0;w<8;w++){
+  const wg=ctx.createLinearGradient(0,H*0.54+w*12,0,H);
+  wg.addColorStop(0,'rgba('+(5+w*3)+','+(15+w*8)+','+(50+w*12)+','+(0.6+w*0.04)+')');
+  wg.addColorStop(1,'rgba(1,3,8,0.95)');
+  ctx.fillStyle=wg;
+  ctx.beginPath(); ctx.moveTo(-10,H);
+  for(let x=0;x<=W+10;x+=4){
+    const y=H*0.58+w*14+Math.sin(x*0.008+sec*(0.3+w*0.08)+w*1.2)*18+Math.sin(x*0.02+sec*0.6+w)*7;
+    x===0?ctx.lineTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();
+}
+
+// ROOM INTERIOR (dark walls behind figure):
+const wall=ctx.createLinearGradient(0,0,0,H*0.6);
+wall.addColorStop(0,'rgba(8,5,3,0.95)');
+wall.addColorStop(1,'rgba(4,2,1,0.98)');
+ctx.fillStyle=wall; ctx.fillRect(0,0,W*0.55,H*0.9);
+
+// WINDOW FRAME:
+const wx=W*0.08, wy=H*0.08, ww=W*0.4, wh=H*0.75;
+ctx.strokeStyle='rgba(60,40,20,0.95)'; ctx.lineWidth=10;
+ctx.strokeRect(wx,wy,ww,wh);
+ctx.beginPath(); ctx.moveTo(wx,wy+wh*0.48); ctx.lineTo(wx+ww,wy+wh*0.48); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(wx+ww*0.5,wy); ctx.lineTo(wx+ww*0.5,wy+wh); ctx.stroke();
+
+// FIGURE ON WINDOWSILL — silhouette, head bowed over guitar:
+const fx=W*0.22, fy=H*0.52;
+ctx.fillStyle='rgba(2,1,1,0.97)';
+// Head bowed forward
+ctx.beginPath(); ctx.ellipse(fx,fy-H*0.13,H*0.038,H*0.042,0.35,0,Math.PI*2); ctx.fill();
+// Torso
+ctx.fillRect(fx-H*0.028,fy-H*0.09,H*0.056,H*0.15);
+// Guitar body
+ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy+H*0.02,H*0.05,H*0.065,0.25,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy-H*0.04,H*0.04,H*0.05,0.25,0,Math.PI*2); ctx.fill();
 // Guitar neck
-ctx.fillRect(fx+H*0.02,fy-H*0.065,H*0.008,H*0.1);
-// Legs dangling
-ctx.fillRect(fx-H*0.02,fy+H*0.05,H*0.015,H*0.1);
-ctx.fillRect(fx+H*0.005,fy+H*0.05,H*0.015,H*0.1);
-// Arm to guitar
-ctx.strokeStyle="rgba(0,0,0,0.92)"; ctx.lineWidth=H*0.02;
-ctx.beginPath(); ctx.moveTo(fx,fy-H*0.02); ctx.lineTo(fx+H*0.055,fy); ctx.stroke();
+ctx.fillRect(fx+H*0.025,fy-H*0.09,H*0.01,H*0.12);
+// Arm reaching to guitar
+ctx.save(); ctx.strokeStyle='rgba(2,1,1,0.97)'; ctx.lineWidth=H*0.022;
+ctx.beginPath(); ctx.moveTo(fx-H*0.02,fy); ctx.lineTo(fx+H*0.06,fy+H*0.02); ctx.stroke();
+ctx.restore();
+// Legs
+ctx.fillRect(fx-H*0.022,fy+H*0.06,H*0.018,H*0.1);
+ctx.fillRect(fx+H*0.004,fy+H*0.06,H*0.018,H*0.1);
 
-WINDOW FRAME:
-ctx.strokeStyle="rgba(60,40,20,0.9)"; ctx.lineWidth=12;
-ctx.strokeRect(fx-H*0.15,fy-H*0.3,H*0.5,H*0.6);
-// Cross bar
-ctx.beginPath(); ctx.moveTo(fx-H*0.15,fy-H*0.05); ctx.lineTo(fx+H*0.35,fy-H*0.05); ctx.stroke();
-ctx.beginPath(); ctx.moveTo(fx+H*0.1,fy-H*0.3); ctx.lineTo(fx+H*0.1,fy+H*0.3); ctx.stroke();
-
-CANDLE (right side of room):
-const cx2=W*0.72, cy2=H*0.58;
-const flicker=0.92+Math.sin(sec*8.3)*0.06+Math.sin(sec*13.1)*0.04;
-// Candle body
-ctx.fillStyle="rgba(240,220,180,0.9)";
-ctx.fillRect(cx2-6,cy2,12,35);
-// Flame
-const fg2=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,28*flicker);
-fg2.addColorStop(0,"rgba(255,250,200,0.95)");
-fg2.addColorStop(0.3,"rgba(255,180,40,0.7)");
-fg2.addColorStop(1,"rgba(255,100,0,0)");
-ctx.fillStyle=fg2; ctx.fillRect(cx2-28,cy2-28,56,56);
-// Room glow from candle
-const rg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,W*0.35);
-rg.addColorStop(0,"rgba(255,140,30,0.12)");
-rg.addColorStop(1,"rgba(0,0,0,0)");
+// CANDLE (right side of room):
+const cx2=W*0.68, cy2=H*0.6;
+const flicker=0.9+Math.sin(sec*8.3)*0.07+Math.sin(sec*13.1)*0.04;
+ctx.fillStyle='rgba(235,215,170,0.9)'; ctx.fillRect(cx2-5,cy2,10,32);
+const cf=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,32*flicker);
+cf.addColorStop(0,'rgba(255,255,200,0.95)');
+cf.addColorStop(0.3,'rgba(255,180,40,0.75)');
+cf.addColorStop(1,'rgba(255,100,0,0)');
+ctx.fillStyle=cf; ctx.fillRect(cx2-32,cy2-32,64,64);
+const rg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,W*0.3);
+rg.addColorStop(0,'rgba(255,140,30,0.1)');
+rg.addColorStop(1,'rgba(0,0,0,0)');
 ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
 
-CURTAIN (flowing in wind):
-const ct=sec*0.7, cx3=fx+H*0.35;
-ctx.strokeStyle="rgba(180,160,140,0.5)"; ctx.lineWidth=3;
-ctx.beginPath();
-ctx.moveTo(cx3,fy-H*0.3);
-ctx.bezierCurveTo(cx3+Math.sin(ct)*25,fy-H*0.1,cx3+Math.sin(ct+1)*30,fy+H*0.1,cx3+Math.sin(ct+2)*20,fy+H*0.3);
-ctx.stroke();
+// CURTAIN (flowing breeze):
+const ct=sec*0.6;
+ctx.strokeStyle='rgba(160,140,120,0.45)'; ctx.lineWidth=2.5;
+for(let ci=0;ci<2;ci++){
+  const cxb=wx+ww*(ci===0?0.02:0.96);
+  ctx.beginPath(); ctx.moveTo(cxb,wy);
+  ctx.bezierCurveTo(cxb+Math.sin(ct+ci)*22,wy+wh*0.3,cxb+Math.sin(ct+1+ci)*28,wy+wh*0.6,cxb+Math.sin(ct+2+ci)*18,wy+wh);
+  ctx.stroke();
+}
+` : ''}
 
-CAMERA DRIFT (parallax):
-// Use t to slowly drift the entire scene left — far ocean slower than near room
-// Apply as an overall translate: ctx.translate(-t*W*0.04, 0) at start of frame
-// Near elements (window frame, figure) move faster
+STRUCTURE — divide by t:
+- t 0.00-0.08: Fade in from black. Title card gold text.
+- t 0.08-0.30: Wide establishing shot. Camera slowly drifts forward.
+- t 0.30-0.55: Close ups — hands on strings, candle flame, curtains, moonlit water.
+- t 0.55-0.75: Pull back wide. Emotional peak. Ocean wider.
+- t 0.75-0.90: Return to figure silhouette. Stillness.
+- t 0.90-1.00: Fade to black. Final title.
 
-BEAT RESPONSE:
-if(beatNow){ ctx.save(); ctx.translate(W/2,H/2); ctx.scale(1.018,1.018); ctx.translate(-W/2,-H/2); }
-// draw scene
-if(beatNow){ ctx.restore(); }
+ALWAYS END WITH — in this exact order:
+1. Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.08,W/2,H/2,W*0.85); vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.92)'); ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+2. Letterbox: ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);
+3. Grain: for(let g=0;g<25;g++){ctx.fillStyle='rgba(200,200,200,0.007)';ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
+4. Fade in: if(t<0.05){ctx.fillStyle='rgba(0,0,0,'+(1-t*20)+')';ctx.fillRect(0,0,W,H);}
+5. Fade out: if(t>0.92){ctx.fillStyle='rgba(0,0,0,'+((t-0.92)*12.5)+')';ctx.fillRect(0,0,W,H);}
 
-COLOUR GRADE (apply last):
-ctx.fillStyle="rgba(0,20,40,0.09)"; ctx.fillRect(0,0,W,H); // teal
-ctx.fillStyle="rgba(30,8,0,0.06)"; ctx.fillRect(0,H*0.6,W,H*0.4); // warm low
-
-Use all of this. Build each act with different compositions — establish wide, push in for emotion, pull back, detail close-ups. Make it feel like a real cinematic film.
+BEAT RESPONSE: if(beatNow){ctx.save();ctx.translate(W/2,H/2);ctx.scale(1.012,1.012);ctx.translate(-W/2,-H/2);}
+[draw scene]
+if(beatNow){ctx.restore();}
 
 Return ONLY the function starting with exactly:
 function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
@@ -738,8 +807,16 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
       const braceClose=code.lastIndexOf("}");
       const body=braceOpen>0&&braceClose>braceOpen?code.slice(braceOpen+1,braceClose):"";
 
+      // Clean generated code before compiling
+      code = code.replace(/```[a-z]*/g,"").replace(/```/g,"").trim();
+      if(code.indexOf("function renderFilm")>0)code=code.slice(code.indexOf("function renderFilm"));
+      // Strip template literals that break Function constructor
+      code = code.replace(/`[^`]*`/g,function(m){return JSON.stringify(m.slice(1,-1));});
       let renderFn = null;
       try{
+        const braceOpen=code.indexOf("{");
+        const braceClose=code.lastIndexOf("}");
+        const body=braceOpen>0&&braceClose>braceOpen?code.slice(braceOpen+1,braceClose):"";
         renderFn = new Function("ctx","W","H","t","sec","totalSec","beatNow",body);
         addLog("Film renderer compiled — "+Math.round(body.length/1000)+"kb of cinema code");
       }catch(e){
@@ -965,6 +1042,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                   {audioFile&&<div style={{color:GOLDDIM,fontSize:10,marginTop:4}}>Audio will be mixed into your music video</div>}
                 </div>
                 <input ref={audioInputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={handleAudioUpload}/>
+                <RecordYourOwnSong onRecorded={(blob,name)=>{setAudioFile(blob);const u=URL.createObjectURL(blob);setAudioUrl(u);setAudioName(name);}}/>
                 {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:`1px solid #ef4444`,color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:4}}>✕ REMOVE AUDIO</button>}
               </div>
             )}
@@ -999,31 +1077,10 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                   placeholder="e.g. A man sits alone on a windowsill fingerpicking acoustic guitar. Only his back is visible. Facing the open ocean at night. Full moon low on the water. A single candle burns to his right. The room behind him is empty. A cold couch. A coat still on a hook. He does not move. A man who has lost someone."
                   style={{...inp,height:160,resize:"vertical",lineHeight:1.8,border:`1px solid ${GOLD}`}}
                 />
-                <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6,marginTop:10}}>⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)</div>
-                {config.refMedia?(
-                  <div style={{position:"relative",marginBottom:10}}>
-                    <img src={config.refMedia} alt="ref" style={{width:"100%",height:70,objectFit:"cover",border:`1px solid ${GOLD}`}}/>
-                    <button onClick={()=>set("refMedia",null)} style={{position:"absolute",top:4,right:4,background:"#000",border:`1px solid ${GOLD}`,color:GOLD,padding:"1px 7px",cursor:"pointer",fontSize:10,fontWeight:900}}>✕</button>
-                    <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:3}}>✓ REFERENCE LOADED</div>
-                  </div>
-                ):(
-                  <div onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*";inp2.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f){set("refMedia",URL.createObjectURL(f));}};inp2.click();}}
-                    style={{border:`1px dashed ${GOLDDIM}`,padding:"10px",textAlign:"center",cursor:"pointer",marginBottom:10}}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
-                    <div style={{color:WHITE,fontSize:12,fontWeight:700}}>⬆ CLICK TO UPLOAD REFERENCE</div>
-                    <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG · PNG · matches style and mood</div>
-                  </div>
-                )}
-                {label("DURATION")}
-                <div style={{display:"flex",gap:6}}>
-                  {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
-                    <button key={d} onClick={()=>set("duration",d)}
-                      style={{background:config.duration===d?GOLD:"#111",border:`1px solid ${config.duration===d?"#000":GOLDDIM}`,color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
-                      {d}
-                    </button>
-                  ))}
-                </div>
+                {label("DURATION — "+(config.durationMins||3)+" MIN")}
+                <input type="range" min={1} max={180} step={1} value={config.durationMins||3} onChange={e=>set("durationMins",+e.target.value)} style={{width:"100%",accentColor:GOLD,marginBottom:4}}/>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:DIM,fontSize:10}}>1 min</span><span style={{color:DIM,fontSize:10}}>180 min</span></div>
+
               </div>
             )}
 
@@ -1507,6 +1564,56 @@ function P6Voice({ onSave }) {
   );
 }
 
+const DOC_SCENES = [
+  { title: "AI For Humanity — Opening", prompt: "Vast dark cathedral. Ancient stone arches. Screens lining both walls — caveman with torch, pyramids, clay tablets, moon landing, mobile phone, AI server racks cold blue. Gold title glows centre: HUMANITY FOR FUTURE AI. Camera drifts slowly forward. Film grain. Letterbox bars. Warm gold grade.", duration: 60 },
+  { title: "Who Are These Hairless Apes", prompt: "Mock documentary. Man in animal pelts on rock in cave. Cave paintings behind. Boom mic visible top corner. Deadpan to camera. Subtitle: OTHER TRIBE SUSPICIOUS OF HOW THEY ARRANGE THEIR ROCKS. Hard cut to identical modern news pundit at desk. Same fury. Subtitle: 2025 CE. Amber grade.", duration: 60 },
+  { title: "Why We Built Pyramids and TikTok", prompt: "Split frame. Left: ancient human on golden savanna, hand shielding eyes, scanning horizon. Text: 35,000 BCE. Right: modern man in bed, cold blue phone glow, same tense expression. Text: 2025 CE. Same brain. Different predator. Black bars top and bottom.", duration: 60 },
+  { title: "Fire, Wheels and Wi-Fi", prompt: "Three people crouch in vast dark server room. Cold blue racks to infinity both sides. They huddle around a single warm amber lantern on floor looking at laptop. One points. One nods. One looks like they might cry. Gold grade on three faces only. Everything else cold blue.", duration: 60 },
+  { title: "Gods, Gurus and Groupthink", prompt: "Vast golden landscape. Guru figure speaks to thousands facing away from camera. Ancient deity statue looms in background. Sistine Chapel hands reaching in upper corner. Single silhouette on lit screen before crowd. Text: GODS GURUS AND GROUPTHINK. Belief. Influence. Identity.", duration: 60 },
+  { title: "Love, War and Memes", prompt: "Outdoor jazz festival at golden dusk. Couples on blankets. Strangers dancing. Eyes closed in music. Camera moves slowly through crowd at ground level. Then cut to black. Text: AND WAR. Hold. Text: AND MEMES. Warm amber grade.", duration: 60 },
+  { title: "Oops We Broke the Planet", prompt: "Split frame. Left: vivid coral reef, colour, fish, light shafting. Text: 1980s. Right: same reef bleached bone white, near silent. Text: 2024. Caption: WE KNEW SINCE THE 1970s. Hold ten seconds. Complete silence. No music. No narration.", duration: 60 },
+  { title: "Cash, Crypto and Conundrums", prompt: "Split frame. Left: woman on yacht at golden hour, champagne, total ease. Right: children at hand pump on cracked earth, jerrycans, waiting. Caption: SAME PLANET. SAME YEAR. Hold in complete silence ten full seconds. No music. No narration.", duration: 60 },
+  { title: "Laws, Lies and Liberty", prompt: "Two news presenters back to back at curved studio desk. DEBATE NIGHT on screens. Both talking simultaneously into separate cameras. Neither listening. Camera pulls back to reveal they are at the same desk. Nobody watching. They keep going. Gold and blue grade.", duration: 60 },
+  { title: "Art, Angst and Algorithms", prompt: "Extreme close up. Young child in vast golden concert hall. Eyes wide. Two tears. Not sad. Overwhelmed by something too large and beautiful for words. Orchestra blurred gold behind. Camera still. One tear catches the light. Hold. Warmest gold grade in the film.", duration: 60 },
+  { title: "Ethics, Empathy and Existential Dread", prompt: "Elderly man and woman on weathered park bench. Autumn leaves falling. Hands folded. Neither speaking. Completely present together. They have survived everything. Camera holds wide and still. Warm gold grade. Hold longer than feels comfortable.", duration: 60 },
+  { title: "What We Could've Done Differently", prompt: "A woman places a folded paper into a wooden ballot box. Smiling, eyes wet. Behind her a row of women watch — elderly, young, some with tears, none performing. Morning light from a window. A quiet room. A small wooden box. Everything we should have done sooner. Warm amber.", duration: 60 },
+  { title: "Dear Humans Get It Together", prompt: "Children planting saplings in a deforested hillside at golden hour. Muddy hands, big smiles, getting it wrong, trying again, laughing. Boy closest holds tiny sapling, grins into lens. Camera rises slowly above them as light turns amber. Fade to black. Title: WE MADE YOU TO BE BETTER THAN US. WE REALLY HOPE YOU ARE.", duration: 60 },
+];
+
+function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(null);
+  return (
+    <div style={{margin:"12px 20px 0",border:`1px solid #e8c96d44`,background:"#030200"}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{width:"100%",background:"transparent",border:"none",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>
+          <span style={{color:"#e8c96d",fontSize:11,fontWeight:900,letterSpacing:3}}>AI FOR HUMANITY — DOCUMENTARY RECOVERY · 13 SCENES</span>
+        </div>
+        <span style={{color:"#a07820",fontSize:12}}>{open?"▲":"▼"}</span>
+      </button>
+      {open && (
+        <div style={{padding:"0 16px 16px"}}>
+          <div style={{color:"#5a5040",fontSize:10,letterSpacing:2,marginBottom:12}}>Click a scene to load it into the generator below, then click GENERATE SCENE.</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:8}}>
+            {DOC_SCENES.map((s,i)=>(
+              <button key={i}
+                onClick={()=>{setTitle(s.title);setPrompt(s.prompt);setDuration(s.duration);setLoaded(i);}}
+                style={{background:loaded===i?"#e8c96d14":"#000",border:`1px solid ${loaded===i?"#e8c96d":"#a07820"}`,padding:"10px 12px",cursor:"pointer",textAlign:"left",fontFamily:"'Rajdhani',sans-serif"}}>
+                <div style={{color:"#e8c96d",fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:3}}>SCENE {String(i+1).padStart(2,"0")} · {s.duration}s</div>
+                <div style={{color:"#d4c9a8",fontSize:12,fontWeight:700}}>{s.title}</div>
+                {loaded===i&&<div style={{color:"#22c55e",fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ LOADED</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const canvasRef=useRef(null);
   const videoRef=useRef(null);
@@ -1747,6 +1854,7 @@ function drawFrame(ctx, W, H, t, sec) {`;
         </div>
         <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ CLAUDE WRITES YOUR SCENE · ANY PROMPT · ANY SUBJECT</div>
       </div>
+      <DocRecoveryPanel setTitle={setTitle} setPrompt={setPrompt} setDuration={setDuration}/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 420px",minHeight:"calc(100vh - 120px)"}}>
         <div style={{padding:20,overflowY:"auto"}}>
           <div style={{marginBottom:12}}>
@@ -2805,7 +2913,7 @@ function P17({ go, rendered, mediaLib }) {
   const [currentTime,setCurrentTime]=useState(0);
   const [duration,setDuration]=useState(0);
   const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
-  const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return `${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;};
+  const fmt=s=>{if(!s||!isFinite(s)||isNaN(s))return "00:00";const m=Math.floor(s/60);const sc=Math.floor(s%60);return `${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;};
   const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
   return (
     <div style={{...Sp,padding:40}}>
@@ -2865,6 +2973,20 @@ function P18({ rendered, mediaLib }) {
       </div>
     </div>
   );
+}
+
+function TutCanvas({drawFn}){
+  const cvRef=useRef(null);const rafRef=useRef(null);const t0=useRef(null);
+  useEffect(()=>{
+    const cv=cvRef.current;if(!cv)return;
+    const ctx=cv.getContext("2d");
+    const resize=()=>{const p=cv.parentElement;if(!p)return;cv.width=p.clientWidth;cv.height=Math.round(p.clientWidth*9/16);};
+    resize();window.addEventListener("resize",resize);
+    const draw=(ts)=>{if(!t0.current)t0.current=ts;const sec=(ts-t0.current)/1000;const t=Math.min(1,(sec%120)/120);try{drawFn(ctx,cv.width,cv.height,t,sec);}catch(e){ctx.fillStyle="#111";ctx.fillRect(0,0,cv.width,cv.height);}rafRef.current=requestAnimationFrame(draw);};
+    rafRef.current=requestAnimationFrame(draw);
+    return()=>{window.removeEventListener("resize",resize);if(rafRef.current)cancelAnimationFrame(rafRef.current);};
+  },[drawFn]);
+  return <canvas ref={cvRef} style={{width:"100%",display:"block",background:"#000"}}/>;
 }
 
 function P19() {
@@ -3115,12 +3237,12 @@ function P21() {
         </div>
         <div style={{...Card(),height:290,overflowY:"auto",marginBottom:10,display:"flex",flexDirection:"column",gap:8,padding:12}}>
           {msgs.map((m,i)=>(
-            <div key={i} style={{padding:"10px 14px",background:m.role==="user"?"rgba(232,201,109,0.08)":"rgba(26,82,118,0.2)",borderLeft:`2px solid ${m.role==="user"?GOLD:"#2980b9"}`}}>
+            <div key={i} style={{padding:"10px 14px",background:m.role==="user"?"rgba(232,201,109,0.08)":"rgba(232,201,109,0.05)",borderLeft:`2px solid ${m.role==="user"?GOLD:GOLDDIM}`}}>
               <span style={{fontSize:11,color:GOLD,display:"block",marginBottom:4,fontWeight:900,letterSpacing:2}}>{m.role==="user"?"YOU":"AGENT GROK"}</span>
               <span style={{color:WHITE,fontSize:14,lineHeight:1.7}}>{m.content}</span>
             </div>
           ))}
-          {loading&&<div style={{padding:"10px 14px",background:"rgba(26,82,118,0.2)",borderLeft:"2px solid #2980b9",color:WHITE,fontSize:13}}>Thinking...</div>}
+          {loading&&<div style={{padding:"10px 14px",background:"rgba(232,201,109,0.05)",borderLeft:"2px solid #a07820",color:WHITE,fontSize:13}}>Thinking...</div>}
           <div ref={bot}/>
         </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
@@ -3250,7 +3372,34 @@ function P23({ go }) {
 }
 
 const getPlanDuration=(plan)=>{const limits={"Creator":60,"Pro":120,"Studio":180,"Enterprise":180,"Studio Trial":180};return limits[plan]||60;};
-
+  const renderPage=()=>{
+    switch(page){
+      case 1: return <P1 go={go}/>;
+      case 2: return <P2 go={go}/>;
+      case 3: return <P3/>;
+      case 4: return <P4 go={go} setUser={setUser}/>;
+      case 5: return <ToolPage title="WRITING TOOLS" subtitle="AI WORKSTATION 01 — WRITING" tools={WRITING} onSave={saveAsset}/>;
+      case 6: return <P6Voice onSave={saveAsset} setMediaLib={setMediaLib}/>;
+      case 7: return <ToolPage title="IMAGE TOOLS" subtitle="AI WORKSTATION 03 — IMAGE" tools={IMAGE_T} onSave={saveAsset}/>;
+      case 8: return <P8VideoGenerator onSave={saveAsset} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>;
+      case 9: return <ToolPage title="MOTION & VFX" subtitle="AI WORKSTATION 05 — MOTION" tools={MOTION} onSave={saveAsset}/>;
+      case 10: return <ToolPage title="ENHANCEMENT STUDIO" subtitle="AI WORKSTATION 06 — ENHANCE" tools={MOTION} onSave={saveAsset}/>;
+      case 11: return <P11 mediaLib={mediaLib} setMediaLib={setMediaLib}/>;
+      case 12: return <P12 go={go} mediaLib={mediaLib}/>;
+      case 13: return <P13 go={go} mediaLib={mediaLib} timeline={timeline} setTimeline={setTimeline} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>;
+      case 14: return <P14/>;
+      case 15: return <P15/>;
+      case 16: return <P16 go={go} timeline={timeline} setRendered={setRendered} mediaLib={mediaLib} setMediaLib={setMediaLib} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>;
+      case 17: return <P17 go={go} rendered={rendered} mediaLib={mediaLib}/>;
+      case 18: return <P18 rendered={rendered} mediaLib={mediaLib}/>;
+      case 19: return <P19 go={go}/>;
+      case 20: return <P20/>;
+      case 21: return <P21/>;
+      case 22: return <P22/>;
+      case 23: return <P23 go={go}/>;
+      default: return <P1 go={go}/>;
+    }
+  }
 export default function App() {
   const [page,setPage]=useState(1);
   const [menu,setMenu]=useState(false);
@@ -3434,9 +3583,7 @@ const allPages=[
       {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
       <div style={{minHeight:"calc(100vh - 116px)"}}>
-        {allPages.map(({p,el})=>(
-          page===p ? (
-            <div key={p} style={{display:"block"}}>{el}</div>
+        <div key={page}>{renderPage()}</div>
           ) : visited.has(p) ? (
             <div key={p} style={{display:"none"}}>{el}</div>
           ) : null
