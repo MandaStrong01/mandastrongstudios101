@@ -3584,10 +3584,6 @@ const allPages=[
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
       <div style={{minHeight:"calc(100vh - 116px)"}}>
         <div key={page}>{renderPage()}</div>
-          ) : visited.has(p) ? (
-            <div key={p} style={{display:"none"}}>{el}</div>
-          ) : null
-        ))}
       </div>
       <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
     </div>
