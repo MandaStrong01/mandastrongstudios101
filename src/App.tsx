@@ -503,10 +503,38 @@ function MusicVideoStudio({ onClose, onSave }) {
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioName, setAudioName] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const recRef = useRef<MediaRecorder|null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+  const recTimerRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const audioInputRef = useRef(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+      recChunksRef.current = [];
+      const mr = new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
+      mr.ondataavailable = e=>{if(e.data.size>0)recChunksRef.current.push(e.data);};
+      mr.onstop = ()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        const blob = new Blob(recChunksRef.current,{type:"audio/webm"});
+        const url = URL.createObjectURL(blob);
+        const file = new File([blob],"recorded_song.webm",{type:"audio/webm"});
+        setAudioFile(file);setAudioUrl(url);setAudioName("Recorded: "+recSeconds+"s");
+        if(recTimerRef.current)clearInterval(recTimerRef.current);
+        setRecording(false);setRecSeconds(0);
+      };
+      mr.start(250);
+      recRef.current = mr;
+      setRecording(true);setRecSeconds(0);
+      recTimerRef.current = setInterval(()=>setRecSeconds(s=>s+1),1000);
+    } catch(e:any){alert("Microphone access denied: "+e.message);}
+  };
+  const stopRecording = ()=>{if(recRef.current&&recording)recRef.current.stop();};
 
   const [config, setConfig] = useState({
     title:"If Only", artist:"Manda", genre:"Folk / Acoustic",
@@ -966,6 +994,30 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                 </div>
                 <input ref={audioInputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={handleAudioUpload}/>
                 {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:`1px solid #ef4444`,color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:4}}>✕ REMOVE AUDIO</button>}
+                {label("RECORD YOUR OWN SONG")}
+                <div style={{background:"#000",border:`1px solid ${recording?"#ef4444":GOLDDIM}`,padding:"12px 14px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:recording?10:0}}>
+                    {!recording?(
+                      <button onClick={startRecording} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"8px 20px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+                        🎙 START RECORDING
+                      </button>
+                    ):(
+                      <button onClick={stopRecording} style={{background:"#ef4444",border:"none",color:"#fff",padding:"8px 20px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",animation:"recPulse .9s ease-in-out infinite"}}>
+                        ⏹ STOP · {recSeconds}s
+                      </button>
+                    )}
+                    {!recording&&<span style={{color:DIM,fontSize:11}}>Record directly from your microphone</span>}
+                    {recording&&(
+                      <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                        {[...Array(12)].map((_,i)=>(
+                          <div key={i} style={{width:3,background:"#ef4444",height:6+Math.abs(Math.sin((Date.now()/120+i)%(Math.PI*2)))*14,transition:"height .1s",opacity:0.7+i*0.025}}/>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {recording&&<div style={{color:"#ef4444",fontSize:10,fontWeight:900,letterSpacing:3}}>● RECORDING IN PROGRESS — {recSeconds}s</div>}
+                </div>
+                <style>{`@keyframes recPulse{0%,100%{opacity:1}50%{opacity:.6}}`}</style>
               </div>
             )}
 
