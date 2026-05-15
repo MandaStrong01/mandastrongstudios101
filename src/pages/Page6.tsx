@@ -485,8 +485,11 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                 </div>
                 <input ref={audioInputRef} type="file" accept="audio/*" style={{ display: "none" }} onChange={handleAudioUpload} />
                 {audioFile && <button onClick={() => { setAudioFile(null); setAudioUrl(""); setAudioName(""); }} style={{ background: "none", border: `1px solid #ef4444`, color: "#ef4444", padding: "3px 10px", cursor: "pointer", fontSize: 10, fontWeight: 900, marginTop: 4 }}>✕ REMOVE AUDIO</button>}
-                {label("RECORD YOUR OWN SONG")}
-                <div style={{ background: "#000", border: `1px solid ${recording ? "#ef4444" : GOLDDIM}`, padding: "12px 14px" }}>
+                <div style={{ background: "#7f1d1d", borderLeft: "4px solid #ef4444", padding: "8px 14px", marginTop: 14, marginBottom: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "#ef4444", fontSize: 16 }}>🎙</span>
+                  <span style={{ color: "#fff", fontWeight: 900, fontSize: 11, letterSpacing: 3 }}>RECORD YOUR OWN SONG</span>
+                </div>
+                <div style={{ background: "#000", border: `1px solid ${recording ? "#ef4444" : "#7f1d1d"}`, borderTop: "none", padding: "12px 14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: recording ? 10 : 0 }}>
                     {!recording ? (
                       <button onClick={startRecording} style={{ background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`, border: "none", color: "#000", padding: "8px 20px", cursor: "pointer", fontSize: 11, fontWeight: 900, letterSpacing: 2, fontFamily: "'Rajdhani',sans-serif" }}>
