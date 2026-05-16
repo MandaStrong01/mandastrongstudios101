@@ -3003,126 +3003,127 @@ function TutCanvas({drawFn}){
   return <canvas ref={cvRef} style={{width:"100%",display:"block",background:"#000"}}/>;
 }
 
+
 function P19({ go }) {
   const [active,setActive]=useState(null);
   const [generating,setGenerating]=useState(null);
-  const [videos,setVideos]=useState(()=>{try{return JSON.parse(sessionStorage.getItem("ms_tut_videos")||"{}");}catch{return {};}});
+  const [drawFns,setDrawFns]=useState({});
   const tuts=[
-    {n:"01",t:"Getting Started — Platform Overview",d:"A complete walkthrough of all 23 pages, the Quick Access menu, footer controls, and how to navigate the studio.",dur:"3",l:"Beginner",page:1,pageLabel:"HOME",tips:["Use ☰ top left to jump to any page","Hit 💾 SAVE PROJECT in the footer","Page 23 has the full How-To guide"]},
-    {n:"02",t:"Writing Tools — Script to Screen",d:"How to use the 50+ writing tools on Page 5. From logline to full feature script using AI Create.",dur:"4",l:"Beginner",page:5,pageLabel:"WRITING TOOLS",tips:["Click any tool card to open it","Use AI CREATE for instant professional scripts","Save results to your Media Library"]},
-    {n:"03",t:"Voice Engine — 54 Characters",d:"Selecting voices, setting pitch and rate, using TEST, setting Mood, and preparing narration for your documentary.",dur:"5",l:"Beginner",page:6,pageLabel:"VOICE ENGINE",tips:["James is your primary documentary narrator","Hit TEST on any voice card to hear it","Use PREPARE & SPEAK to AI-format your script"]},
-    {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, upload audio or Record Your Own Song, generating your music video.",dur:"5",l:"Intermediate",page:6,pageLabel:"MUSIC VIDEO STUDIO",tips:["Access from MUSIC VIDEO STUDIO button on Page 6","Upload your own audio for beat-synced video","Hit RECORD YOUR OWN SONG to record directly"]},
-    {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Reference images, duration settings, saving clips.",dur:"4",l:"Intermediate",page:8,pageLabel:"VIDEO GENERATOR",tips:["Be specific — lighting, mood, camera angle","Upload a reference image to match a visual style","Each scene saves automatically to your Media Library"]},
-    {n:"06",t:"Timeline Editor — Building Your Film",d:"Dragging clips to tracks, syncing audio and video, setting film duration, and preparing for render.",dur:"4",l:"Intermediate",page:13,pageLabel:"TIMELINE EDITOR",tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate","Set film duration — 60, 90, or 180 minutes","Hit → RENDER when your timeline is ready"]},
-    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video. Recommended levels explained.",dur:"3",l:"Beginner",page:15,pageLabel:"AUDIO MIXER",tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85"]},
-    {n:"08",t:"Render Engine — Exporting in 4K",d:"Quality settings, starting the render, and what to do if clips need regenerating.",dur:"4",l:"Intermediate",page:16,pageLabel:"RENDER ENGINE",tips:["1080p recommended for most use","4K for professional distribution","Missing clips are regenerated automatically"]},
-    {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly from the platform.",dur:"2",l:"Beginner",page:18,pageLabel:"EXPORT & DISTRIBUTE",tips:["Download to device first","Each social button opens the upload page directly"]},
-    {n:"10",t:"Saving & Project History",d:"Save your session, restore from history, and ensure your clips persist across sessions.",dur:"2",l:"Beginner",page:1,pageLabel:"HOME / FOOTER",tips:["Hit 💾 SAVE PROJECT in the footer at any time","📂 MY PROJECTS shows your full session history"]},
-    {n:"11",t:"Agent Grok — Your AI Assistant",d:"How to use Agent Grok to get instant answers about any tool, workflow, or production question.",dur:"2",l:"Beginner",page:21,pageLabel:"AGENT GROK",tips:["Ask anything — tools, pricing, workflow","Use quick-question buttons for instant answers"]},
-    {n:"12",t:"AI For Humanity — Full Case Study",d:"Complete case study: how the AI For Humanity documentary was built inside MandaStrong Studio from script to render.",dur:"5",l:"Advanced",page:8,pageLabel:"VIDEO GENERATOR",tips:["James narration — pitch 0.86, rate 0.62, pause 1600ms","13 scenes generated on Page 8, synced on Page 13","Full workflow: P8 → P6 → P13 → P15 → P16 → P17 → P18"]},
+    {n:"01",t:"Getting Started — Platform Overview",d:"Complete walkthrough of all 23 pages, Quick Access menu, footer controls, and navigation.",dur:"3:00",l:"Beginner",page:1,tips:["Use ☰ top left to jump to any page","Hit 💾 SAVE PROJECT in the footer","Page 23 has the full How-To guide"]},
+    {n:"02",t:"Writing Tools — Script to Screen",d:"How to use the 50+ writing tools on Page 5. From logline to full feature script.",dur:"4:00",l:"Beginner",page:5,tips:["Click any tool card to open it","Use AI CREATE for instant professional scripts","Save results to your Media Library"]},
+    {n:"03",t:"Voice Engine — 54 Characters",d:"Selecting voices, setting pitch and rate, mood, and preparing narration for documentary.",dur:"5:00",l:"Beginner",page:6,tips:["Filter by gender, age, and origin","Hit TEST on any voice card to hear it","Use PREPARE & SPEAK to AI-format your script"]},
+    {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, generating and exporting.",dur:"5:00",l:"Intermediate",page:6,tips:["Access from MUSIC VIDEO STUDIO on Page 6","Upload your own audio for beat-synced video","Record your own song with the red button"]},
+    {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Reference images, duration, saving clips.",dur:"4:00",l:"Intermediate",page:8,tips:["Be specific — lighting, mood, camera angle","Upload a reference image to match a visual style","Use the Documentary Recovery panel for your 13 scenes"]},
+    {n:"06",t:"Timeline Editor — Building Your Film",d:"Dragging clips to tracks, syncing audio and video, setting film duration, preparing for render.",dur:"4:00",l:"Intermediate",page:13,tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate","Set film duration — 60, 90, or 180 minutes","Hit → RENDER when your timeline is ready"]},
+    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video.",dur:"3:00",l:"Beginner",page:15,tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85"]},
+    {n:"08",t:"Render Engine — Exporting in 4K",d:"Quality settings, starting the render, what to do if clips need regenerating.",dur:"4:00",l:"Intermediate",page:16,tips:["1080p recommended for most use","4K for professional distribution","Missing clips are regenerated automatically"]},
+    {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly.",dur:"2:00",l:"Beginner",page:18,tips:["Download to device first","Each social button opens the upload page directly"]},
+    {n:"10",t:"Saving & Project History",d:"Save your session, restore from history, and ensure your clips persist.",dur:"2:00",l:"Beginner",page:1,tips:["Hit 💾 SAVE PROJECT in the footer at any time","📂 MY PROJECTS shows your full session history"]},
+    {n:"11",t:"Agent Grok — Your AI Assistant",d:"How to use Agent Grok to get instant answers about any tool, workflow, or production question.",dur:"2:00",l:"Beginner",page:21,tips:["Ask anything — tools, pricing, workflow","Available 24/7 — no waiting"]},
+    {n:"12",t:"AI For Humanity — Full Case Study",d:"Complete case study: how the AI For Humanity documentary was built from script to render.",dur:"5:00",l:"Advanced",page:8,tips:["13 scenes generated on Page 8, synced on Page 13","Full workflow: P8 → P6 → P13 → P15 → P16 → P17 → P18"]},
   ];
   const lc={Beginner:"#22c55e",Intermediate:"#f59e0b",Advanced:"#ef4444"};
-  const generateTutorialVideo=async(idx)=>{
-    setGenerating(idx);const t=tuts[idx];
+  const generate=async(idx)=>{
+    setGenerating(idx);setActive(idx);
+    const t=tuts[idx];
     try{
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-          messages:[{role:"user",content:`Write a JavaScript canvas drawFrame function for a professional tutorial video about "${t.t}" for MandaStrong Studio. Scene: A professional instructor (warm, confident, studio lighting, gold and black colour scheme) at a modern desk facing camera. Behind them: a large screen showing the topic title. Animated lower-third text: "TUTORIAL ${t.n}: ${t.t.toUpperCase()}". Camera slowly pushes in. Function: function drawFrame(ctx,W,H,t,sec). W=1280 H=720. Return only the function.`}]})
+          messages:[{role:"user",content:`Write a JavaScript canvas animation for a tutorial about "${t.t}" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON ${t.n}, relevant diagram or visual for the topic, and MANDASTRONG STUDIO label at bottom. Use sec for time-based animation, t=0-1 for progress. W=canvas width H=canvas height. Return ONLY the function body starting with: function drawFrame(ctx,W,H,t,sec){`}]})
       });
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
-      code=code.replace(/\`\`\`javascript|\`\`\`js|\`\`\`/g,"").trim();
+      code=code.replace(/```javascript|```js|```/g,"").trim();
       const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
       const bo=code.indexOf("{");const bc=code.lastIndexOf("}");
-      const body=bo>0&&bc>bo?code.slice(bo+1,bc):"";
+      const body=bo>=0&&bc>bo?code.slice(bo+1,bc):"";
       const fn=new Function("ctx","W","H","t","sec",body);
-      const canvas=document.createElement("canvas");canvas.width=1280;canvas.height=720;
-      const ctx2=canvas.getContext("2d");
-      const stream=canvas.captureStream(12);
-      const recorder=new MediaRecorder(stream,{mimeType:"video/webm"});
-      const chunks=[];
-      recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
-      recorder.start(80);
-      const dur=Math.min(parseInt(t.dur)*60,90);
-      await new Promise(resolve=>{
-        let frame=0;const total=dur*12;const ms=Math.round(1000/12);const start=performance.now();
-        const tick=()=>{
-          if(frame>=total){resolve(null);return;}
-          const prog=frame/total;const s=frame/12;
-          try{ctx2.clearRect(0,0,1280,720);fn(ctx2,1280,720,prog,s);}
-          catch(e){ctx2.fillStyle="#0a0800";ctx2.fillRect(0,0,1280,720);ctx2.fillStyle="#e8c96d";ctx2.font="bold 28px Arial";ctx2.textAlign="center";ctx2.fillText("TUTORIAL "+t.n+": "+t.t.slice(0,50),640,360);}
-          frame++;setTimeout(tick,Math.max(4,start+(frame*ms)-performance.now()));
-        };tick();
-      });
-      recorder.stop();
-      await new Promise(r=>{recorder.onstop=r;});
-      const blob=new Blob(chunks,{type:"video/webm"});
-      const url=URL.createObjectURL(blob);
-      setVideos(v=>{const nv={...v,[idx]:url};try{sessionStorage.setItem("ms_tut_videos",JSON.stringify(nv));}catch{}return nv;});
+      setDrawFns(p=>({...p,[idx]:fn}));
     }catch(e){console.error(e);}
     setGenerating(null);
   };
   return(
-    <div style={{...Sp,padding:"30px 40px"}}>
-      <div style={{maxWidth:880,margin:"0 auto"}}>
-        <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>LEARNING CENTER</div>
-        <h1 style={{...H1,fontSize:28,marginBottom:16}}>TUTORIALS</h1>
-        <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.8}}>Step-by-step video guides. Click any tutorial — Claude generates and plays a real video lesson just for you.</div>
-        {tuts.map((t,idx)=>(
-          <div key={t.n} style={{...Card(),marginBottom:12,border:`1px solid ${active===idx?GOLD:GOLDDIM}`}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",padding:4}} onClick={()=>setActive(active===idx?null:idx)}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <span style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900,minWidth:28}}>{t.n}</span>
-                <div>
-                  <div style={{color:WHITE,fontWeight:800,fontSize:14}}>{t.t}</div>
-                  <div style={{color:DIM,fontSize:11,marginTop:2}}>{t.dur} min · {t.tips.length} tips {videos[idx]?"· ✓ READY":""}</div>
+    <div style={{...Sp,padding:0,background:"#000"}}>
+      <div style={{background:"linear-gradient(180deg,#080600,#000)",borderBottom:`1px solid ${GOLD}44`,padding:"24px 32px 18px"}}>
+        <div style={{maxWidth:900,margin:"0 auto"}}>
+          <div style={{fontSize:9,color:GOLDDIM,letterSpacing:5,fontWeight:900,marginBottom:6}}>LEARNING CENTER</div>
+          <h1 style={{...H1,fontSize:28,margin:"0 0 8px"}}>TUTORIALS</h1>
+          <p style={{color:WHITE,fontSize:13,lineHeight:1.8,margin:0,opacity:.8}}>Hit GENERATE TO WATCH on any lesson. Claude writes a unique animated tutorial and plays it instantly.</p>
+        </div>
+      </div>
+      <div style={{maxWidth:900,margin:"0 auto",padding:"20px 32px"}}>
+        {tuts.map((t,idx)=>{
+          const isActive=active===idx;const isGen=generating===idx;const hasFn=!!drawFns[idx];
+          return(
+            <div key={t.n} style={{marginBottom:10}}>
+              <div style={{background:isActive?"#060400":"#030200",border:`1px solid ${isActive?GOLD:GOLDDIM+"66"}`,borderBottom:isActive?"none":undefined,display:"flex",alignItems:"stretch",cursor:"pointer"}}
+                onClick={()=>setActive(isActive?null:idx)}>
+                <div style={{width:56,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:isActive?`linear-gradient(180deg,${GOLDDIM}33,${GOLD}11)`:"#0a0800",borderRight:`1px solid ${isActive?GOLD+"66":GOLDDIM+"33"}`}}>
+                  <span style={{fontFamily:"'Cinzel',serif",color:isActive?GOLD:GOLDDIM,fontSize:13,fontWeight:900}}>{t.n}</span>
+                </div>
+                <div style={{flex:1,padding:"13px 16px",minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:3}}>
+                    <span style={{color:WHITE,fontWeight:900,fontSize:14}}>{t.t}</span>
+                    <span style={{background:lc[t.l]+"1a",border:`1px solid ${lc[t.l]}`,color:lc[t.l],padding:"1px 8px",fontSize:9,fontWeight:900,letterSpacing:2}}>{t.l.toUpperCase()}</span>
+                    {hasFn&&<span style={{background:"#22c55e1a",border:"1px solid #22c55e",color:"#22c55e",padding:"1px 8px",fontSize:9,fontWeight:900,letterSpacing:2}}>READY ✓</span>}
+                  </div>
+                  <div style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>{t.dur} · {t.tips.length} PRO TIPS</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 16px",flexShrink:0}}>
+                  {isGen?(
+                    <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>GENERATING...</span>
+                  ):(
+                    <button onClick={e=>{e.stopPropagation();generate(idx);}}
+                      style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"7px 18px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>
+                      {hasFn?"▶ PLAY AGAIN":"▶ GENERATE TO WATCH"}
+                    </button>
+                  )}
+                  <span style={{color:isActive?GOLD:GOLDDIM,fontSize:14,fontWeight:900}}>{isActive?"▲":"▼"}</span>
                 </div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                <button onClick={e=>{e.stopPropagation();go(t.page);}} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"5px 12px",fontSize:10,fontWeight:900,letterSpacing:1.5,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>GO TO PAGE {t.page}</button>
-                <span style={{background:lc[t.l]+"22",border:`1px solid ${lc[t.l]}`,color:lc[t.l],padding:"3px 10px",fontSize:11,fontWeight:900,letterSpacing:2}}>{t.l.toUpperCase()}</span>
-                <span style={{color:GOLD,fontSize:16}}>{active===idx?"▲":"▼"}</span>
-              </div>
+              {isActive&&(
+                <div style={{background:"#040300",border:`1px solid ${GOLD}`,borderTop:"none"}}>
+                  {isGen?(
+                    <div style={{aspectRatio:"16/9",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,background:"linear-gradient(135deg,#060400,#020100)"}}>
+                      <div style={{width:60,height:60,border:`2px solid ${GOLD}`,borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+                      <div style={{color:GOLD,fontSize:13,fontWeight:900,letterSpacing:3}}>CLAUDE IS WRITING YOUR TUTORIAL</div>
+                      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                    </div>
+                  ):hasFn?(
+                    <TutCanvas drawFn={drawFns[idx]}/>
+                  ):(
+                    <div style={{aspectRatio:"16/9",background:"linear-gradient(135deg,#060400,#020100)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,cursor:"pointer"}}
+                      onClick={()=>generate(idx)}>
+                      <div style={{width:80,height:80,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 50px ${GOLD}55`}}>
+                        <span style={{color:"#000",fontSize:30,fontWeight:900,marginLeft:4}}>▶</span>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{color:GOLD,fontWeight:900,fontSize:15,letterSpacing:4,marginBottom:6}}>GENERATE TO WATCH</div>
+                        <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>LESSON {t.n} · {t.dur} · {t.l.toUpperCase()}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{padding:"20px 26px"}}>
+                    <p style={{color:WHITE,fontSize:14,lineHeight:1.95,marginBottom:18}}>{t.d}</p>
+                    <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3,marginBottom:10}}>PRO TIPS</div>
+                    {t.tips.map((tip,i)=>(
+                      <div key={i} style={{display:"flex",gap:12,marginBottom:9,alignItems:"flex-start"}}>
+                        <span style={{color:GOLD,fontWeight:900,flexShrink:0}}>✦</span>
+                        <span style={{color:WHITE,fontSize:13,lineHeight:1.75}}>{tip}</span>
+                      </div>
+                    ))}
+                    <div style={{marginTop:18,display:"flex",gap:10,flexWrap:"wrap"}}>
+                      {!hasFn&&!isGen&&<button onClick={()=>generate(idx)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"11px 28px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>▶ GENERATE TO WATCH</button>}
+                      {hasFn&&!isGen&&<button onClick={()=>generate(idx)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"11px 28px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>↺ REGENERATE</button>}
+                      <button onClick={()=>go(t.page)} style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,padding:"11px 20px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>OPEN PAGE {t.page} ▶</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            {active===idx&&(
-              <div style={{marginTop:14}}>
-                {videos[idx]?(
-                  <div style={{marginBottom:12}}>
-                    <div style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:3,marginBottom:6}}>✓ TUTORIAL VIDEO READY</div>
-                    <video src={videos[idx]} controls autoPlay style={{width:"100%",aspectRatio:"16/9",background:"#000",display:"block",border:`1px solid ${GOLD}`}}/>
-                    <button onClick={()=>generateTutorialVideo(idx)} style={{...G("out",false),marginTop:6,padding:"6px 16px",fontSize:10,letterSpacing:2}}>↺ REGENERATE</button>
-                  </div>
-                ):(
-                  <div style={{background:"#080500",aspectRatio:"16/9",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginBottom:12,border:`1px solid ${GOLDDIM}`}}>
-                    {generating===idx?(
-                      <div style={{textAlign:"center",padding:20}}>
-                        <div style={{color:GOLD,fontSize:13,fontWeight:900,letterSpacing:3,marginBottom:10}}>⟳ GENERATING YOUR TUTORIAL...</div>
-                        <div style={{color:DIM,fontSize:11,lineHeight:1.8}}>Claude is writing and rendering a video lesson.<br/>Ready in about 30 seconds.</div>
-                      </div>
-                    ):(
-                      <div style={{textAlign:"center",padding:20}}>
-                        <button onClick={()=>generateTutorialVideo(idx)}
-                          style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"18px 36px",cursor:"pointer",fontSize:14,fontWeight:900,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",marginBottom:10,boxShadow:`0 0 30px ${GOLD}44`}}>
-                          ▶ WATCH TUTORIAL
-                        </button>
-                        <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>CLAUDE GENERATES YOUR PERSONAL VIDEO LESSON ON DEMAND</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <p style={{color:WHITE,fontSize:13,lineHeight:1.9,marginBottom:12}}>{t.d}</p>
-                <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,marginBottom:8}}>PRO TIPS</div>
-                {t.tips.map((tip,i)=>(
-                  <div key={i} style={{display:"flex",gap:10,marginBottom:6}}>
-                    <span style={{color:GOLD,fontWeight:900,flexShrink:0}}>✦</span>
-                    <span style={{color:WHITE,fontSize:13,lineHeight:1.7}}>{tip}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
