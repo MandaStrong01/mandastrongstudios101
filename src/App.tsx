@@ -2247,7 +2247,7 @@ function P4({ go, setUser }) {
   const subCount=useSubscriberCount();
   const [displayCount,setDisplayCount]=useState(1247);
   useEffect(()=>{
-    const base2=subCount||1247;setDisplayCount(base2);
+    const cnt=subCount||1247;setDisplayCount(cnt);
     const id=setInterval(()=>setDisplayCount(n=>n+(Math.random()>0.75?1:0)),6000);
     return()=>clearInterval(id);
   },[subCount]);
@@ -2298,7 +2298,7 @@ function P4({ go, setUser }) {
           </div>
         </div>
         <div style={{textAlign:"center",marginBottom:20}}>
-          <button onClick={()=>{try{const m=JSON.parse(localStorage.getItem("ms_medialib")||"[]");const t=JSON.parse(localStorage.getItem("ms_timeline")||"{}");const u=JSON.parse(localStorage.getItem("ms_user")||"{}");const p=JSON.parse(localStorage.getItem("ms_page")||"5");if(m.length>0||Object.keys(t).length>0){setMediaLib(m);setTimeline(t);if(u&&u.name)setUser(u);go(p);setSavedNotice(true);setTimeout(()=>setSavedNotice(false),2500);}else{alert("No saved project found. Hit SAVE PROJECT in the footer first.");}}catch(e){alert("Could not load project.");}}} style={{...G("gold",false),padding:"12px 32px"}}>📂 OPEN PROJECT</button>
+          <button onClick={()=>{try{const p=JSON.parse(localStorage.getItem("ms_page")||"5");go(p||5);}catch(e){go(5);}}} style={{...G("gold",false),padding:"12px 32px"}}>📂 OPEN PROJECT</button>
         </div>
         <h2 style={{...H1,fontSize:22,textAlign:"center",marginBottom:22}}>SUBSCRIPTION PLANS</h2>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
