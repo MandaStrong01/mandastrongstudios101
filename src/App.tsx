@@ -1311,6 +1311,16 @@ const VOICE_CHARACTERS = [
   {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal · Dreamy · Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
 
+function buildChunks(txt) {
+  if(!txt||!txt.trim()) return [];
+  const parts = txt.split(/(?<=[.!?,;:])\s+/);
+  return parts.map(t=>{
+    const s=t.trim();if(!s)return null;
+    const type=s.endsWith("?")?"question":s.endsWith("!")?"exclaim":s.endsWith(",")||s.endsWith(";")||s.endsWith(":")?   "clause":"sentence";
+    return {type,text:s};
+  }).filter(Boolean);
+}
+
 function P6Voice({ onSave }) {
   const [text,setText]=useState("");
   const [processed,setProcessed]=useState("");
@@ -3508,6 +3518,17 @@ export default function App() {
             dbId:c2.id
           }));
           setMediaLib(restored);
+          // Auto-populate timeline track 0 with video clips
+          const videoClips = restored.filter(cl=>cl.type&&cl.type.startsWith("video"));
+          if(videoClips.length>0){
+            setTimeline(tl=>{
+              const existing = Object.values(tl).flat();
+              if(existing.length===0){
+                return {0: videoClips.map(cl=>({...cl,startTime:0,syncGroup:"master",synced:true}))};
+              }
+              return tl;
+            });
+          }
         } else {
           // Fallback to localStorage
           try{
@@ -3673,10 +3694,6 @@ function useSubscriberCount() {
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
       <div style={{minHeight:"calc(100vh - 116px)"}}>
         <div key={page}>{renderPage()}</div>
-          ) : visited.has(p) ? (
-            <div key={p} style={{display:"none"}}>{el}</div>
-          ) : null
-        ))}
       </div>
       <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
     </div>

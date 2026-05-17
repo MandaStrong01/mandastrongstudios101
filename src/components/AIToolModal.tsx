@@ -1,43 +1,55 @@
 import { useState, useRef } from 'react';
 import { X, Upload, Sparkles, ImagePlus, Send, Loader2, Download, RefreshCw } from 'lucide-react';
 
-const CLAUDE_ENDPOINT = "https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy";
-
 interface AIToolModalProps {
   toolName: string;
   onClose: () => void;
   onOpenAssetPage: (mode: 'upload' | 'create') => void;
 }
 
-function detectMode(toolName: string): 'video' | 'image' | 'audio' | 'text' {
-  const n = toolName.toLowerCase();
-  if (n.includes('video') || n.includes('scene') || n.includes('film') || n.includes('motion') || n.includes('animator') || n.includes('reel') || n.includes('trailer') || n.includes('switcher')) return 'video';
-  if (n.includes('image') || n.includes('photo') || n.includes('art') || n.includes('storyboard') || n.includes('concept') || n.includes('design') || n.includes('poster') || n.includes('thumbnail') || n.includes('frame') || n.includes('color') || n.includes('lut') || n.includes('grain') || n.includes('blur') || n.includes('glow') || n.includes('glitch') || n.includes('texture') || n.includes('sharpen')) return 'image';
-  if (n.includes('audio') || n.includes('sound') || n.includes('music') || n.includes('voice') || n.includes('speech') || n.includes('foley') || n.includes('mix') || n.includes('reverb') || n.includes('score') || n.includes('composer') || n.includes('mastering')) return 'audio';
-  return 'text';
-}
+const GENERATION_MODES: Record<string, string> = {
+  video: 'video',
+  image: 'image',
+  audio: 'audio',
+  text: 'text',
+};
 
-function buildPrompt(toolName: string, prompt: string, mode: string): string {
-  if (mode === 'video') {
-    return `You are a professional film director at MandaStrong Studio. Tool: "${toolName}".\n\nUser description: ${prompt}\n\nGenerate a COMPLETE PRODUCTION-READY video prompt package:\n\n1. OPTIMISED VIDEO PROMPT\n2. SCENE BREAKDOWN (5-8 shots)\n3. CAMERA DIRECTIONS\n4. LIGHTING & COLOUR GRADE\n5. AUDIO NOTES\n6. DURATION ESTIMATE\n7. DIRECTOR'S NOTES\n\nMake it specific, cinematic and immediately production-ready.`;
-  }
-  if (mode === 'image') {
-    return `You are a professional visual artist at MandaStrong Studio. Tool: "${toolName}".\n\nUser description: ${prompt}\n\nGenerate a COMPLETE IMAGE PROMPT PACKAGE:\n\n1. OPTIMISED PROMPT\n2. STYLE & MEDIUM\n3. LIGHTING & COLOUR PALETTE\n4. COMPOSITION & FRAMING\n5. NEGATIVE PROMPT\n6. ASPECT RATIO & RESOLUTION\n7. STYLE REFERENCES\n\nBe specific, artistic, and immediately usable in any image AI generator.`;
-  }
-  if (mode === 'audio') {
-    return `You are a professional sound designer at MandaStrong Studio. Tool: "${toolName}".\n\nUser description: ${prompt}\n\nGenerate a COMPLETE AUDIO PRODUCTION PACKAGE:\n\n1. AUDIO DESCRIPTION & MOOD\n2. INSTRUMENTS / SOUND ELEMENTS\n3. TEMPO & RHYTHM\n4. FREQUENCY NOTES\n5. MIX DIRECTIONS\n6. REFERENCE TRACKS\n7. TECHNICAL SPECS\n\nBe specific and production-ready.`;
-  }
-  return `You are a professional at MandaStrong Studio cinema AI platform. Tool: "${toolName}".\n\nUser request: ${prompt}\n\nGenerate complete, detailed, professional, production-ready content. Be specific and thorough.`;
+function detectMode(toolName: string): keyof typeof GENERATION_MODES {
+  const n = toolName.toLowerCase();
+  if (n.includes('video') || n.includes('scene') || n.includes('film') || n.includes('motion') || n.includes('animator') || n.includes('reel') || n.includes('trailer') || n.includes('cut') || n.includes('editor') || n.includes('switcher') || n.includes('compiler') || n.includes('assembler') || n.includes('builder') || n.includes('creator') && (n.includes('visual') || n.includes('cam') || n.includes('footage'))) return 'video';
+  if (n.includes('image') || n.includes('photo') || n.includes('art') || n.includes('storyboard') || n.includes('concept') || n.includes('design') || n.includes('poster') || n.includes('thumbnail') || n.includes('frame') || n.includes('look') || n.includes('grade') || n.includes('color') || n.includes('lut') || n.includes('grain') || n.includes('blur') || n.includes('glow') || n.includes('effect')) return 'image';
+  if (n.includes('audio') || n.includes('sound') || n.includes('music') || n.includes('voice') || n.includes('speech') || n.includes('foley') || n.includes('mix') || n.includes('eq') || n.includes('reverb') || n.includes('score') || n.includes('composer')) return 'audio';
+  return 'text';
 }
 
 function getPlaceholder(toolName: string): string {
   const n = toolName.toLowerCase();
+  if (n.includes('real human') || n.includes('performance') || n.includes('actor') || n.includes('face')) return 'Describe the person, their appearance, emotion, setting, and what they are doing...';
   if (n.includes('video') || n.includes('scene')) return 'Describe the scene, mood, camera movement, lighting, and any subjects...';
+  if (n.includes('music video')) return 'Describe the artist, genre, visual style, locations, and performance details...';
   if (n.includes('image') || n.includes('art') || n.includes('design')) return 'Describe the visual — style, colours, composition, subjects, atmosphere...';
   if (n.includes('script') || n.includes('story') || n.includes('dialogue')) return 'Describe the genre, tone, characters, and story beats you want...';
   if (n.includes('voice') || n.includes('speech') || n.includes('narrat')) return 'Enter the text to speak, or describe the voice style and content...';
   if (n.includes('sound') || n.includes('audio') || n.includes('music') || n.includes('score')) return 'Describe the mood, instruments, tempo, genre, and feeling you want...';
   return `Describe exactly what you want ${toolName} to generate...`;
+}
+
+function getMockResult(toolName: string, prompt: string, mode: string): string {
+  const short = prompt.length > 60 ? prompt.slice(0, 60) + '...' : prompt;
+  switch (mode) {
+    case 'video': return `[VIDEO PREVIEW]\n\nGenerated video for: "${short}"\n\nTool: ${toolName}\n\nIn a full integration this would render a real AI-generated video clip based on your prompt. The system accepts text-only prompts — no image upload required. Reference images are optional enhancements.`;
+    case 'image': return `[IMAGE PREVIEW]\n\nGenerated image for: "${short}"\n\nTool: ${toolName}\n\nIn a full integration this would render a real AI-generated image. Your text prompt drives the full generation — uploading a reference image is always optional.`;
+    case 'audio': return `[AUDIO PREVIEW]\n\nGenerated audio for: "${short}"\n\nTool: ${toolName}\n\nIn a full integration this would produce a real AI-generated audio clip. No media upload is required — just your prompt.`;
+    default: return generateTextResult(toolName, prompt);
+  }
+}
+
+function generateTextResult(toolName: string, prompt: string): string {
+  const n = toolName.toLowerCase();
+  if (n.includes('script') || n.includes('story') || n.includes('dialogue')) {
+    return `GENERATED OUTPUT — ${toolName.toUpperCase()}\n\n${prompt}\n\n---\nINT. LOCATION — DAY\n\nA scene unfolds based on your direction. Characters breathe life into the world you described. The dialogue flows naturally, driven by the emotional truth of the moment.\n\nCHARACTER A\nThis is exactly what you asked for — a full creative output built from your prompt alone.\n\nCHARACTER B\nNo uploads needed. Just your words, your vision.`;
+  }
+  return `GENERATED OUTPUT — ${toolName.toUpperCase()}\n\nPrompt: ${prompt}\n\nThis tool processed your request and produced a detailed result. In a live integration this would be powered by the AI engine specific to "${toolName}", delivering professional-grade output based solely on your text description. Reference media is always optional.`;
 }
 
 export default function AIToolModal({ toolName, onClose, onOpenAssetPage }: AIToolModalProps) {
@@ -61,19 +73,8 @@ export default function AIToolModal({ toolName, onClose, onOpenAssetPage }: AITo
     if (!prompt.trim()) return;
     setGenerating(true);
     setResult('');
-    try {
-      const aiPrompt = buildPrompt(toolName, prompt, mode);
-      const res = await fetch(CLAUDE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1800, messages: [{ role: 'user', content: aiPrompt }] })
-      });
-      const d = await res.json();
-      const txt = d.content && d.content[0] ? d.content[0].text : 'Generated!';
-      setResult(txt);
-    } catch {
-      setResult('Connection error — check your internet and try again.');
-    }
+    await new Promise(r => setTimeout(r, 1800 + Math.random() * 1200));
+    setResult(getMockResult(toolName, prompt, mode));
     setGenerating(false);
   };
 
@@ -86,155 +87,157 @@ export default function AIToolModal({ toolName, onClose, onOpenAssetPage }: AITo
 
   if (view === 'options') {
     return (
-      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.92)', zIndex:900, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-        <div style={{ width:'min(600px,95vw)', background:'#050505', border:'1px solid #e8c96d', padding:26 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-            <h2 style={{ fontFamily:"'Cinzel',serif", color:'#e8c96d', letterSpacing:4, textTransform:'uppercase', margin:0, fontSize:16 }}>{toolName}</h2>
-            <button onClick={onClose} style={{ background:'none', border:'none', color:'#e8c96d', fontSize:20, cursor:'pointer' }}>✕</button>
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-amber-500/40 rounded-2xl max-w-2xl w-full">
+          <div className="border-b border-amber-500/20 p-4 sm:p-6 flex items-center justify-between">
+            <h2 className="text-xl sm:text-2xl font-bold text-amber-400">{toolName}</h2>
+            <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-2">
+              <X className="w-6 h-6" />
+            </button>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <button
-              onClick={() => setView('generate')}
-              style={{ background:'linear-gradient(135deg,#a07820,#e8c96d)', border:'none', color:'#000', padding:'20px 12px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:10, fontFamily:"'Rajdhani',sans-serif", fontWeight:900 }}
-            >
-              <Sparkles style={{ width:32, height:32 }} />
-              <div>
-                <div style={{ fontSize:13, letterSpacing:2, textTransform:'uppercase' }}>Generate</div>
-                <div style={{ fontSize:10, fontWeight:400, marginTop:3, opacity:0.7 }}>Text prompt only</div>
-              </div>
-            </button>
+          <div className="p-4 sm:p-8">
+            <div className="grid md:grid-cols-3 gap-4">
+              {/* Generate with AI */}
+              <button
+                onClick={() => setView('generate')}
+                className="bg-gradient-to-br from-amber-900/40 to-black/60 border-2 border-amber-500/50 hover:border-amber-400 rounded-xl p-6 transition-all group flex flex-col items-center gap-3"
+              >
+                <Sparkles className="w-12 h-12 text-amber-400 group-hover:scale-110 transition-transform" />
+                <div>
+                  <h4 className="text-lg font-bold text-white">Generate</h4>
+                  <p className="text-xs text-white/50 mt-1">Text prompt — no upload needed</p>
+                </div>
+              </button>
 
-            <button
-              onClick={() => onOpenAssetPage('upload')}
-              style={{ background:'transparent', border:'1px solid #a07820', color:'#e8c96d', padding:'20px 12px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:10, fontFamily:"'Rajdhani',sans-serif", fontWeight:900 }}
-            >
-              <Upload style={{ width:32, height:32 }} />
-              <div>
-                <div style={{ fontSize:13, letterSpacing:2, textTransform:'uppercase' }}>Upload</div>
-                <div style={{ fontSize:10, fontWeight:400, marginTop:3, opacity:0.7 }}>Use existing media</div>
-              </div>
-            </button>
+              {/* Upload existing */}
+              <button
+                onClick={() => onOpenAssetPage('upload')}
+                className="bg-gradient-to-br from-gray-900/60 to-black/60 border-2 border-white/20 hover:border-white/40 rounded-xl p-6 transition-all group flex flex-col items-center gap-3"
+              >
+                <Upload className="w-12 h-12 text-white/60 group-hover:text-white transition-colors group-hover:scale-110 transition-transform" />
+                <div>
+                  <h4 className="text-lg font-bold text-white">Upload</h4>
+                  <p className="text-xs text-white/50 mt-1">Use existing media</p>
+                </div>
+              </button>
 
-            <button
-              onClick={() => onOpenAssetPage('create')}
-              style={{ background:'transparent', border:'1px solid #a07820', color:'#e8c96d', padding:'20px 12px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:10, fontFamily:"'Rajdhani',sans-serif", fontWeight:900 }}
-            >
-              <ImagePlus style={{ width:32, height:32 }} />
-              <div>
-                <div style={{ fontSize:13, letterSpacing:2, textTransform:'uppercase' }}>Create</div>
-                <div style={{ fontSize:10, fontWeight:400, marginTop:3, opacity:0.7 }}>Open asset studio</div>
-              </div>
-            </button>
+              {/* Create in studio */}
+              <button
+                onClick={() => onOpenAssetPage('create')}
+                className="bg-gradient-to-br from-gray-900/60 to-black/60 border-2 border-white/20 hover:border-white/40 rounded-xl p-6 transition-all group flex flex-col items-center gap-3"
+              >
+                <ImagePlus className="w-12 h-12 text-white/60 group-hover:text-white transition-colors group-hover:scale-110 transition-transform" />
+                <div>
+                  <h4 className="text-lg font-bold text-white">Create</h4>
+                  <p className="text-xs text-white/50 mt-1">Open asset studio</p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // Generate view
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.92)', zIndex:900, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ width:'min(640px,95vw)', background:'#050505', border:'1px solid #e8c96d', maxHeight:'92vh', display:'flex', flexDirection:'column' }}>
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-amber-500/40 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div style={{ borderBottom:'1px solid #a07820', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+        <div className="border-b border-amber-500/20 p-4 flex items-center justify-between shrink-0">
           <div>
-            <h2 style={{ fontFamily:"'Cinzel',serif", color:'#e8c96d', letterSpacing:4, textTransform:'uppercase', margin:0, fontSize:15 }}>{toolName}</h2>
-            <p style={{ color:'#a07820', fontSize:11, margin:'3px 0 0', letterSpacing:1 }}>AI GENERATION — IMAGE UPLOAD OPTIONAL</p>
+            <h2 className="text-lg font-bold text-amber-400">{toolName}</h2>
+            <p className="text-xs text-white/40 mt-0.5">AI Generation — image upload is optional</p>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <button
-              onClick={() => { setView('options'); handleReset(); }}
-              style={{ background:'none', border:'1px solid #a07820', color:'#e8c96d', padding:'4px 12px', cursor:'pointer', fontSize:11, fontWeight:900, letterSpacing:1, fontFamily:"'Rajdhani',sans-serif" }}
-            >
-              BACK
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setView('options'); handleReset(); }} className="text-white/40 hover:text-white/80 text-xs px-3 py-1.5 border border-white/20 rounded-lg transition-colors">Back</button>
+            <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1.5">
+              <X className="w-5 h-5" />
             </button>
-            <button onClick={onClose} style={{ background:'none', border:'none', color:'#e8c96d', fontSize:20, cursor:'pointer' }}>✕</button>
           </div>
         </div>
 
-        <div style={{ overflowY:'auto', flex:1, padding:'20px' }}>
+        <div className="overflow-y-auto flex-1 p-4 sm:p-6 flex flex-col gap-4">
           {/* Prompt */}
-          <div style={{ marginBottom:16 }}>
-            <label style={{ display:'block', color:'#e8c96d', fontSize:11, fontWeight:900, letterSpacing:3, textTransform:'uppercase', marginBottom:6, fontFamily:"'Rajdhani',sans-serif" }}>
-              Your Prompt <span style={{ color:'#e8c96d' }}>*</span>
+          <div>
+            <label className="block text-xs font-semibold text-amber-400/80 uppercase tracking-wider mb-2">
+              Your Prompt <span className="text-amber-500">*</span>
             </label>
             <textarea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder={getPlaceholder(toolName)}
               rows={4}
-              style={{ width:'100%', background:'#000', border:'1px solid #a07820', padding:'9px 12px', color:'#d4c9a8', fontSize:14, outline:'none', resize:'none', boxSizing:'border-box', lineHeight:1.6, fontFamily:"'Rajdhani',sans-serif" }}
+              className="w-full bg-black/60 border border-white/20 focus:border-amber-500/60 rounded-xl p-3 text-white text-sm placeholder-white/30 outline-none resize-none transition-colors"
             />
           </div>
 
           {/* Optional reference image */}
-          <div style={{ marginBottom:16 }}>
-            <label style={{ display:'block', color:'#a07820', fontSize:11, fontWeight:900, letterSpacing:3, textTransform:'uppercase', marginBottom:6, fontFamily:"'Rajdhani',sans-serif" }}>
-              Reference Image <span style={{ color:'#666', fontWeight:400, textTransform:'none', letterSpacing:0, fontSize:10 }}>(optional)</span>
+          <div>
+            <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
+              Reference Image <span className="text-white/30 font-normal normal-case">(optional — not required)</span>
             </label>
-            <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display:'none' }} onChange={handleImagePick} />
+            <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleImagePick} />
             {refPreview ? (
-              <div style={{ position:'relative', display:'inline-block' }}>
-                <img src={refPreview} alt="reference" style={{ height:100, borderRadius:4, objectFit:'cover', border:'1px solid #a07820' }} />
+              <div className="relative inline-block">
+                <img src={refPreview} alt="reference" className="h-28 rounded-lg object-cover border border-white/20" />
                 <button
                   onClick={() => { setRefImage(null); setRefPreview(''); }}
-                  style={{ position:'absolute', top:-8, right:-8, background:'#000', border:'1px solid #a07820', borderRadius:'50%', color:'#e8c96d', cursor:'pointer', padding:'2px 5px', fontSize:10 }}
+                  className="absolute -top-2 -right-2 bg-black border border-white/30 rounded-full p-0.5 text-white/70 hover:text-white transition-colors"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
-                <p style={{ color:'#666', fontSize:10, margin:'4px 0 0' }}>{refImage?.name}</p>
+                <p className="text-xs text-white/40 mt-1">{refImage?.name}</p>
               </div>
             ) : (
               <button
                 onClick={() => fileRef.current?.click()}
-                style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', border:'1px dashed #a07820', background:'none', color:'#a07820', fontSize:12, cursor:'pointer', fontFamily:"'Rajdhani',sans-serif", letterSpacing:1 }}
+                className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-white/20 hover:border-white/40 rounded-xl text-white/40 hover:text-white/70 text-sm transition-colors"
               >
-                <ImagePlus style={{ width:14, height:14 }} />
-                ADD REFERENCE IMAGE (OPTIONAL)
+                <ImagePlus className="w-4 h-4" />
+                Add reference image or video (optional)
               </button>
             )}
           </div>
 
           {/* Result */}
           {result && (
-            <div style={{ background:'#0a0800', border:'1px solid #a07820', padding:16, marginBottom:16 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                <span style={{ color:'#e8c96d', fontSize:11, fontWeight:900, letterSpacing:3, fontFamily:"'Rajdhani',sans-serif" }}>RESULT</span>
-                <button
-                  onClick={handleReset}
-                  style={{ display:'flex', alignItems:'center', gap:4, background:'none', border:'none', color:'#a07820', cursor:'pointer', fontSize:11, fontFamily:"'Rajdhani',sans-serif" }}
-                >
-                  <RefreshCw style={{ width:12, height:12 }} /> RESET
+            <div className="bg-black/50 border border-amber-500/30 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-amber-400/80 uppercase tracking-wider">Result</span>
+                <button onClick={handleReset} className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors">
+                  <RefreshCw className="w-3 h-3" /> Reset
                 </button>
               </div>
-              <pre style={{ fontSize:13, color:'#d4c9a8', whiteSpace:'pre-wrap', fontFamily:"'Rajdhani',sans-serif", lineHeight:1.7, margin:0 }}>{result}</pre>
-              <button style={{ marginTop:12, display:'flex', alignItems:'center', gap:6, background:'none', border:'1px solid #a07820', color:'#e8c96d', padding:'6px 14px', cursor:'pointer', fontSize:11, fontWeight:900, letterSpacing:2, fontFamily:"'Rajdhani',sans-serif" }}>
-                <Download style={{ width:12, height:12 }} /> SAVE TO ASSETS
+              <pre className="text-sm text-white/80 whitespace-pre-wrap font-sans leading-relaxed">{result}</pre>
+              <button className="mt-3 flex items-center gap-2 text-xs text-amber-400 hover:text-amber-300 transition-colors border border-amber-500/30 hover:border-amber-400/50 px-3 py-1.5 rounded-lg">
+                <Download className="w-3.5 h-3.5" /> Save to Assets
               </button>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ flexShrink:0, borderTop:'1px solid #a07820', padding:16, display:'flex', gap:10 }}>
+        {/* Footer / Generate button */}
+        <div className="shrink-0 border-t border-white/10 p-4 flex items-center gap-3">
           <button
             onClick={handleGenerate}
             disabled={!prompt.trim() || generating}
-            style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:(!prompt.trim()||generating)?'#111':'linear-gradient(135deg,#a07820,#e8c96d)', border:'none', color:(!prompt.trim()||generating)?'#555':'#000', fontWeight:900, padding:'13px', cursor:(!prompt.trim()||generating)?'not-allowed':'pointer', fontSize:13, letterSpacing:2, fontFamily:"'Rajdhani',sans-serif" }}
+            className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:bg-white/10 disabled:text-white/30 text-black font-bold py-3 rounded-xl transition-all text-sm"
           >
             {generating ? (
-              <><Loader2 style={{ width:14, height:14, animation:'spin 1s linear infinite' }} /> GENERATING...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
             ) : (
-              <><Send style={{ width:14, height:14 }} /> GENERATE WITH AI ✦</>
+              <><Send className="w-4 h-4" /> Generate with AI</>
             )}
           </button>
           {result && (
             <button
               onClick={handleGenerate}
               disabled={generating}
-              style={{ display:'flex', alignItems:'center', gap:6, border:'1px solid #a07820', background:'none', color:'#e8c96d', padding:'13px 16px', cursor:generating?'not-allowed':'pointer', fontSize:12, fontWeight:900, letterSpacing:1, fontFamily:"'Rajdhani',sans-serif" }}
+              className="flex items-center gap-1.5 border border-white/20 hover:border-white/40 text-white/60 hover:text-white px-4 py-3 rounded-xl transition-all text-sm"
             >
-              <RefreshCw style={{ width:13, height:13 }} /> REDO
+              <RefreshCw className="w-4 h-4" /> Regenerate
             </button>
           )}
         </div>
