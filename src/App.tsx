@@ -1,3 +1,191 @@
+
+We couldn't renew your plan
+Update your payment method to restore full access.
+
+Update payment method
+
+Review plans
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+Publish application
+Version 656 at May 16 11:08 PM
+
+
+
+Publish this application.
+
+Please analyze the deployment logs and fix the errors.
+
+Publish this application.
+
+Publish this application.
+
+Publish this application.
+
+Publish this application.
+
+Publish this application.
+
+Publish this application.
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+Publish application
+Version 657 at May 17 9:08 AM
+
+
+
+Publish this application.
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+
+// @ts-nocheck import { useState, useRef, useEffect } from "react"; ...
+
+Pasted
+there are many pages missing---can uo please chack to see hats missi and reurn my workig ready to render back
+
+
+// @ts-nocheck import { useState, useRef, useEffect } from "react"; ...
+
+Pasted
+Publish this application.
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+Publish application
+Version 658 at May 17 10:09 AM
+
+
+
+image.png
+
+// @ts-nocheck import { useState, useRef, useEffect } from "react"; ...
+
+Pasted
+Claude keeps missing items or not carrying out tasks. My app 3 days ago was reder ready. Claude had re generated them and put them in Timelie. I am out of tokens. This is the last step after 10 months. please can you put correct code into file so i can end this project.
+
+image.png
+
+// @ts-nocheck import { useState, useRef, useEffect } from "react"; ...
+
+Pasted
+Publish this application.
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+Publish application
+Version 659 at May 17 11:31 AM
+
+
+
+Screenshot_2026-05-17_11.32.48.png
+Publish this application.
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+Publish application
+Version 660 at May 17 11:37 AM
+
+
+
+
+// @ts-nocheck import { useState, useRef, useEffect } from "react"; ...
+
+Pasted
+why is 1st page blanl----please fix and proide new code to file...2 days ago i had a render ready app until claude essed wiyj it so please can yo compare claudes to what needs to closer to 3800 lies, id be grateful
+
+Error
+You have hit the rate limit. Please upgrade to keep chatting.
+
+You're out of tokens
+Upgrade now to keep going, or continue coding for free in the editor.
+
+Upgrade
+
+// @ts-nocheck import { useState, useRef, useEffect } from "react"; ...
+
+Pasted
+Publish this application.
+
+Your site has been successfully published! You can view it at: 
+https://mandastrongstudio2026.bolt.host
+
+
+You can setup a custom domain by either purchasing a new domain or use a domain you already own.
+
+
+
+
+
+Publish application
+Version 661 at May 17 11:42 AM
+
+
+You've used all your tokens.
+
+Switch to Pro 200 for 2x more usage
+
+
+
+Standard
+
+Select
+
+Plan
+
+/
+Pasted Content
+3,536 lines • 250,587 characters
 // @ts-nocheck
 import { useState, useRef, useEffect } from "react";
 
@@ -3533,3 +3721,4 @@ const allPages=[
       default: return <P1 go={go}/>;
     }
   }
+
