@@ -28,7 +28,7 @@ const G = (v, sm) => ({
   border: v==="gold" ? "none" : `1px solid ${GOLD}`,
   color: v==="gold" ? "#000" : GOLD,
   borderRadius:0, fontWeight:900,
-  padding: sm ? "5px 14px             " : "10px 26px",
+  padding: sm ? "5px 14px" : "10px 26px",
   fontSize: sm ? 11 : 13,
   cursor:"pointer", letterSpacing:2, textTransform:"uppercase",
   fontFamily:"'Rajdhani',sans-serif",
@@ -43,7 +43,7 @@ const STOCK_VOICES = [
   { id:"sophia", name:"Sophia", desc:"Bright Australian Female", style:"Upbeat · Engaging", accent:"Australian" },
   { id:"james",  name:"James",  desc:"Dry British Male", style:"Sarcastic · Witty", accent:"British" },
   { id:"nova",   name:"Nova",   desc:"Neutral AI Female", style:"Clean · Professional", accent:"Neutral" },
-  { id:"river",  name:"River",  de sc:"Warm American Male", style:"Friendly · Intimate", accent:"American South" },
+  { id:"river",  name:"River",  desc:"Warm American Male", style:"Friendly · Intimate", accent:"American South" },
 ];
 
 const VOICE_TOOLS = ["Text to Voice","Text to Speech","Text to Narration","Text to Audiobook","Text to Voiceover","AI Voice Actor","Neural Voice Generator","Emotion Voice Synth","Documentary Voice","Trailer Voice Generator","Commercial Voice","Character Voice Creator","Audiobook Creator","Podcast Voice"];
@@ -55,30 +55,6 @@ const loadVoiceAssignments = () => {
 if (typeof window !== "undefined") loadVoiceAssignments();
 
 let currentUtterance = null;
-
-async function proxyFetch(body, retries=2) {
-  for(let attempt=0; attempt<retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(()=>controller.abort(), 55000);
-      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(body),
-        signal:controller.signal
-      });
-      clearTimeout(timeout);
-      if(!res.ok) throw new Error("HTTP "+res.status);
-      const d = await res.json();
-      if(d.error) throw new Error(d.error.message||"API error");
-      return d;
-    } catch(e) {
-      if(attempt===retries-1) throw e;
-      await new Promise(r=>setTimeout(r,1500));
-    }
-  }
-}
-
 
 function speakText(voiceId, txt, onStart, onEnd) {
   if (!txt||!txt.trim()) return;
@@ -1456,7 +1432,9 @@ function P6Voice({ onSave }) {
     if(!text.trim())return;
     setLoading(true);setProcessed("");setSaved(false);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:`You are a speech coach preparing text for TTS. Speaker: ${selected.name} — ${selected.style}. Break into short sentences, add commas for natural pauses, spell out numbers. Output ONLY the reformatted text:\n\n${text}`}]});
+      const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:`You are a speech coach preparing text for TTS. Speaker: ${selected.name} — ${selected.style}. Break into short sentences, add commas for natural pauses, spell out numbers. Output ONLY the reformatted text:\n\n${text}`}]})});
+      const d=await res.json();
       const out=d.content&&d.content[0]?d.content[0].text.trim():text;
       setProcessed(out);setActiveTab("result");speakNow(out);
     }catch(e){setProcessed(text);speakNow(text);}
@@ -1747,8 +1725,13 @@ COLOUR GRADING (apply last):
 Return ONLY the JavaScript function starting with:
 function drawFrame(ctx, W, H, t, sec) {`;
 
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:directorPrompt}]}).catch(e=>{addLog("Error: "+e.message);setGenerating(false);return null;});
-      if(!d){return;}
+      const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+          messages:[{role:"user",content:directorPrompt}]})
+      });
+      const d=await res.json();
       if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
 
       let fnCode=d.content&&d.content[0]?d.content[0].text.trim():"";
@@ -1766,7 +1749,13 @@ function drawFrame(ctx, W, H, t, sec) {`;
         drawFn=new Function("ctx","W","H","t","sec",body);
       }catch(e){
         addLog("Retrying with simplified renderer...");
-        const rd=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:`Write a cinematic canvas renderer for: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]});
+        const retry=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
+            messages:[{role:"user",content:`Write a cinematic canvas renderer for: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]})
+        });
+        const rd=await retry.json();
         let rc=rd.content&&rd.content[0]?rd.content[0].text.trim():"";
         rc=rc.replace(/```javascript|```js|```/g,"").trim();
         const ri=rc.indexOf("function drawFrame");if(ri>0)rc=rc.slice(ri);
@@ -2641,7 +2630,13 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         const scenePrompt=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/\d+s$/,"").trim();
         log("  Regenerating: "+scenePrompt.slice(0,40)+"...");
         try{
-          const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:"Write a JavaScript canvas function for this cinematic scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]});
+          const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+              messages:[{role:"user",content:"Write a JavaScript canvas function for this cinematic scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]})
+          });
+          const d=await res.json();
           let code=d.content&&d.content[0]?d.content[0].text.trim():"";
           code=code.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").trim();
           const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
@@ -3042,8 +3037,12 @@ function P19({ go }) {
     setGenerating(idx);setActive(idx);
     const t=tuts[idx];
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:filmPrompt}]}).catch(e=>{addLog("Error: "+e.message);setGenerating(false);return null;});
-      if(!d){return;}
+      const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+          messages:[{role:"user",content:`Write a JavaScript canvas animation for a tutorial about "${t.t}" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON ${t.n}, relevant diagram or visual for the topic, and MANDASTRONG STUDIO label at bottom. Use sec for time-based animation, t=0-1 for progress. W=canvas width H=canvas height. Return ONLY the function body starting with: function drawFrame(ctx,W,H,t,sec){`}]})
+      });
+      const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
       code=code.replace(/```javascript|```js|```/g,"").trim();
       const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
@@ -3230,8 +3229,13 @@ function P21() {
     setInp("");setLoading(true);
     setMsgs(p=>[...p,{role:"user",content:question}]);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Grok — the dedicated AI production assistant for MandaStrong Studio. Professional, authoritative, warm and concise. Expert on all 23 pages, 600+ AI tools, voice engine with 54 characters, video generator, music video studio, timeline editor, audio mixer, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo 7-day free trial. Founded by MandaStrong. Be specific, practical and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]})
-      if(!d){setLoading(false);return;}
+      const r=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
+          system:"You are Agent Grok — the dedicated AI production assistant for MandaStrong Studio, a world-class cinema intelligence platform. Professional, authoritative, warm and concise. You know every detail: 23 pages, 600+ AI tools, voice engine with 54 characters, video generator with cinematic canvas rendering for any genre (horror, noir, romance, sci-fi, western, fantasy, documentary, B&W), music video studio with audio upload and Record Your Own Song, timeline editor, audio mixer, render engine up to 4K, export to all social platforms. Three plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial. Founded by MandaStrong. Speak like a senior film production professional. Be specific, practical and direct.",
+          messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]})
+      });
+      const d=await r.json();
       setMsgs(p=>[...p,{role:"assistant",content:d.content&&d.content[0]?d.content[0].text:"Unable to process. Please try again."}]);
     }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Please check your network and try again."}]);}
     setLoading(false);
