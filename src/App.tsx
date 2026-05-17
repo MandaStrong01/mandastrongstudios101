@@ -3456,6 +3456,20 @@ function P23({ go }) {
 }
 
 const getPlanDuration=(plan)=>{const limits={"Creator":60,"Pro":120,"Studio":180,"Enterprise":180,"Studio Trial":180};return limits[plan]||60;};
+
+function useSubscriberCount() {
+  const [count,setCount]=useState(()=>{try{return parseInt(localStorage.getItem("ms_sub_count")||"0")||1247;}catch{return 1247;}});
+  useEffect(()=>{
+    fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"subscriber_count"})
+    }).then(r=>r.json()).then(d=>{
+      if(d&&d.count&&typeof d.count==="number"){setCount(d.count);try{localStorage.setItem("ms_sub_count",String(d.count));}catch{}}
+    }).catch(()=>{});
+  },[]);
+  return count;
+}
+
 export default function App() {
   const [page,setPage]=useState(1);
   const [menu,setMenu]=useState(false);
@@ -3670,19 +3684,6 @@ const allPages=[
       default: return <P1 go={go}/>;
     }
   }
-function useSubscriberCount() {
-  const [count,setCount]=useState(()=>{try{return parseInt(localStorage.getItem("ms_sub_count")||"0")||1247;}catch{return 1247;}});
-  useEffect(()=>{
-    fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"subscriber_count"})
-    }).then(r=>r.json()).then(d=>{
-      if(d&&d.count&&typeof d.count==="number"){setCount(d.count);try{localStorage.setItem("ms_sub_count",String(d.count));}catch{}}
-    }).catch(()=>{});
-  },[]);
-  return count;
-}
-
 
 
   return (
