@@ -1903,24 +1903,12 @@ function P1({ go }) {
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
           <button onClick={()=>{
-            // Detect device and trigger correct install method
-            const ua = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua);
-            const isAndroid = /android/.test(ua);
-            const isMobile = isIOS || isAndroid;
-            const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
-
+            // Trigger PWA install if available, otherwise open app directly
             if(window.deferredInstallPrompt){
-              // Chrome/Edge/Android — native install prompt
               window.deferredInstallPrompt.prompt();
               window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
             } else {
-              // Desktop — look for install icon in address bar
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
+              window.open("https://mandastrongstudio2026.bolt.host","_blank");
             }
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
