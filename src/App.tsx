@@ -1173,16 +1173,15 @@ const VOICE_CHARACTERS = [
   {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal - Dreamy - Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
 
-function P6Voice({ onSave }) {
+function P6Voice({ onSave, setMediaLib }) {
   const [text,setText]=useState("");
   const [processed,setProcessed]=useState("");
   const [loading,setLoading]=useState(false);
   const [speaking,setSpeaking]=useState(false);
   const [mood,setMood]=useState("Neutral");
   const [saved,setSaved]=useState(false);
-  const [copied,setCopied]=useState(false);
-  const [showMVS,setShowMVS]=useState(false);
   const [savedToLib,setSavedToLib]=useState(false);
+  const [showMVS,setShowMVS]=useState(false);
   const [selVoice,setSelVoice]=useState("james");
   const [search,setSearch]=useState("");
   const [filterGender,setFilterGender]=useState("All");
@@ -1192,17 +1191,15 @@ function P6Voice({ onSave }) {
   const [pitchV,setPitchV]=useState(1.0);
   const [pauseLen,setPauseLen]=useState(700);
   const [volume,setVolume]=useState(1.0);
-  const [activeTab,setActiveTab]=useState("speak");
   const [sysVoices,setSysVoices]=useState([]);
-  const [audioUrl,setAudioUrl]=useState("");
-  const [audioSaved,setAudioSaved]=useState(false);
   const chunksRef=useRef([]);
   const idxRef=useRef(0);
   const timerRef=useRef(null);
 
   useEffect(()=>{
-    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en")));
-    load(); window.speechSynthesis.onvoiceschanged=load;
+    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
+    load();
+    window.speechSynthesis.onvoiceschanged=load;
     return()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);};
   },[]);
 
@@ -1217,37 +1214,65 @@ function P6Voice({ onSave }) {
     const ms=search===""||v.name.toLowerCase().includes(search.toLowerCase())||v.style.toLowerCase().includes(search.toLowerCase());
     return mg&&ma&&mo&&ms;
   });
+
   const selected=VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
+  // Each character gets a CONSISTENT unique voice based on their ID hash
+  // This ensures James always sounds different from Aurora, etc.
   const pickSysVoice=(vc)=>{
     if(!sysVoices.length)return null;
-    // Priority: named premium voices first, then language match, then fallback
-    const allEn = sysVoices.filter(v=>v.lang.startsWith("en"));
-    const gb = allEn.filter(v=>v.lang==="en-GB");
-    const us = allEn.filter(v=>v.lang==="en-US");
-    const au = allEn.filter(v=>v.lang==="en-AU");
-    const isMale = vc.gender==="Male";
-    const isBritish = ["British","Scottish","Irish","Welsh"].includes(vc.origin);
-    const isAU = ["Australian","New Zealand"].includes(vc.origin);
+    const allEn=sysVoices.filter(v=>v.lang&&v.lang.startsWith("en"));
+    if(!allEn.length)return sysVoices[0]||null;
 
-    // Premium named voices — highest quality
-    const premiumMaleGB = gb.find(v=>/daniel|oliver|arthur|malcolm/i.test(v.name));
-    const premiumFemaleGB = gb.find(v=>/kate|serena|moira|emily/i.test(v.name));
-    const premiumMaleUS = us.find(v=>/alex|fred|tom|ryan|guy/i.test(v.name));
-    const premiumFemaleUS = us.find(v=>/samantha|zoe|ava|susan|victoria/i.test(v.name));
-    const premiumAU = au.find(v=>/karen|lee/i.test(v.name));
+    // Build distinct pools
+    const gb=allEn.filter(v=>v.lang==="en-GB");
+    const us=allEn.filter(v=>v.lang==="en-US");
+    const au=allEn.filter(v=>v.lang==="en-AU");
+    const isMale=vc.gender==="Male";
+    const isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin);
+    const isAU=["Australian","New Zealand"].includes(vc.origin);
 
-    if(isBritish) return isMale?(premiumMaleGB||gb.find(v=>v.name.toLowerCase().includes("male"))||gb[0]||premiumMaleUS||allEn[0]):(premiumFemaleGB||gb[0]||premiumFemaleUS||allEn[0]);
-    if(isAU) return premiumAU||au[0]||allEn[0];
-    if(vc.origin==="Irish") return gb.find(v=>/moira/i.test(v.name))||gb[0]||allEn[0];
-    // Default US/neutral
-    return isMale?(premiumMaleUS||us.find(v=>v.name.toLowerCase().includes("male"))||us[0]||allEn[0]):(premiumFemaleUS||us[0]||allEn[0]);
+    // Named premium voices — highest quality, most distinct
+    const maleGB=["Daniel","Oliver","Arthur","Malcolm","George","Stewart"];
+    const femaleGB=["Kate","Serena","Emily","Moira","Fiona","Tessa"];
+    const maleUS=["Alex","Fred","Tom","Ryan","Bruce","Lee"];
+    const femaleUS=["Samantha","Ava","Victoria","Zoe","Susan","Karen"];
+
+    // Hash character ID for consistent assignment
+    const hash=vc.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
+
+    let pool=[];
+    if(isBritish&&isMale){
+      pool=gb.filter(v=>maleGB.some(n=>v.name.includes(n)));
+      if(!pool.length)pool=gb.filter(v=>v.name.toLowerCase().includes("male")||v.name.toLowerCase().includes("daniel")||v.name.toLowerCase().includes("oliver"));
+      if(!pool.length)pool=gb;
+    } else if(isBritish&&!isMale){
+      pool=gb.filter(v=>femaleGB.some(n=>v.name.includes(n)));
+      if(!pool.length)pool=gb.filter(v=>v.name.toLowerCase().includes("female")||v.name.toLowerCase().includes("kate")||v.name.toLowerCase().includes("serena"));
+      if(!pool.length)pool=gb;
+    } else if(isAU){
+      pool=au.length?au:allEn;
+    } else if(isMale){
+      pool=us.filter(v=>maleUS.some(n=>v.name.includes(n)));
+      if(!pool.length)pool=us.filter(v=>v.name.toLowerCase().includes("male"));
+      if(!pool.length)pool=us.length?us:allEn;
+    } else {
+      pool=us.filter(v=>femaleUS.some(n=>v.name.includes(n)));
+      if(!pool.length)pool=us.filter(v=>v.name.toLowerCase().includes("female")||v.name.toLowerCase().includes("samantha"));
+      if(!pool.length)pool=us.length?us:allEn;
+    }
+
+    // Deduplicate and pick by hash — same character always same voice
+    const unique=[...new Map(pool.map(v=>[v.name,v])).values()];
+    if(!unique.length)return allEn[hash%allEn.length]||allEn[0];
+    return unique[hash%unique.length];
   };
 
-  
   const speakNow=(txt)=>{
-    window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
-    const chunks=buildChunks(txt);chunksRef.current=chunks;idxRef.current=0;setSpeaking(true);
+    window.speechSynthesis.cancel();
+    if(timerRef.current)clearTimeout(timerRef.current);
+    const chunks=buildChunks(txt);
+    chunksRef.current=chunks;idxRef.current=0;setSpeaking(true);
     const baseRate=speed*(selected.rate||0.9);
     const basePitch=pitchV*(selected.pitch||1.0);
     const totalChunks=chunks.length;
@@ -1258,27 +1283,22 @@ function P6Voice({ onSave }) {
       if(chunk.type==="breath"||chunk.type==="ellipsis"||!chunk.text){
         idxRef.current=idx+1;timerRef.current=setTimeout(next,pauseLen*0.6);return;
       }
-      const liveVoices=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-      const liveV=liveVoices.length>0?pickSysVoice(selected):null;
+      const liveV=pickSysVoice(selected);
       const utt=new SpeechSynthesisUtterance(chunk.text);
       if(liveV)utt.voice=liveV;
       utt.volume=volume;
-      const rVar=[0,0.03,-0.03,0.02,-0.015,0.025,-0.02,0.01]; // More natural variation
-      const pVar=[0,0.025,-0.02,0.04,-0.025,0.015,-0.03,0.02]; // Richer pitch contour
-      let pitchMod=chunk.type==="question"?0.12:chunk.type==="exclaim"?0.08:chunk.type==="sentence"&&idx===totalChunks-1?-0.06:0;
-      // Detect emphasis (ALL CAPS words) and slow down slightly
-      const hasEmphasis=/\b[A-Z]{2,}\b/.test(chunk.text);
-      const emphasisMod=hasEmphasis?-0.05:0;
-      const emphasisPitch=hasEmphasis?0.06:0;
-      utt.rate=Math.max(0.1,Math.min(2.0,baseRate+rVar[idx%rVar.length]+emphasisMod));
-      utt.pitch=Math.max(0.1,Math.min(2.0,basePitch+pVar[idx%pVar.length]+pitchMod+emphasisPitch));
+      const rVar=[0,0.03,-0.03,0.02,-0.015,0.025,-0.02,0.01];
+      const pVar=[0,0.025,-0.02,0.04,-0.025,0.015,-0.03,0.02];
+      const pitchMod=chunk.type==="question"?0.12:chunk.type==="exclaim"?0.08:chunk.type==="sentence"&&idx===totalChunks-1?-0.06:0;
+      const hasEmphasis=/[A-Z]{2,}/.test(chunk.text);
+      utt.rate=Math.max(0.1,Math.min(2.0,baseRate+rVar[idx%rVar.length]+(hasEmphasis?-0.05:0)));
+      utt.pitch=Math.max(0.1,Math.min(2.0,basePitch+pVar[idx%pVar.length]+pitchMod+(hasEmphasis?0.06:0)));
       const afterPause=chunk.type==="question"?Math.round(pauseLen*1.1):chunk.type==="sentence"?pauseLen:chunk.type==="clause"?Math.round(pauseLen*0.4):Math.round(pauseLen*0.15);
       utt.onend=()=>{idxRef.current=idx+1;timerRef.current=setTimeout(next,afterPause);};
       utt.onerror=()=>{idxRef.current=idx+1;next();};
       window.speechSynthesis.speak(utt);
     };
-    const voices=window.speechSynthesis.getVoices();
-    if(voices.length>0){setTimeout(()=>next(),50);}
+    if(window.speechSynthesis.getVoices().length>0){setTimeout(()=>next(),50);}
     else{window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(()=>next(),50);};}
   };
 
@@ -1286,10 +1306,9 @@ function P6Voice({ onSave }) {
     if(!text.trim())return;
     setLoading(true);setProcessed("");setSaved(false);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"You are a speech coach for TTS. Speaker: "+selected.name+" - "+selected.style+". Break into short sentences, add commas for pauses, spell out numbers. Output ONLY reformatted text:\n\n"+text}]});
-
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"You are a speech coach for TTS. Speaker: "+selected.name+" - "+selected.style+". Break into short sentences, add commas for natural pauses, spell out numbers. Output ONLY the reformatted text:\n\n"+text}]});
       const out=d.content&&d.content[0]?d.content[0].text.trim():text;
-      setProcessed(out);setActiveTab("result");speakNow(out);
+      setProcessed(out);speakNow(out);
     }catch(e){setProcessed(text);speakNow(text);}
     setLoading(false);
   };
@@ -1300,16 +1319,22 @@ function P6Voice({ onSave }) {
   return (
     <div style={{...Sp}}>
       {showMVS&&<MusicVideoStudio onClose={()=>setShowMVS(false)} onSave={onSave}/>}
+
+      {/* ── HEADER — always at top ─────────────────────────────── */}
       <div style={{padding:"12px 18px",borderBottom:`1px solid ${GOLDDIM}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>AI WORKSTATION 02 — CINEMA VOICE ENGINE</div>
           <h1 style={{...H1,fontSize:24,margin:0}}>TEXT TO LIFELIKE SPEECH</h1>
         </div>
-        <button onClick={()=>setShowMVS(true)} style={{...G("gold",true)}}>
+        <button onClick={()=>setShowMVS(true)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"10px 20px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
           🎬 MUSIC VIDEO STUDIO
         </button>
       </div>
+
+      {/* ── BODY — left voice list, right speak controls ───────── */}
       <div style={{display:"grid",gridTemplateColumns:"290px 1fr",minHeight:"calc(100vh - 120px)"}}>
+
+        {/* LEFT — voice library */}
         <div style={{borderRight:`1px solid ${GOLDDIM}`,background:"#030303",display:"flex",flexDirection:"column"}}>
           <div style={{padding:"10px 10px 6px"}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:8}}>VOICE LIBRARY — {filtered.length} / {VOICE_CHARACTERS.length}</div>
@@ -1331,108 +1356,129 @@ function P6Voice({ onSave }) {
                 {ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}
               </select>
             </div>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..." style={{...inp,padding:"6px 10px",fontSize:11,height:30,marginBottom:0}}/>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..."
+              style={{...inp,padding:"6px 10px",fontSize:11,height:30,marginBottom:0}}/>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 6px 80px"}}>
             {filtered.map(v=>(
               <div key={v.id} onClick={()=>setSelVoice(v.id)}
-                style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:`2px solid ${selVoice===v.id?GOLD:GOLDDIM}`,cursor:"pointer",transition:"border-color .15s"}}>
+                style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:`2px solid ${selVoice===v.id?GOLD:GOLDDIM}`,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:18}}>{v.emoji}</span>
                     <div>
                       <div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900,letterSpacing:1}}>{v.name}</div>
-                      <div style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>{v.origin} - {v.gender} - {v.age}</div>
+                      <div style={{color:GOLDDIM,fontSize:10}}>{v.origin} - {v.gender} - {v.age}</div>
                     </div>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{color:GOLDDIM,fontSize:9,letterSpacing:1}}>PITCH {v.pitch} - RATE {v.rate}</div>
-                    </div>
-                    <button onClick={e=>{e.stopPropagation();setSelVoice(v.id);setTimeout(()=>speakNow("Hello. This is "+v.name+". "+v.desc),100);}}
-                      style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 8px",cursor:"pointer",fontSize:9,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>
-                      ▶ TEST
-                    </button>
-                  </div>
+                  <button
+                    onClick={e=>{
+                      e.stopPropagation();
+                      // Temporarily select this voice, speak test, restore
+                      const prev=selVoice;
+                      setSelVoice(v.id);
+                      // Use speakText directly so we don't affect main state
+                      window.speechSynthesis.cancel();
+                      const utt=new SpeechSynthesisUtterance("Hello. I am "+v.name+". "+v.desc);
+                      // Pick the right system voice for THIS character
+                      const allVoices=window.speechSynthesis.getVoices().filter(sv=>sv.lang&&sv.lang.startsWith("en"));
+                      const gb=allVoices.filter(sv=>sv.lang==="en-GB");
+                      const us=allVoices.filter(sv=>sv.lang==="en-US");
+                      const au=allVoices.filter(sv=>sv.lang==="en-AU");
+                      const isMale=v.gender==="Male";
+                      const isBritish=["British","Scottish","Irish","Welsh"].includes(v.origin);
+                      const isAU=["Australian","New Zealand"].includes(v.origin);
+                      const hash=v.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
+                      let pool=[];
+                      if(isBritish&&isMale)pool=[...gb.filter(sv=>/daniel|oliver|arthur|malcolm|george/i.test(sv.name)),...gb];
+                      else if(isBritish&&!isMale)pool=[...gb.filter(sv=>/kate|serena|emily|moira|fiona/i.test(sv.name)),...gb];
+                      else if(isAU)pool=[...au,...allVoices];
+                      else if(isMale)pool=[...us.filter(sv=>/alex|fred|tom|ryan|bruce/i.test(sv.name)),...us];
+                      else pool=[...us.filter(sv=>/samantha|ava|victoria|zoe|susan/i.test(sv.name)),...us];
+                      if(!pool.length)pool=allVoices;
+                      const unique=[...new Map(pool.map(sv=>[sv.name,sv])).values()];
+                      const picked=unique[hash%unique.length]||allVoices[0];
+                      if(picked)utt.voice=picked;
+                      utt.pitch=v.pitch||1.0;
+                      utt.rate=v.rate||0.85;
+                      utt.volume=1.0;
+                      window.speechSynthesis.speak(utt);
+                    }}
+                    style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 10px",cursor:"pointer",fontSize:9,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap",flexShrink:0}}>
+                    ▶ TEST
+                  </button>
                 </div>
                 <div style={{color:DIM,fontSize:10,lineHeight:1.5}}>{v.style}</div>
-                {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ SELECTED — SPEAK ABOVE TO USE THIS VOICE</div>}
+                {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ SELECTED</div>}
               </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
-        {/* RIGHT PANEL — speak + sliders always visible */}
+
+        {/* RIGHT — speak controls */}
         <div style={{display:"flex",flexDirection:"column",background:"#030303",overflowY:"auto",padding:20}}>
-          {/* Selected voice info */}
-          <div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"10px 14px",marginBottom:14,flexShrink:0}}>
+          <div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"10px 14px",marginBottom:14}}>
             <div style={{color:WHITE,fontSize:13,fontWeight:900}}>{selected.name} {selected.emoji} - {selected.origin} - {selected.gender}</div>
             <div style={{color:GOLDDIM,fontSize:11,marginTop:3}}>{selected.style}</div>
             <div style={{color:DIM,fontSize:11,marginTop:2,fontStyle:"italic"}}>{selected.desc}</div>
           </div>
-
-          {/* Script textarea */}
           <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>YOUR NARRATION SCRIPT</div>
           <textarea value={text} onChange={e=>setText(e.target.value)}
             placeholder="Paste your narration script here..."
-            style={{width:"100%",background:"#000",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",color:WHITE,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.9,height:180,resize:"vertical",marginBottom:14}}/>
-
-          {/* Sliders — always visible */}
+            style={{...inp,height:160,resize:"vertical",marginBottom:14}}/>
           <div style={{background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",marginBottom:14}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:10}}>VOICE SETTINGS</div>
-            <div style={{marginBottom:14}}>
-              <div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>MOOD</div>
-              <select value={mood} onChange={e=>setMood(e.target.value)} style={{width:"100%",background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"9px 12px",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}>
-                {["Neutral","Happy","Sad","Angry","Excited","Calm","Dramatic","Mysterious","Romantic","Sarcastic","Melancholic","Authoritative","Warm"].map(m=>(<option key={m} value={m} style={{background:"#000"}}>{m}</option>))}
+            <div style={{marginBottom:10}}>
+              <div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:4}}>MOOD</div>
+              <select value={mood} onChange={e=>setMood(e.target.value)} style={{width:"100%",background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"8px 12px",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}>
+                {["Neutral","Happy","Sad","Angry","Excited","Calm","Dramatic","Mysterious","Romantic","Sarcastic","Melancholic","Authoritative","Warm"].map(m=><option key={m} value={m} style={{background:"#000"}}>{m}</option>)}
               </select>
             </div>
-            {[
-              ["SPEED",speed,0.3,1.5,0.01,(v)=>setSpeed(v),`${speed.toFixed(2)}x`],
-              ["PITCH",pitchV,0.3,2.0,0.01,(v)=>setPitchV(v),`${pitchV.toFixed(2)}`],
-              ["PAUSE (ms)",pauseLen,200,2000,50,(v)=>setPauseLen(v),`${pauseLen}ms`],
-              ["VOLUME",volume,0.1,1.0,0.05,(v)=>setVolume(v),`${Math.round(volume*100)}%`],
-            ].map(([label,val,min,max,step,setter,display])=>(
+            {[["SPEED",speed,0.3,1.5,0.01,v=>setSpeed(v),speed.toFixed(2)+"x"],
+              ["PITCH",pitchV,0.3,2.0,0.01,v=>setPitchV(v),pitchV.toFixed(2)],
+              ["PAUSE (ms)",pauseLen,200,2000,50,v=>setPauseLen(v),pauseLen+"ms"],
+              ["VOLUME",volume,0.1,1.0,0.05,v=>setVolume(v),Math.round(volume*100)+"%"]
+            ].map(([label,val,mn,mx,st,setter,display])=>(
               <div key={label} style={{marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                   <span style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>{label}</span>
                   <span style={{color:GOLD,fontSize:11,fontWeight:900}}>{display}</span>
                 </div>
-                <input type="range" min={min} max={max} step={step} value={val}
-                  onChange={e=>setter(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
+                <input type="range" min={mn} max={mx} step={st} value={val} onChange={e=>setter(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
               </div>
             ))}
-
           </div>
-
-          {/* Speak buttons */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
             <button onClick={processAndSpeak} disabled={loading||!text.trim()}
               style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1}}>
               {loading?"⟳ PREPARING...":"✦ PREPARE & SPEAK"}
             </button>
-            <button onClick={()=>{if(speaking){stop();}else{speakNow(text);}}} disabled={!text.trim()}
+            <button onClick={()=>speaking?stop():speakNow(text)} disabled={!text.trim()}
               style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1}}>
               {speaking?"⏹ STOP":"▶ SPEAK NOW"}
             </button>
-          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}} disabled={!text.trim()} style={{...G(savedToLib?"out":"gold",false),width:"100%",padding:"10px",fontSize:11,letterSpacing:2,marginTop:8,opacity:!text.trim()?0.5:1}}>{savedToLib?"SAVED TO MEDIA LIBRARY":"SAVE TO MEDIA LIBRARY"}</button>
           </div>
-
-          {/* Result */}
+          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}}
+            disabled={!text.trim()}
+            style={{background:savedToLib?`linear-gradient(135deg,#064406,#0a640a)`:"transparent",border:`1px solid ${savedToLib?"#22c55e":GOLD}`,color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"10px",fontSize:11,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",marginBottom:14,opacity:!text.trim()?0.5:1}}>
+            {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
+          </button>
           {processed&&(
             <div>
               <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>AI-FORMATTED RESULT</div>
               <textarea value={processed} onChange={e=>setProcessed(e.target.value)}
-                style={{width:"100%",background:"#000",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.9,height:140,resize:"vertical",marginBottom:8}}/>
+                style={{...inp,height:140,resize:"vertical",marginBottom:8}}/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                 <button onClick={()=>speakNow(processed)} style={{...G("gold",false),padding:"10px"}}>▶ PLAY</button>
                 <button onClick={stop} style={{...G("out",false),padding:"10px"}}>⏹ STOP</button>
-                <button onClick={()=>{if(onSave)onSave({id:Date.now()+Math.random(),name:`${selected.name} — Narration`,type:"audio/narration",content:processed,url:""});setSaved(true);}}
-                  style={{...G("gold",false),padding:"10px"}}>{saved?"✓ SAVED":"💾 SAVE"}</button>
+                <button onClick={()=>{if(onSave)onSave({id:Date.now()+Math.random(),name:selected.name+" Narration",type:"audio/narration",content:processed,url:""});setSaved(true);}}
+                  style={{...G(saved?"out":"gold",false),padding:"10px"}}>{saved?"✓ SAVED":"💾 SAVE"}</button>
               </div>
               {saved&&<div style={{marginTop:8,background:"#061406",border:"1px solid #22c55e",padding:"8px",textAlign:"center",color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:2}}>✓ SAVED TO MEDIA LIBRARY</div>}
             </div>
           )}
         </div>
+      </div>
     </div>
   );
 }
@@ -2067,6 +2113,7 @@ function P4({ go, setUser }) {
   const [name,setName]=useState(""); const [re,setRe]=useState("");
   const inp={width:"100%",background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const [loginOk,setLoginOk]=useState(false);
+  const [displayCount,setDisplayCount]=useState(()=>{try{return parseInt(localStorage.getItem("ms_sub_count")||"0")||0;}catch{return 0;}});
   const login=()=>{
     if(email==="woolleya129@gmail.com"&&pass==="Mangler1970!!"){
       setLoginOk(true);
@@ -2079,6 +2126,13 @@ function P4({ go, setUser }) {
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:1000,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+          <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 36px",textAlign:"center",boxShadow:`0 0 24px ${GOLD}33`}}>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LIVE SUBSCRIBERS</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:38,fontWeight:900,lineHeight:1,textShadow:`0 0 20px ${GOLD}99`}}>{displayCount.toLocaleString()}</div>
+            <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING DAILY</div>
+          </div>
+        </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:36}}>
           <div style={{...Card()}}>
             <div style={{fontSize:11,color:GOLD,letterSpacing:3,marginBottom:8,fontWeight:700}}>EXISTING USER</div>
@@ -2965,7 +3019,7 @@ function P20() {
       <div style={{maxWidth:860,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>LEGAL</div>
         <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,letterSpacing:4,marginBottom:4}}>TERMS & DISCLAIMER</h1>
-        <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 - MANDASTRONG STUDIO LLC</div>
+        <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 - MANDASTRONG STUDIO</div>
 
         {/* Tab selector */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",marginBottom:28,border:`1px solid ${GOLDDIM}`}}>
@@ -2980,23 +3034,23 @@ function P20() {
         {tab==="tos"&&(
           <div>
             <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 20px",marginBottom:20,textAlign:"center"}}>
-              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO LLC - PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
+              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO - PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
               <div style={{color:WHITE,fontSize:12,marginTop:4}}>By using this platform you agree to be legally bound by these Terms.</div>
             </div>
 
             {sec("1. ACCEPTANCE OF TERMS",<>{p("By accessing or using MandaStrong Studio you agree to be legally bound by these Terms of Service. If you do not agree, do not use this platform. These terms apply to all users including free, trial, and paid subscribers.")}</>)}
             {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Creator ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
-            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio LLC. You may not reproduce, distribute, or resell the platform itself.")}</>)}
+            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
             {sec("4. AI-GENERATED CONTENT",<>{p("Content generated by MandaStrong Studio's AI tools is produced algorithmically. You are solely responsible for reviewing, editing, and verifying all AI-generated outputs before use. MandaStrong Studio makes no guarantees regarding the accuracy, appropriateness, or fitness for purpose of AI-generated content.")}{p("You agree not to use AI-generated content to produce material that is defamatory, illegal, harmful, or in violation of third-party rights.")}</>)}
             {sec("5. ACCEPTABLE USE",<>{p("You agree to use MandaStrong Studio only for lawful purposes. The following are strictly prohibited:")}{li(["Producing content that is defamatory, obscene, or harasses individuals","Infringing on third-party intellectual property rights","Attempting to reverse-engineer, copy, or redistribute the platform","Using the platform to generate spam, malware, or fraudulent content","Sharing your account credentials with third parties"])}</>)}
             {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. Full details available at MandaStrong1.Etsy.com.")}</>)}
-            {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio LLC shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
+            {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
-            {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio LLC is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
+            {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
             {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Grok on Page 21 of the platform.")}</>)}
 
             <div style={{background:"#050500",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO LLC - AMANDA WOOLLEY, FOUNDER - MARCH 2026</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO - AMANDA WOOLLEY, FOUNDER - MARCH 2026</p>
             </div>
           </div>
         )}
@@ -3018,7 +3072,7 @@ function P20() {
             {sec("CHANGES TO THIS DISCLAIMER",<>{p("MandaStrong Studio reserves the right to update this disclaimer at any time. Continued use of the platform following any update constitutes your acceptance of the revised terms.")}</>)}
 
             <div style={{background:"#050500",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY - FOUNDER - MANDASTRONG STUDIO LLC - MARCH 2026 - mandastrongstudio.bolt.host</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY - FOUNDER - MANDASTRONG STUDIO - MARCH 2026 - mandastrongstudio.bolt.host</p>
             </div>
           </div>
         )}
@@ -3160,7 +3214,7 @@ function P23({ go }) {
       </video>
       <div style={{padding:"26px 40px 80px"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
-          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO - CINEMA INTELLIGENCE PLATFORM - 2026</div>
+          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,textShadow:`0 0 30px ${GOLD}99`,marginBottom:6}}>THAT'S ALL FOLKS</h1>
           <div style={{color:WHITE,fontSize:12,letterSpacing:3,marginBottom:12}}>THANK YOU FOR CREATING WITH US</div>
           <video autoPlay loop playsInline muted preload="auto"
@@ -3171,19 +3225,11 @@ function P23({ go }) {
           </video>
           <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:24}}/>
 
-          {/* Home and Exit buttons only */}
-          <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:28}}>
-            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
-            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
-          </div>
-
-          {/* Etsy store - support the mission */}
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
             style={{display:"block",background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,color:"#000",padding:"20px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",marginBottom:20,width:"100%",boxSizing:"border-box",boxShadow:`0 0 30px ${GOLD}44`}}>
-            🛍 VISIT MANDASTRONG1.ETSY.COM - BOOKS - MERCH - SUPPORT THIS MISSION
+            🛍 VISIT MANDASTRONG1.ETSY.COM · BOOKS · MERCH · SUPPORT THIS MISSION
           </a>
 
-          {/* Our Mission */}
           <div style={{...Card(),textAlign:"left",marginBottom:16,background:"#050500",border:`2px solid ${GOLD}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:14,textAlign:"center"}}>✦ OUR MISSION ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>MandaStrong Studio was built with one belief: <strong style={{color:GOLD}}>that every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
@@ -3191,7 +3237,7 @@ function P23({ go }) {
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio. I built this because I believe technology should serve humanity, and art should serve truth.</p>
           </div>
 
-          {/* How To Guide */}
+          {/* FULL HOW TO USE GUIDE — expanded by default */}
           <div onClick={()=>setGuideOpen(g=>!g)} style={{...Card(),marginBottom:0,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",textAlign:"left",border:`2px solid ${GOLD}`,background:"#0a0800"}}>
             <span style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3}}>📖 COMPLETE HOW TO USE GUIDE</span>
             <span style={{color:GOLD,fontSize:18}}>{guideOpen?"▲":"▼"}</span>
@@ -3199,23 +3245,33 @@ function P23({ go }) {
           {guideOpen&&(
             <div style={{...Card(),textAlign:"left",padding:"24px 28px",border:`2px solid ${GOLD}`,borderTopWidth:0}}>
               {[
-                {t:"RECOMMENDED WORKFLOW",c2:"Page 8 → Page 6 → Page 13 → Page 15 → Page 16 → Page 17 → Page 18. Hit 💾 SAVE PROJECT at every stage."},
-                {t:"PAGE 8 — VIDEO GENERATOR",c:"Describe any scene. Be specific about genre, lighting, camera, mood. Use the Documentary Recovery panel for your 13 AI For Humanity scenes. Every clip saves automatically."},
-                {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voice characters. Filter by gender, age, origin. Hit TEST. Go to SPEAK tab, paste your script, hit PREPARE & SPEAK. Use mood slider for emotional tone."},
-                {t:"PAGE 6 — MUSIC VIDEO STUDIO",c:"Hit MUSIC VIDEO STUDIO top right. Set song details, style, colour grade. Write a detailed scene. Upload audio or use the red RECORD YOUR OWN SONG button."},
-                {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit SYNC ALL TRACKS to auto-populate all tracks. Set film duration. Hit RENDER when ready."},
-                {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: VOICE 85 - MUSIC 40 - EFX 50 - MASTER 85."},
-                {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality up to 4K. Hit START RENDER. Download or Preview when complete."},
-                {t:"PAGE 19 — TUTORIALS",c:"12 lessons. Hit GENERATE TO WATCH for a Claude-written animated tutorial for each lesson."},
-                {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about tools, workflow, pricing or production."},
-              ].map(({t,c:c2})=>(
-                <div key={t} style={{borderBottom:`1px solid ${GOLDDIM}33`,paddingBottom:14,marginBottom:14}}>
-                  <div style={{color:GOLD,fontWeight:900,fontSize:11,letterSpacing:2,marginBottom:5}}>✦ {t}</div>
-                  <div style={{color:WHITE,fontSize:13,lineHeight:1.8}}>{c}</div>
+                {t:"STEP 1 — SIGN IN OR REGISTER (PAGE 4)",c:"Go to Page 4. Existing users sign in with email and password. New creators enter your name and email then click START FREE TRIAL to begin your 7-day Studio plan trial at no cost. To explore without an account click BROWSE AS GUEST. Choose your subscription plan — Creator $20/mo, Pro $30/mo, Studio $50/mo. Studio gives you 8K export, 600+ tools, 1TB storage and full commercial rights."},
+                {t:"STEP 2 — WRITE YOUR SCRIPT (PAGE 5)",c:"Page 5 has 50+ professional writing tools. Click any tool card to open it. Use AI CREATE to generate a complete script, logline, treatment, synopsis, or full feature from a single prompt. Be specific — include genre, tone, setting and characters. Save your results to the Media Library using the SAVE TO LIBRARY button inside each tool. Use PLOT HOLE DETECTOR and CONTINUITY CHECKER before moving to production."},
+                {t:"STEP 3 — VOICE ENGINE (PAGE 6)",c:"Page 6 has 54 cinematic voice characters. Filter by gender, age and origin using the left panel. Click any voice card to select it — selected voice shows gold border. Hit ▶ TEST on any card to hear that character's distinct voice immediately. Paste your narration script in the right panel. Set mood, speed, pitch, pause length and volume using the sliders. Hit ✦ PREPARE & SPEAK to have Claude professionally reformat your script for natural speech, then speak it. Hit ▶ SPEAK NOW to speak your raw text directly. Hit 💾 SAVE TO MEDIA LIBRARY to save the narration as an asset."},
+                {t:"STEP 4 — MUSIC VIDEO STUDIO (PAGE 6)",c:"Hit the 🎬 MUSIC VIDEO STUDIO button at the top right of Page 6. Step 1: Enter song title, artist, choose genre, mood and tempo. Upload your audio file (MP3, WAV, M4A) or hit the red ● RECORD YOUR OWN SONG button to record live. Step 2: Choose video style, colour grade, visual effects and editing style. Step 3: Write a detailed scene description — be specific about what you see, the lighting, the setting, who is in it. Step 4: Hit GENERATE MUSIC VIDEO. Claude writes a complete cinematic renderer and produces a full beat-synced music video. Download or save to your Media Library when done."},
+                {t:"STEP 5 — GENERATE SCENES (PAGE 8)",c:"Page 8 is the Cinema Scene Generator. Click the green AI FOR HUMANITY — DOCUMENTARY RECOVERY panel at the top to access your 13 pre-written documentary scenes. Click any scene to load it, then hit 🎬 GENERATE SCENE. Each clip is automatically saved to IndexedDB and your Media Library. For custom scenes: write any scene description in plain English in the text box. Upload a reference image to match its colour, lighting and mood. Set duration (5–60 seconds). Hit GENERATE SCENE. Every clip saves automatically. Repeat for all scenes you need."},
+                {t:"STEP 6 — TIMELINE EDITOR (PAGE 13)",c:"Go to Page 13. Your clips from Page 8 will auto-load into Track 0 on startup. Hit ⚡ SYNC ALL TRACKS to automatically populate all tracks from your Media Library — video clips to Track 0, audio to Track 1. Set your film duration using the slider (60, 90 or 180 minutes). To manually arrange clips drag them from the DRAG TO TIMELINE panel at the bottom into any track. Hit → RENDER when your timeline is ready."},
+                {t:"STEP 7 — AUDIO MIXER (PAGE 15)",c:"Page 15 is the 4-channel audio mixer. Recommended settings for documentary: VOICE 85, MUSIC 40, EFX 50, MASTER 85. For music video: VOICE 60, MUSIC 75, EFX 40, MASTER 85. Adjust each channel using the vertical sliders. Hit SAVE PRESET to store your mix for the render."},
+                {t:"STEP 8 — RENDER YOUR FILM (PAGE 16)",c:"Go to Page 16. Your clips load automatically from storage. Select output quality — 480p, 720p, 1080p or 4K. Choose frame rate (24, 30 or 60fps) and codec (VP9 recommended). The render queue shows all your clips in order. Hit START RENDER. The engine processes every clip, applies your audio mix, adds vignette, letterbox and film grain, and assembles your complete film. If any clip is missing the engine regenerates it automatically using Claude. When complete hit DOWNLOAD FILM or go to PREVIEW (Page 17) or EXPORT (Page 18)."},
+                {t:"STEP 9 — PREVIEW (PAGE 17)",c:"Page 17 is the full-screen preview player. Use the playback controls to scrub through your completed film. Check timing, transitions and audio sync before distributing."},
+                {t:"STEP 10 — EXPORT AND DISTRIBUTE (PAGE 18)",c:"Page 18 has one-click export to YouTube, Instagram, TikTok, Facebook, X, Vimeo and WhatsApp. Hit DOWNLOAD TO DEVICE first to save your film locally. Then click any social platform button to open its upload page directly. Your film is in WebM format — compatible with all major platforms."},
+                {t:"SAVE YOUR PROJECT (FOOTER)",c:"Hit 💾 SAVE PROJECT in the footer at any time on any page. Give your session a name and optional note. Hit 📂 MY PROJECTS to see your full session history and continue where you left off. Your video clips are stored in IndexedDB and survive page refresh automatically."},
+                {t:"AGENT GROK (PAGE 21)",c:"Page 21 is your 24/7 AI production consultant. Ask Agent Grok anything — tool recommendations, workflow advice, troubleshooting, pricing, export formats, or how any feature works. Use the quick question buttons for instant answers or type your own question and hit SEND."},
+                {t:"TUTORIALS (PAGE 19)",c:"Page 19 has 12 video lessons. Hit ▶ GENERATE TO WATCH on any lesson. Claude writes a unique animated tutorial specifically for that topic and plays it instantly in the canvas. Hit OPEN PAGE to jump directly to the page being taught."},
+              ].map(({t,c:cv})=>(
+                <div key={t} style={{borderBottom:`1px solid ${GOLDDIM}33`,paddingBottom:16,marginBottom:16}}>
+                  <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:2,marginBottom:6}}>✦ {t}</div>
+                  <div style={{color:WHITE,fontSize:13,lineHeight:1.9}}>{cv}</div>
                 </div>
               ))}
             </div>
           )}
+
+          {/* HOME and EXIT at the bottom */}
+          <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginTop:28}}>
+            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
+            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3399,20 +3455,7 @@ const allPages=[
     {p:23,el:<P23 go={go}/>},
   ];
 
-  return (
-    <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      <Header go={go} setMenu={setMenu}/>
-      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
-      {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
-      {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
-      {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
-      <div style={{minHeight:"calc(100vh - 116px)"}}>
-        <div key={page}>{renderPage()}</div>
-      </div>
-      <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
-    </div>
-  );
-}  const renderPage=()=>{
+  const renderPage=()=>{
     switch(page){
       case 1: return <P1 go={go}/>;
       case 2: return <P2 go={go}/>;
@@ -3440,3 +3483,19 @@ const allPages=[
       default: return <P1 go={go}/>;
     }
   }
+
+
+  return (
+    <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
+      <Header go={go} setMenu={setMenu}/>
+      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
+      {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
+      {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
+      {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
+      <div style={{minHeight:"calc(100vh - 116px)"}}>
+        <div key={page}>{renderPage()}</div>
+      </div>
+      <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
+    </div>
+  );
+}
