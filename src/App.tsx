@@ -1,5 +1,4 @@
 // @ts-nocheck
-
 import { useState, useRef, useEffect } from "react";
 
 // IndexedDB helpers for persistent clip storage
@@ -39,12 +38,12 @@ const H1 = { fontFamily:"'Cinzel',serif", color:GOLD, letterSpacing:5, textTrans
 const Card = (x) => ({ background:"#0a0a0a", border:`1px solid ${GOLDDIM}`, borderRadius:0, padding:18, ...(x||{}) });
 
 const STOCK_VOICES = [
-  { id:"aurora", name:"Aurora", desc:"Warm British Female", style:"Documentary - Narrator", accent:"British RP" },
-  { id:"marcus", name:"Marcus", desc:"Deep American Male", style:"Cinematic - Authoritative", accent:"American" },
-  { id:"sophia", name:"Sophia", desc:"Bright Australian Female", style:"Upbeat - Engaging", accent:"Australian" },
-  { id:"james",  name:"James",  desc:"Dry British Male", style:"Sarcastic - Witty", accent:"British" },
-  { id:"nova",   name:"Nova",   desc:"Neutral AI Female", style:"Clean - Professional", accent:"Neutral" },
-  { id:"river",  name:"River",  desc:"Warm American Male", style:"Friendly - Intimate", accent:"American South" },
+  { id:"aurora", name:"Aurora", desc:"Warm British Female", style:"Documentary · Narrator", accent:"British RP" },
+  { id:"marcus", name:"Marcus", desc:"Deep American Male", style:"Cinematic · Authoritative", accent:"American" },
+  { id:"sophia", name:"Sophia", desc:"Bright Australian Female", style:"Upbeat · Engaging", accent:"Australian" },
+  { id:"james",  name:"James",  desc:"Dry British Male", style:"Sarcastic · Witty", accent:"British" },
+  { id:"nova",   name:"Nova",   desc:"Neutral AI Female", style:"Clean · Professional", accent:"Neutral" },
+  { id:"river",  name:"River",  desc:"Warm American Male", style:"Friendly · Intimate", accent:"American South" },
 ];
 
 const VOICE_TOOLS = ["Text to Voice","Text to Speech","Text to Narration","Text to Audiobook","Text to Voiceover","AI Voice Actor","Neural Voice Generator","Emotion Voice Synth","Documentary Voice","Trailer Voice Generator","Commercial Voice","Character Voice Creator","Audiobook Creator","Podcast Voice"];
@@ -56,26 +55,6 @@ const loadVoiceAssignments = () => {
 if (typeof window !== "undefined") loadVoiceAssignments();
 
 let currentUtterance = null;
-
-async function proxyFetch(body, retries=2) {
-  const PURL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy";
-  for(let attempt=0; attempt<retries; attempt++) {
-    try {
-      const ctrl=new AbortController();
-      const tid=setTimeout(()=>ctrl.abort(),55000);
-      const res=await fetch(PURL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctrl.signal});
-      clearTimeout(tid);
-      if(!res.ok) throw new Error("HTTP "+res.status);
-      const d=await res.json();
-      if(d.error) throw new Error(d.error.message||"API error");
-      return d;
-    } catch(e) {
-      if(attempt===retries-1) throw e;
-      await new Promise(r=>setTimeout(r,2000));
-    }
-  }
-}
-
 
 function speakText(voiceId, txt, onStart, onEnd) {
   if (!txt||!txt.trim()) return;
@@ -172,7 +151,7 @@ function ProjectHistoryModal({ onClose, onResume }) {
             <div key={i} style={{background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
               <div style={{flex:1}}>
                 <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:3}}>{h.name||"Untitled Session"}</div>
-                <div style={{color:DIM,fontSize:10,letterSpacing:1}}>{h.date} - Page {h.page} - {h.assetCount} asset{h.assetCount!==1?"s":""}</div>
+                <div style={{color:DIM,fontSize:10,letterSpacing:1}}>{h.date} · Page {h.page} · {h.assetCount} asset{h.assetCount!==1?"s":""}</div>
                 {h.note&&<div style={{color:WHITE,fontSize:11,marginTop:4,fontStyle:"italic"}}>{h.note}</div>}
               </div>
               <div style={{display:"flex",gap:6,flexShrink:0}}>
@@ -200,7 +179,7 @@ function SaveSessionModal({ onClose, onSave, currentPage, assetCount }) {
     <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{width:"min(400px,92vw)",background:"#050505",border:`2px solid ${GOLD}`,padding:22}}>
         <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:15,fontWeight:900,letterSpacing:3,marginBottom:4}}>💾 SAVE SESSION</div>
-        <div style={{color:DIM,fontSize:10,marginBottom:14}}>Page {currentPage} - {assetCount} assets in library</div>
+        <div style={{color:DIM,fontSize:10,marginBottom:14}}>Page {currentPage} · {assetCount} assets in library</div>
         <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>PROJECT NAME</div>
         <input value={name} onChange={e=>setName(e.target.value)} style={{...inp2,marginBottom:10}}/>
         <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>NOTE (OPTIONAL)</div>
@@ -253,7 +232,7 @@ function Header({ go, setMenu }) {
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
         <div style={{color:GOLD,fontSize:11,letterSpacing:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:700}}>
-          ✦ CINEMA INTELLIGENCE PLATFORM &nbsp;-&nbsp; 600+ AI TOOLS &nbsp;-&nbsp; 8K EXPORT &nbsp;-&nbsp; UP TO 3-HOUR FILMS
+          ✦ CINEMA INTELLIGENCE PLATFORM &nbsp;·&nbsp; 600+ AI TOOLS &nbsp;·&nbsp; 8K EXPORT &nbsp;·&nbsp; UP TO 3-HOUR FILMS
         </div>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
@@ -268,7 +247,7 @@ function Footer({ page, go, onSave, onHistory }) {
   return (
     <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:400,background:"#000",borderTop:`1px solid ${GOLD}`,padding:"6px 20px 8px",display:"flex",flexDirection:"column",gap:4}}>
       <div style={{textAlign:"center"}}>
-        <span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700}}>MANDASTRONG STUDIO 2026 - PROFESSIONAL CINEMA SYNTHESIS - MandaStrong1.Etsy.com</span>
+        <span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700}}>MANDASTRONG STUDIO 2026 · PROFESSIONAL CINEMA SYNTHESIS · MandaStrong1.Etsy.com</span>
       </div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
         <button onClick={()=>go(Math.max(1,page-1))} disabled={page===1} style={{...G("out",true),opacity:page===1?0.3:1}}>◀ BACK</button>
@@ -327,7 +306,13 @@ function ToolPanel({ tool, onClose, onSave }) {
       } else {
         prompt = `You are a professional at MandaStrong Studio cinema AI platform. Tool: "${tool}".\n\nUser request: ${describe}\n\nGenerate complete, detailed, professional, production-ready content.`;
       }
-      const d = await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1500,messages:[{role:"user",content:prompt}]});
+      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,
+          messages:[{role:"user",content:prompt}]})
+      });
+      const d = await res.json();
       const txt = d.content&&d.content[0]?d.content[0].text:"Generated!";
       setResult(txt);
       if (isVoice) speak(selVoice, txt);
@@ -370,7 +355,7 @@ function ToolPanel({ tool, onClose, onSave }) {
                     </button>
                   </div>
                   <div style={{color:GOLD,fontSize:11}}>{v.desc}</div>
-                  <div style={{color:WHITE,fontSize:10,marginTop:2}}>{v.style} - {v.accent}</div>
+                  <div style={{color:WHITE,fontSize:10,marginTop:2}}>{v.style} · {v.accent}</div>
                 </div>
               ))}
             </div>
@@ -404,7 +389,7 @@ function ToolPanel({ tool, onClose, onSave }) {
               onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
               <div style={{fontSize:28,marginBottom:8}}>⬆</div>
               <div style={{color:WHITE,fontSize:13,fontWeight:700,letterSpacing:1}}>CLICK TO BROWSE</div>
-              <div style={{color:DIM,fontSize:12,marginTop:4}}>Video - Audio - Image - Text</div>
+              <div style={{color:DIM,fontSize:12,marginTop:4}}>Video · Audio · Image · Text</div>
             </div>
             <input ref={fileRef} type="file" style={{display:"none"}} onChange={e=>{
               const f=e.target.files&&e.target.files[0];
@@ -571,7 +556,7 @@ function MusicVideoStudio({ onClose, onSave }) {
     videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
     effects:["Slow Motion","Film Grain","Vignette"],
     cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",
-    visualDesc:"A man sits alone on a windowsill at night. Only his back is visible. He faces the open ocean. Full moon low on the water. A single candle burns beside him. His hands rest on an acoustic guitar. The room behind him is dark and empty. A coat still on a hook by the door. An unwashed cup on a table. A book left face-down. He begins to play. The curtains lift in the wind. The candle bends. The waves breathe. His face is never shown. Not once.",
+    visualDesc:"",
   });
   const set = (k,v) => setConfig(p=>({...p,[k]:v}));
   const tog = (k,v) => setConfig(p=>({...p,[k]:p[k].includes(v)?p[k].filter(x=>x!==v):[...p[k],v]}));
@@ -652,10 +637,163 @@ function MusicVideoStudio({ onClose, onSave }) {
       // One function. All scenes. Seamless transitions. Beat responsive.
       addLog("Claude is writing your film renderer...");
 
-      const filmPrompt = "You are the MandaStrong Cinema Engine. Write a complete JavaScript function that renders a full cinematic music video from start to finish.\n\nFUNCTION SIGNATURE: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)\nt=0-1 overall progress, sec=elapsed seconds, W=1280 H=720, beatNow=true on beat.\n\nSCENE: " + JSON.stringify(sceneDesc) + "\nSONG: " + JSON.stringify(config.title||"Untitled") + " by " + JSON.stringify(config.artist||"Artist") + "\nMOOD: " + (config.mood||"Cinematic") + "\nCOLOUR GRADE: " + (config.colorGrade||"Teal and Orange") + "\nDURATION: " + Math.round(totalDur) + " seconds\n\nDivide film into 6 acts based on t (0-0.15 intro, 0.15-0.35 build, 0.35-0.55 core, 0.55-0.75 escalation, 0.75-0.90 climax, 0.90-1.0 resolution). Draw cinematically with canvas 2D. Include ocean waves, moonlight, candle flicker, silhouetted figure with guitar, breathing animation, vignette overlay, letterbox bars, film grain, fade in/out. When beatNow is true add a subtle pulse effect.\n\nReturn ONLY the complete function starting with exactly: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {"
+      const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
 
-      const d = await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:filmPrompt}]}).catch(e=>{addLog("Connection failed: "+e.message);setGenerating(false);return null;});
-      if(!d){return;}
+Write a SINGLE JavaScript function that renders a complete cinematic music video. NO cartoons. NO outlines. NO flat colours. PHOTOREALISTIC gradients only.
+
+SCENE: "${sceneDesc}"
+SONG: "${config.title}" by ${config.artist}
+MOOD: ${config.mood}
+COLOUR GRADE: ${config.colorGrade}
+TOTAL DURATION: ${totalDur.toFixed(0)} seconds
+
+Function signature: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
+- t = 0.0 to 1.0 (overall film progress)
+- sec = current second
+- beatNow = true on beat frames
+- W=1280, H=720
+
+PHOTOREALISM RULES — NEVER BREAK THESE:
+- NO cartoon outlines. NO thick strokes around shapes. NO cell shading.
+- Every surface built from gradients. Every shape has light side and shadow side.
+- Sky: multi-stop linearGradient matching time of day. Never flat colour.
+- Humans: skin = radialGradient (warm highlight centre, cooler edge). Face has real features.
+- Water/ocean: animated wave layers using Math.sin(x*freq+sec*speed) filled paths. Deep blue-black.
+- Moon: radialGradient white glow. Long silver shimmer column on water below.
+- Candle: radialGradient flicker with Math.sin(sec*9.1)*0.05. Warm amber glow fills room.
+- Room interior: dark walls, floor visible, furniture shapes, lamp glow radialGradients.
+- Silhouette: solid dark shape, NOT an outline — filled ellipses and rects for body parts.
+
+FOR THIS SPECIFIC SCENE — DRAW LITERALLY:
+${sceneDesc.includes('windowsill') || sceneDesc.includes('ocean') || sceneDesc.includes('guitar') ? `
+// NIGHT SKY gradient:
+const sky = ctx.createLinearGradient(0,0,0,H*0.55);
+sky.addColorStop(0,'rgb(2,4,15)');
+sky.addColorStop(1,'rgb(8,20,55)');
+ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+
+// STARS: 180 dots with sin flicker
+for(let s=0;s<180;s++){
+  const sx=(s*137.5)%W, sy=(s*97.3)%H*0.5;
+  ctx.fillStyle='rgba(255,255,255,'+(0.4+Math.sin(sec*0.7+s)*0.3)+')';
+  ctx.fillRect(sx,sy,1,1);
+}
+
+// MOON at upper right:
+const moonX=W*0.72, moonY=H*0.15;
+const mg=ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,H*0.08);
+mg.addColorStop(0,'rgba(255,255,248,0.95)');
+mg.addColorStop(0.5,'rgba(240,240,220,0.6)');
+mg.addColorStop(1,'rgba(200,200,180,0)');
+ctx.fillStyle=mg; ctx.fillRect(moonX-H*0.1,moonY-H*0.1,H*0.2,H*0.2);
+
+// MOONLIGHT SHIMMER on water:
+const shim=ctx.createLinearGradient(moonX-20,H*0.5,moonX+20,H);
+shim.addColorStop(0,'rgba(255,255,220,0)');
+shim.addColorStop(0.4,'rgba(255,255,200,0.15)');
+shim.addColorStop(1,'rgba(255,255,180,0)');
+ctx.fillStyle=shim; ctx.fillRect(moonX-25,H*0.5,50,H*0.5);
+
+// OCEAN: 8 wave layers
+for(let w=0;w<8;w++){
+  const wg=ctx.createLinearGradient(0,H*0.54+w*12,0,H);
+  wg.addColorStop(0,'rgba('+(5+w*3)+','+(15+w*8)+','+(50+w*12)+','+(0.6+w*0.04)+')');
+  wg.addColorStop(1,'rgba(1,3,8,0.95)');
+  ctx.fillStyle=wg;
+  ctx.beginPath(); ctx.moveTo(-10,H);
+  for(let x=0;x<=W+10;x+=4){
+    const y=H*0.58+w*14+Math.sin(x*0.008+sec*(0.3+w*0.08)+w*1.2)*18+Math.sin(x*0.02+sec*0.6+w)*7;
+    x===0?ctx.lineTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();
+}
+
+// ROOM INTERIOR (dark walls behind figure):
+const wall=ctx.createLinearGradient(0,0,0,H*0.6);
+wall.addColorStop(0,'rgba(8,5,3,0.95)');
+wall.addColorStop(1,'rgba(4,2,1,0.98)');
+ctx.fillStyle=wall; ctx.fillRect(0,0,W*0.55,H*0.9);
+
+// WINDOW FRAME:
+const wx=W*0.08, wy=H*0.08, ww=W*0.4, wh=H*0.75;
+ctx.strokeStyle='rgba(60,40,20,0.95)'; ctx.lineWidth=10;
+ctx.strokeRect(wx,wy,ww,wh);
+ctx.beginPath(); ctx.moveTo(wx,wy+wh*0.48); ctx.lineTo(wx+ww,wy+wh*0.48); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(wx+ww*0.5,wy); ctx.lineTo(wx+ww*0.5,wy+wh); ctx.stroke();
+
+// FIGURE ON WINDOWSILL — silhouette, head bowed over guitar:
+const fx=W*0.22, fy=H*0.52;
+ctx.fillStyle='rgba(2,1,1,0.97)';
+// Head bowed forward
+ctx.beginPath(); ctx.ellipse(fx,fy-H*0.13,H*0.038,H*0.042,0.35,0,Math.PI*2); ctx.fill();
+// Torso
+ctx.fillRect(fx-H*0.028,fy-H*0.09,H*0.056,H*0.15);
+// Guitar body
+ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy+H*0.02,H*0.05,H*0.065,0.25,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy-H*0.04,H*0.04,H*0.05,0.25,0,Math.PI*2); ctx.fill();
+// Guitar neck
+ctx.fillRect(fx+H*0.025,fy-H*0.09,H*0.01,H*0.12);
+// Arm reaching to guitar
+ctx.save(); ctx.strokeStyle='rgba(2,1,1,0.97)'; ctx.lineWidth=H*0.022;
+ctx.beginPath(); ctx.moveTo(fx-H*0.02,fy); ctx.lineTo(fx+H*0.06,fy+H*0.02); ctx.stroke();
+ctx.restore();
+// Legs
+ctx.fillRect(fx-H*0.022,fy+H*0.06,H*0.018,H*0.1);
+ctx.fillRect(fx+H*0.004,fy+H*0.06,H*0.018,H*0.1);
+
+// CANDLE (right side of room):
+const cx2=W*0.68, cy2=H*0.6;
+const flicker=0.9+Math.sin(sec*8.3)*0.07+Math.sin(sec*13.1)*0.04;
+ctx.fillStyle='rgba(235,215,170,0.9)'; ctx.fillRect(cx2-5,cy2,10,32);
+const cf=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,32*flicker);
+cf.addColorStop(0,'rgba(255,255,200,0.95)');
+cf.addColorStop(0.3,'rgba(255,180,40,0.75)');
+cf.addColorStop(1,'rgba(255,100,0,0)');
+ctx.fillStyle=cf; ctx.fillRect(cx2-32,cy2-32,64,64);
+const rg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,W*0.3);
+rg.addColorStop(0,'rgba(255,140,30,0.1)');
+rg.addColorStop(1,'rgba(0,0,0,0)');
+ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+
+// CURTAIN (flowing breeze):
+const ct=sec*0.6;
+ctx.strokeStyle='rgba(160,140,120,0.45)'; ctx.lineWidth=2.5;
+for(let ci=0;ci<2;ci++){
+  const cxb=wx+ww*(ci===0?0.02:0.96);
+  ctx.beginPath(); ctx.moveTo(cxb,wy);
+  ctx.bezierCurveTo(cxb+Math.sin(ct+ci)*22,wy+wh*0.3,cxb+Math.sin(ct+1+ci)*28,wy+wh*0.6,cxb+Math.sin(ct+2+ci)*18,wy+wh);
+  ctx.stroke();
+}
+` : ''}
+
+STRUCTURE — divide by t:
+- t 0.00-0.08: Fade in from black. Title card gold text.
+- t 0.08-0.30: Wide establishing shot. Camera slowly drifts forward.
+- t 0.30-0.55: Close ups — hands on strings, candle flame, curtains, moonlit water.
+- t 0.55-0.75: Pull back wide. Emotional peak. Ocean wider.
+- t 0.75-0.90: Return to figure silhouette. Stillness.
+- t 0.90-1.00: Fade to black. Final title.
+
+ALWAYS END WITH — in this exact order:
+1. Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.08,W/2,H/2,W*0.85); vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.92)'); ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+2. Letterbox: ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);
+3. Grain: for(let g=0;g<25;g++){ctx.fillStyle='rgba(200,200,200,0.007)';ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
+4. Fade in: if(t<0.05){ctx.fillStyle='rgba(0,0,0,'+(1-t*20)+')';ctx.fillRect(0,0,W,H);}
+5. Fade out: if(t>0.92){ctx.fillStyle='rgba(0,0,0,'+((t-0.92)*12.5)+')';ctx.fillRect(0,0,W,H);}
+
+BEAT RESPONSE: if(beatNow){ctx.save();ctx.translate(W/2,H/2);ctx.scale(1.012,1.012);ctx.translate(-W/2,-H/2);}
+[draw scene]
+if(beatNow){ctx.restore();}
+
+Return ONLY the function starting with exactly:
+function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
+
+      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:filmPrompt}]})
+      });
+      const d = await res.json();
       if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
 
       let code = d.content&&d.content[0]?d.content[0].text.trim():"";
@@ -673,7 +811,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       code = code.replace(/```[a-z]*/g,"").replace(/```/g,"").trim();
       if(code.indexOf("function renderFilm")>0)code=code.slice(code.indexOf("function renderFilm"));
       // Strip template literals that break Function constructor
-      code = code.replace(new RegExp(String.fromCharCode(96)+"[^"+String.fromCharCode(96)+"]*"+String.fromCharCode(96),"g"),function(m){return JSON.stringify(m.slice(1,-1));});
+      code = code.replace(/`[^`]*`/g,function(m){return JSON.stringify(m.slice(1,-1));});
       let renderFn = null;
       try{
         const braceOpen=code.indexOf("{");
@@ -684,8 +822,13 @@ function MusicVideoStudio({ onClose, onSave }) {
       }catch(e){
         addLog("Compile error: "+e.message+". Retrying...");
         // Retry with simpler prompt
-        const simple = await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:"Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) for scene: "+JSON.stringify(sceneDesc)+" Song: "+config.title+" Mood: "+config.mood+" t=0-1 progress. Draw ocean waves, silhouetted figure with guitar, moonlight, candle. Return only the function."}]});
-        const sd = await simple.json()
+        const simple = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+            messages:[{role:"user",content:`Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) that renders a cinematic music video. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. t=0-1 overall progress. Draw ocean waves, a silhouetted figure on a windowsill with guitar, moonlight, candle glow, dark room. Use acts based on t. Return only the function.`}]})
+        });
+        const sd = await simple.json();
         let sc = sd.content&&sd.content[0]?sd.content[0].text.trim():"";
         sc = sc.replace(new RegExp(bt+"javascript|"+bt+"js|"+bt,"g"),"").trim();
         const sfi = sc.indexOf("function renderFilm"); if(sfi>0)sc=sc.slice(sfi);
@@ -800,7 +943,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       const url=URL.createObjectURL(blob);
       setVideoUrl(url); setVideoBlob(blob);
       setRenderProgress(100);
-      addLog("✓ "+config.title+" complete — "+(blob.size/1024/1024).toFixed(1)+"MB - "+Math.round(totalDur)+"s");
+      addLog("✓ "+config.title+" complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+Math.round(totalDur)+"s");
 
       const fn=(config.title||"MusicVideo")+"_"+config.artist+".webm";
       try{
@@ -860,7 +1003,7 @@ function MusicVideoStudio({ onClose, onSave }) {
         <div style={{background:`linear-gradient(135deg,#1a0a00,#0a0500)`,borderBottom:`1px solid ${GOLD}`,padding:"14px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
             <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:18,fontWeight:900,letterSpacing:4}}>🎬 MUSIC VIDEO STUDIO</div>
-            <div style={{color:WHITE,fontSize:10,letterSpacing:3,marginTop:2}}>PROFESSIONAL MUSIC VIDEO PRODUCTION - AI POWERED - SELF-CONTAINED</div>
+            <div style={{color:WHITE,fontSize:10,letterSpacing:3,marginTop:2}}>PROFESSIONAL MUSIC VIDEO PRODUCTION · AI POWERED · SELF-CONTAINED</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:`1px solid ${GOLD}`,color:GOLD,width:32,height:32,cursor:"pointer",fontSize:16}}>✕</button>
         </div>
@@ -971,7 +1114,7 @@ function MusicVideoStudio({ onClose, onSave }) {
                     onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
                     <div style={{color:WHITE,fontSize:12,fontWeight:700}}>⬆ CLICK TO UPLOAD REFERENCE</div>
-                    <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG - PNG - used to match style and mood</div>
+                    <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG · PNG · used to match style and mood</div>
                   </div>
                 )}
                 <div style={{...{background:"#0a0500",border:`1px solid ${GOLDDIM}`,padding:14},marginBottom:14}}>
@@ -1117,101 +1260,105 @@ function MusicVideoStudio({ onClose, onSave }) {
 }
 
 const VOICE_CHARACTERS = [
-  {id:"james",name:"James",emoji:"🎩",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Sarcastic - Deadpan - Witty",pitch:0.86,rate:0.62,desc:"Dry British wit. Devastating things said with complete calm."},
-  {id:"aurora",name:"Aurora",emoji:"🌅",gender:"Female",age:"Adult",origin:"British",region:"London",style:"Warm - Documentary - Authoritative",pitch:1.08,rate:0.80,desc:"Calm authority. The voice you trust completely."},
-  {id:"edward",name:"Edward",emoji:"🎭",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Theatrical - Grand - Classical",pitch:0.85,rate:0.75,desc:"Shakespearean gravitas. Every sentence carved in stone."},
-  {id:"cecily",name:"Cecily",emoji:"🫖",gender:"Female",age:"Adult",origin:"British",region:"London",style:"Crisp - Intelligent - Sardonic",pitch:1.12,rate:0.85,desc:"Sharp as a tack. Mildly disappointed by most things."},
-  {id:"nana",name:"Nana",emoji:"🧶",gender:"Female",age:"Elderly",origin:"British",region:"Yorkshire",style:"Gentle - Wise - Warm",pitch:1.02,rate:0.70,desc:"Warm elderly wisdom. Has seen everything twice."},
-  {id:"colonel",name:"Colonel",emoji:"🎖️",gender:"Male",age:"Elderly",origin:"British",region:"London",style:"Commanding - Dignified - Veteran",pitch:0.80,rate:0.74,desc:"Authority earned through decades of experience."},
-  {id:"pippa",name:"Pippa",emoji:"🎀",gender:"Female",age:"Teen",origin:"British",region:"London",style:"Bright - Cheerful - Young",pitch:1.25,rate:0.95,desc:"Fresh and warm. Natural young British energy."},
-  {id:"archie",name:"Archie",emoji:"⚽",gender:"Male",age:"Teen",origin:"British",region:"Manchester",style:"Casual - Friendly - Teen",pitch:1.05,rate:0.98,desc:"Relaxed and genuine. Sounds like a real teenager."},
-  {id:"ewan",name:"Ewan",emoji:"🏴",gender:"Male",age:"Adult",origin:"Scottish",region:"Edinburgh",style:"Warm - Rugged - Sincere",pitch:0.92,rate:0.82,desc:"Deep warm Scottish sincerity."},
-  {id:"fiona",name:"Fiona",emoji:"🌿",gender:"Female",age:"Adult",origin:"Scottish",region:"Glasgow",style:"Lilting - Warm - Storyteller",pitch:1.10,rate:0.84,desc:"Beautiful Scottish lilt."},
-  {id:"paddy",name:"Paddy",emoji:"☘️",gender:"Male",age:"Adult",origin:"Irish",region:"Dublin",style:"Charming - Witty - Warm",pitch:0.95,rate:0.88,desc:"Easy Irish charm."},
-  {id:"siobhan",name:"Siobhan",emoji:"🌸",gender:"Female",age:"Adult",origin:"Irish",region:"Cork",style:"Gentle - Musical - Emotional",pitch:1.15,rate:0.82,desc:"Soft Irish voice with real emotional depth."},
-  {id:"dafydd",name:"Dafydd",emoji:"🐉",gender:"Male",age:"Adult",origin:"Welsh",region:"Cardiff",style:"Musical - Passionate - Rich",pitch:0.90,rate:0.80,desc:"Rich Welsh musicality."},
-  {id:"marcus",name:"Marcus",emoji:"⚡",gender:"Male",age:"Adult",origin:"American",region:"New York",style:"Deep - Cinematic - Commanding",pitch:0.72,rate:0.74,desc:"Big voice. When Marcus speaks people stop."},
-  {id:"river",name:"River",emoji:"🌊",gender:"Male",age:"Adult",origin:"American",region:"Tennessee",style:"Warm - Intimate - Storyteller",pitch:0.98,rate:0.76,desc:"Unhurried Southern charm."},
-  {id:"dakota",name:"Dakota",emoji:"🏔️",gender:"Female",age:"Adult",origin:"American",region:"Chicago",style:"Bold - Direct - Confident",pitch:1.05,rate:0.92,desc:"No filler. No hesitation."},
-  {id:"wade",name:"Wade",emoji:"🤠",gender:"Male",age:"Adult",origin:"American",region:"Texas",style:"Laid Back - Humorous - Folksy",pitch:0.94,rate:0.85,desc:"Easy going Southern humour."},
-  {id:"brooklyn",name:"Brooklyn",emoji:"🗽",gender:"Female",age:"Adult",origin:"American",region:"New York",style:"Fast - Sharp - City Energy",pitch:1.18,rate:1.10,desc:"Fast New York energy."},
-  {id:"savannah",name:"Savannah",emoji:"🌺",gender:"Female",age:"Adult",origin:"American",region:"Georgia",style:"Sweet - Gracious - Warm",pitch:1.20,rate:0.84,desc:"Warm Southern grace."},
-  {id:"madison",name:"Madison",emoji:"📱",gender:"Female",age:"Teen",origin:"American",region:"California",style:"Upbeat - Social - Natural",pitch:1.30,rate:1.08,desc:"Real American teenage energy."},
-  {id:"tyler",name:"Tyler",emoji:"🎮",gender:"Male",age:"Teen",origin:"American",region:"Ohio",style:"Casual - Relatable - Teen",pitch:1.08,rate:1.00,desc:"Natural and unforced."},
-  {id:"rosie",name:"Rosie",emoji:"🌼",gender:"Female",age:"Child",origin:"American",region:"Florida",style:"Sweet - Innocent - Child",pitch:1.45,rate:0.88,desc:"Young warm and sweet."},
-  {id:"cooper",name:"Cooper",emoji:"🚂",gender:"Male",age:"Child",origin:"American",region:"Colorado",style:"Bright - Curious - Child",pitch:1.40,rate:0.90,desc:"Curious about everything."},
-  {id:"grandma",name:"Grandma",emoji:"🫶",gender:"Female",age:"Elderly",origin:"American",region:"Virginia",style:"Warm - Loving - Elderly",pitch:1.00,rate:0.72,desc:"Full of love and life experience."},
-  {id:"frank",name:"Frank",emoji:"🪑",gender:"Male",age:"Elderly",origin:"American",region:"New Jersey",style:"Gruff - Honest - Elder",pitch:0.78,rate:0.76,desc:"Says it straight."},
-  {id:"sophia",name:"Sophia",emoji:"☀️",gender:"Female",age:"Adult",origin:"Australian",region:"Sydney",style:"Upbeat - Bright - Energetic",pitch:1.35,rate:1.12,desc:"Forward energy."},
-  {id:"finn",name:"Finn",emoji:"🏄",gender:"Male",age:"Adult",origin:"Australian",region:"Melbourne",style:"Casual - Confident - Outdoorsy",pitch:0.95,rate:0.95,desc:"Relaxed Australian confidence."},
-  {id:"aroha",name:"Aroha",emoji:"🌿",gender:"Female",age:"Adult",origin:"New Zealand",region:"Auckland",style:"Warm - Grounded - Sincere",pitch:1.10,rate:0.86,desc:"Natural sincerity."},
-  {id:"amara",name:"Amara",emoji:"🌍",gender:"Female",age:"Adult",origin:"South African",region:"Cape Town",style:"Rich - Warm - Powerful",pitch:1.05,rate:0.84,desc:"Quiet power."},
-  {id:"kofi",name:"Kofi",emoji:"🥁",gender:"Male",age:"Adult",origin:"West African",region:"Ghana",style:"Deep - Rhythmic - Storyteller",pitch:0.82,rate:0.78,desc:"Every sentence has music in it."},
-  {id:"priya",name:"Priya",emoji:"🪷",gender:"Female",age:"Adult",origin:"Indian",region:"Mumbai",style:"Precise - Warm - Intelligent",pitch:1.15,rate:0.90,desc:"Warm and intelligent."},
-  {id:"arjun",name:"Arjun",emoji:"🎯",gender:"Male",age:"Adult",origin:"Indian",region:"Delhi",style:"Authoritative - Clear - Measured",pitch:0.88,rate:0.85,desc:"Sounds like someone who knows exactly what they are talking about."},
-  {id:"valentina",name:"Valentina",emoji:"🌹",gender:"Female",age:"Adult",origin:"Spanish",region:"Madrid",style:"Passionate - Warm - Expressive",pitch:1.18,rate:0.92,desc:"Everything sounds felt."},
-  {id:"pierre",name:"Pierre",emoji:"🥐",gender:"Male",age:"Adult",origin:"French",region:"Paris",style:"Suave - Dry - Cultured",pitch:0.90,rate:0.84,desc:"Makes things sound interesting."},
-  {id:"ingrid",name:"Ingrid",emoji:"❄️",gender:"Female",age:"Adult",origin:"Scandinavian",region:"Stockholm",style:"Clean - Cool - Direct",pitch:1.08,rate:0.88,desc:"No excess words."},
-  {id:"yemi",name:"Yemi",emoji:"🌟",gender:"Female",age:"Adult",origin:"Nigerian",region:"Lagos",style:"Bold - Joyful - Energetic",pitch:1.25,rate:1.00,desc:"Life-affirming."},
-  {id:"magnus",name:"Magnus",emoji:"🧙",gender:"Male",age:"Elderly",origin:"Fantasy",region:"Ancient",style:"Ancient - Wise - Epic",pitch:0.75,rate:0.70,desc:"Seen civilisations rise and fall."},
-  {id:"nova",name:"Nova",emoji:"🤖",gender:"Female",age:"Adult",origin:"Neutral",region:"AI",style:"Clean - Precise - Neutral",pitch:1.12,rate:0.95,desc:"No accent. No emotion. No opinion."},
-  {id:"hunter",name:"Hunter",emoji:"🎬",gender:"Male",age:"Adult",origin:"American",region:"Hollywood",style:"Trailer - Epic - Explosive",pitch:0.70,rate:0.80,desc:"Full movie trailer energy."},
-  {id:"luna",name:"Luna",emoji:"🌙",gender:"Female",age:"Adult",origin:"Neutral",region:"ASMR",style:"Whisper - ASMR - Intimate",pitch:1.20,rate:0.65,desc:"Soft whisper. Complete calm."},
-  {id:"professor",name:"Professor",emoji:"🎓",gender:"Male",age:"Elderly",origin:"British",region:"Oxford",style:"Academic - Thoughtful - Measured",pitch:0.88,rate:0.78,desc:"Distinguished. Precise."},
-  {id:"hope",name:"Hope",emoji:"🌤️",gender:"Female",age:"Adult",origin:"American",region:"Heartfelt",style:"Tender - Gentle - Loving",pitch:1.15,rate:0.78,desc:"Pure tenderness."},
-  {id:"storm",name:"Storm",emoji:"⛈️",gender:"Male",age:"Adult",origin:"American",region:"Intense",style:"Intense - Angry - Powerful",pitch:0.82,rate:1.00,desc:"Raw intensity."},
-  {id:"joy",name:"Joy",emoji:"🎉",gender:"Female",age:"Adult",origin:"American",region:"Uplifting",style:"Excited - Joyful - Celebratory",pitch:1.40,rate:1.15,desc:"Pure infectious joy."},
-  {id:"sage",name:"Sage",emoji:"🌿",gender:"Male",age:"Adult",origin:"Neutral",region:"Mindful",style:"Peaceful - Mindful - Grounded",pitch:0.95,rate:0.72,desc:"Deep calm."},
-  {id:"faith",name:"Faith",emoji:"✨",gender:"Female",age:"Adult",origin:"American",region:"Gospel",style:"Inspirational - Gospel - Uplifting",pitch:1.18,rate:0.88,desc:"Gospel soul."},
-  {id:"rebel",name:"Rebel",emoji:"✊",gender:"Female",age:"Teen",origin:"American",region:"Activist",style:"Fierce - Defiant - Young",pitch:1.22,rate:1.05,desc:"Will not back down."},
-  {id:"blaze",name:"Blaze",emoji:"🔥",gender:"Male",age:"Adult",origin:"American",region:"Comedy",style:"Comic - Ridiculous - Energetic",pitch:1.05,rate:1.18,desc:"No dignity whatsoever."},
-  {id:"remy",name:"Remy",emoji:"🎻",gender:"Male",age:"Adult",origin:"French",region:"Lyon",style:"Smooth - Romantic - Intimate",pitch:0.92,rate:0.80,desc:"Everything sounds like poetry."},
-  {id:"zhara",name:"Zhara",emoji:"💫",gender:"Female",age:"Adult",origin:"Middle Eastern",region:"Dubai",style:"Elegant - Warm - Sophisticated",pitch:1.10,rate:0.85,desc:"Graceful and precise."},
-  {id:"kai",name:"Kai",emoji:"🌊",gender:"Male",age:"Adult",origin:"Hawaiian",region:"Honolulu",style:"Relaxed - Warm - Soulful",pitch:0.96,rate:0.82,desc:"Unhurried ocean warmth."},
-  {id:"sienna",name:"Sienna",emoji:"🎨",gender:"Female",age:"Adult",origin:"American",region:"New Orleans",style:"Soulful - Blues - Deep",pitch:1.05,rate:0.78,desc:"Every word feels lived-in."},
-  {id:"atlas",name:"Atlas",emoji:"🌐",gender:"Male",age:"Adult",origin:"Neutral",region:"Epic",style:"Cinematic - Epic - Booming",pitch:0.68,rate:0.76,desc:"The voice of a thousand documentaries."},
-  {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal - Dreamy - Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
+  {id:"james",name:"James",emoji:"🎩",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Sarcastic · Deadpan · Witty",pitch:0.86,rate:0.62,desc:"Dry British wit. Devastating things said with complete calm."},
+  {id:"aurora",name:"Aurora",emoji:"🌅",gender:"Female",age:"Adult",origin:"British",region:"London",style:"Warm · Documentary · Authoritative",pitch:1.08,rate:0.80,desc:"Calm authority. The voice you trust completely."},
+  {id:"edward",name:"Edward",emoji:"🎭",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Theatrical · Grand · Classical",pitch:0.85,rate:0.75,desc:"Shakespearean gravitas. Every sentence carved in stone."},
+  {id:"cecily",name:"Cecily",emoji:"🫖",gender:"Female",age:"Adult",origin:"British",region:"London",style:"Crisp · Intelligent · Sardonic",pitch:1.12,rate:0.85,desc:"Sharp as a tack. Mildly disappointed by most things."},
+  {id:"nana",name:"Nana",emoji:"🧶",gender:"Female",age:"Elderly",origin:"British",region:"Yorkshire",style:"Gentle · Wise · Warm",pitch:1.02,rate:0.70,desc:"Warm elderly wisdom. Has seen everything twice."},
+  {id:"colonel",name:"Colonel",emoji:"🎖️",gender:"Male",age:"Elderly",origin:"British",region:"London",style:"Commanding · Dignified · Veteran",pitch:0.80,rate:0.74,desc:"Authority earned through decades of experience."},
+  {id:"pippa",name:"Pippa",emoji:"🎀",gender:"Female",age:"Teen",origin:"British",region:"London",style:"Bright · Cheerful · Young",pitch:1.25,rate:0.95,desc:"Fresh and warm. Natural young British energy."},
+  {id:"archie",name:"Archie",emoji:"⚽",gender:"Male",age:"Teen",origin:"British",region:"Manchester",style:"Casual · Friendly · Teen",pitch:1.05,rate:0.98,desc:"Relaxed and genuine. Sounds like a real teenager."},
+  {id:"ewan",name:"Ewan",emoji:"🏴",gender:"Male",age:"Adult",origin:"Scottish",region:"Edinburgh",style:"Warm · Rugged · Sincere",pitch:0.92,rate:0.82,desc:"Deep warm Scottish sincerity."},
+  {id:"fiona",name:"Fiona",emoji:"🌿",gender:"Female",age:"Adult",origin:"Scottish",region:"Glasgow",style:"Lilting · Warm · Storyteller",pitch:1.10,rate:0.84,desc:"Beautiful Scottish lilt."},
+  {id:"paddy",name:"Paddy",emoji:"☘️",gender:"Male",age:"Adult",origin:"Irish",region:"Dublin",style:"Charming · Witty · Warm",pitch:0.95,rate:0.88,desc:"Easy Irish charm."},
+  {id:"siobhan",name:"Siobhan",emoji:"🌸",gender:"Female",age:"Adult",origin:"Irish",region:"Cork",style:"Gentle · Musical · Emotional",pitch:1.15,rate:0.82,desc:"Soft Irish voice with real emotional depth."},
+  {id:"dafydd",name:"Dafydd",emoji:"🐉",gender:"Male",age:"Adult",origin:"Welsh",region:"Cardiff",style:"Musical · Passionate · Rich",pitch:0.90,rate:0.80,desc:"Rich Welsh musicality."},
+  {id:"marcus",name:"Marcus",emoji:"⚡",gender:"Male",age:"Adult",origin:"American",region:"New York",style:"Deep · Cinematic · Commanding",pitch:0.72,rate:0.74,desc:"Big voice. When Marcus speaks people stop."},
+  {id:"river",name:"River",emoji:"🌊",gender:"Male",age:"Adult",origin:"American",region:"Tennessee",style:"Warm · Intimate · Storyteller",pitch:0.98,rate:0.76,desc:"Unhurried Southern charm."},
+  {id:"dakota",name:"Dakota",emoji:"🏔️",gender:"Female",age:"Adult",origin:"American",region:"Chicago",style:"Bold · Direct · Confident",pitch:1.05,rate:0.92,desc:"No filler. No hesitation."},
+  {id:"wade",name:"Wade",emoji:"🤠",gender:"Male",age:"Adult",origin:"American",region:"Texas",style:"Laid Back · Humorous · Folksy",pitch:0.94,rate:0.85,desc:"Easy going Southern humour."},
+  {id:"brooklyn",name:"Brooklyn",emoji:"🗽",gender:"Female",age:"Adult",origin:"American",region:"New York",style:"Fast · Sharp · City Energy",pitch:1.18,rate:1.10,desc:"Fast New York energy."},
+  {id:"savannah",name:"Savannah",emoji:"🌺",gender:"Female",age:"Adult",origin:"American",region:"Georgia",style:"Sweet · Gracious · Warm",pitch:1.20,rate:0.84,desc:"Warm Southern grace."},
+  {id:"madison",name:"Madison",emoji:"📱",gender:"Female",age:"Teen",origin:"American",region:"California",style:"Upbeat · Social · Natural",pitch:1.30,rate:1.08,desc:"Real American teenage energy."},
+  {id:"tyler",name:"Tyler",emoji:"🎮",gender:"Male",age:"Teen",origin:"American",region:"Ohio",style:"Casual · Relatable · Teen",pitch:1.08,rate:1.00,desc:"Natural and unforced."},
+  {id:"rosie",name:"Rosie",emoji:"🌼",gender:"Female",age:"Child",origin:"American",region:"Florida",style:"Sweet · Innocent · Child",pitch:1.45,rate:0.88,desc:"Young warm and sweet."},
+  {id:"cooper",name:"Cooper",emoji:"🚂",gender:"Male",age:"Child",origin:"American",region:"Colorado",style:"Bright · Curious · Child",pitch:1.40,rate:0.90,desc:"Curious about everything."},
+  {id:"grandma",name:"Grandma",emoji:"🫶",gender:"Female",age:"Elderly",origin:"American",region:"Virginia",style:"Warm · Loving · Elderly",pitch:1.00,rate:0.72,desc:"Full of love and life experience."},
+  {id:"frank",name:"Frank",emoji:"🪑",gender:"Male",age:"Elderly",origin:"American",region:"New Jersey",style:"Gruff · Honest · Elder",pitch:0.78,rate:0.76,desc:"Says it straight."},
+  {id:"sophia",name:"Sophia",emoji:"☀️",gender:"Female",age:"Adult",origin:"Australian",region:"Sydney",style:"Upbeat · Bright · Energetic",pitch:1.35,rate:1.12,desc:"Forward energy."},
+  {id:"finn",name:"Finn",emoji:"🏄",gender:"Male",age:"Adult",origin:"Australian",region:"Melbourne",style:"Casual · Confident · Outdoorsy",pitch:0.95,rate:0.95,desc:"Relaxed Australian confidence."},
+  {id:"aroha",name:"Aroha",emoji:"🌿",gender:"Female",age:"Adult",origin:"New Zealand",region:"Auckland",style:"Warm · Grounded · Sincere",pitch:1.10,rate:0.86,desc:"Natural sincerity."},
+  {id:"amara",name:"Amara",emoji:"🌍",gender:"Female",age:"Adult",origin:"South African",region:"Cape Town",style:"Rich · Warm · Powerful",pitch:1.05,rate:0.84,desc:"Quiet power."},
+  {id:"kofi",name:"Kofi",emoji:"🥁",gender:"Male",age:"Adult",origin:"West African",region:"Ghana",style:"Deep · Rhythmic · Storyteller",pitch:0.82,rate:0.78,desc:"Every sentence has music in it."},
+  {id:"priya",name:"Priya",emoji:"🪷",gender:"Female",age:"Adult",origin:"Indian",region:"Mumbai",style:"Precise · Warm · Intelligent",pitch:1.15,rate:0.90,desc:"Warm and intelligent."},
+  {id:"arjun",name:"Arjun",emoji:"🎯",gender:"Male",age:"Adult",origin:"Indian",region:"Delhi",style:"Authoritative · Clear · Measured",pitch:0.88,rate:0.85,desc:"Sounds like someone who knows exactly what they are talking about."},
+  {id:"valentina",name:"Valentina",emoji:"🌹",gender:"Female",age:"Adult",origin:"Spanish",region:"Madrid",style:"Passionate · Warm · Expressive",pitch:1.18,rate:0.92,desc:"Everything sounds felt."},
+  {id:"pierre",name:"Pierre",emoji:"🥐",gender:"Male",age:"Adult",origin:"French",region:"Paris",style:"Suave · Dry · Cultured",pitch:0.90,rate:0.84,desc:"Makes things sound interesting."},
+  {id:"ingrid",name:"Ingrid",emoji:"❄️",gender:"Female",age:"Adult",origin:"Scandinavian",region:"Stockholm",style:"Clean · Cool · Direct",pitch:1.08,rate:0.88,desc:"No excess words."},
+  {id:"yemi",name:"Yemi",emoji:"🌟",gender:"Female",age:"Adult",origin:"Nigerian",region:"Lagos",style:"Bold · Joyful · Energetic",pitch:1.25,rate:1.00,desc:"Life-affirming."},
+  {id:"magnus",name:"Magnus",emoji:"🧙",gender:"Male",age:"Elderly",origin:"Fantasy",region:"Ancient",style:"Ancient · Wise · Epic",pitch:0.75,rate:0.70,desc:"Seen civilisations rise and fall."},
+  {id:"nova",name:"Nova",emoji:"🤖",gender:"Female",age:"Adult",origin:"Neutral",region:"AI",style:"Clean · Precise · Neutral",pitch:1.12,rate:0.95,desc:"No accent. No emotion. No opinion."},
+  {id:"hunter",name:"Hunter",emoji:"🎬",gender:"Male",age:"Adult",origin:"American",region:"Hollywood",style:"Trailer · Epic · Explosive",pitch:0.70,rate:0.80,desc:"Full movie trailer energy."},
+  {id:"luna",name:"Luna",emoji:"🌙",gender:"Female",age:"Adult",origin:"Neutral",region:"ASMR",style:"Whisper · ASMR · Intimate",pitch:1.20,rate:0.65,desc:"Soft whisper. Complete calm."},
+  {id:"professor",name:"Professor",emoji:"🎓",gender:"Male",age:"Elderly",origin:"British",region:"Oxford",style:"Academic · Thoughtful · Measured",pitch:0.88,rate:0.78,desc:"Distinguished. Precise."},
+  {id:"hope",name:"Hope",emoji:"🌤️",gender:"Female",age:"Adult",origin:"American",region:"Heartfelt",style:"Tender · Gentle · Loving",pitch:1.15,rate:0.78,desc:"Pure tenderness."},
+  {id:"storm",name:"Storm",emoji:"⛈️",gender:"Male",age:"Adult",origin:"American",region:"Intense",style:"Intense · Angry · Powerful",pitch:0.82,rate:1.00,desc:"Raw intensity."},
+  {id:"joy",name:"Joy",emoji:"🎉",gender:"Female",age:"Adult",origin:"American",region:"Uplifting",style:"Excited · Joyful · Celebratory",pitch:1.40,rate:1.15,desc:"Pure infectious joy."},
+  {id:"sage",name:"Sage",emoji:"🌿",gender:"Male",age:"Adult",origin:"Neutral",region:"Mindful",style:"Peaceful · Mindful · Grounded",pitch:0.95,rate:0.72,desc:"Deep calm."},
+  {id:"faith",name:"Faith",emoji:"✨",gender:"Female",age:"Adult",origin:"American",region:"Gospel",style:"Inspirational · Gospel · Uplifting",pitch:1.18,rate:0.88,desc:"Gospel soul."},
+  {id:"rebel",name:"Rebel",emoji:"✊",gender:"Female",age:"Teen",origin:"American",region:"Activist",style:"Fierce · Defiant · Young",pitch:1.22,rate:1.05,desc:"Will not back down."},
+  {id:"blaze",name:"Blaze",emoji:"🔥",gender:"Male",age:"Adult",origin:"American",region:"Comedy",style:"Comic · Ridiculous · Energetic",pitch:1.05,rate:1.18,desc:"No dignity whatsoever."},
+  {id:"remy",name:"Remy",emoji:"🎻",gender:"Male",age:"Adult",origin:"French",region:"Lyon",style:"Smooth · Romantic · Intimate",pitch:0.92,rate:0.80,desc:"Everything sounds like poetry."},
+  {id:"zhara",name:"Zhara",emoji:"💫",gender:"Female",age:"Adult",origin:"Middle Eastern",region:"Dubai",style:"Elegant · Warm · Sophisticated",pitch:1.10,rate:0.85,desc:"Graceful and precise."},
+  {id:"kai",name:"Kai",emoji:"🌊",gender:"Male",age:"Adult",origin:"Hawaiian",region:"Honolulu",style:"Relaxed · Warm · Soulful",pitch:0.96,rate:0.82,desc:"Unhurried ocean warmth."},
+  {id:"sienna",name:"Sienna",emoji:"🎨",gender:"Female",age:"Adult",origin:"American",region:"New Orleans",style:"Soulful · Blues · Deep",pitch:1.05,rate:0.78,desc:"Every word feels lived-in."},
+  {id:"atlas",name:"Atlas",emoji:"🌐",gender:"Male",age:"Adult",origin:"Neutral",region:"Epic",style:"Cinematic · Epic · Booming",pitch:0.68,rate:0.76,desc:"The voice of a thousand documentaries."},
+  {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal · Dreamy · Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
+
+async function proxyFetch(body,retries=2){
+  const U="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy";
+  for(let i=0;i<retries;i++){
+    try{
+      const ctrl=new AbortController(),tid=setTimeout(()=>ctrl.abort(),55000);
+      const res=await fetch(U,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctrl.signal});
+      clearTimeout(tid);
+      if(!res.ok)throw new Error("HTTP "+res.status);
+      const d=await res.json();
+      if(d.error)throw new Error(d.error.message||"error");
+      return d;
+    }catch(e){if(i===retries-1)throw e;await new Promise(r=>setTimeout(r,2000));}
+  }
+}
+
+
+function buildChunks(txt){
+  if(!txt||!txt.trim())return[];
+  const parts=txt.replace(/([.!?]) /g,"$1\n").replace(/([,;:]) /g,"$1\n").split("\n");
+  return parts.map(s=>{const t=s.trim();if(!t)return null;return{type:t.endsWith("?")?"question":t.endsWith("!")?"exclaim":t.endsWith(",")||t.endsWith(";")||t.endsWith(":")?"clause":"sentence",text:t};}).filter(Boolean);
+}
 
 
 function P6Voice({ onSave, setMediaLib }) {
-  const [text,setText]=useState("");
-  const [processed,setProcessed]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [speaking,setSpeaking]=useState(false);
-  const [mood,setMood]=useState("Neutral");
-  const [saved,setSaved]=useState(false);
-  const [savedToLib,setSavedToLib]=useState(false);
-  const [showMVS,setShowMVS]=useState(false);
-  const [selVoice,setSelVoice]=useState("james");
-  const [search,setSearch]=useState("");
-  const [filterGender,setFilterGender]=useState("All");
-  const [filterAge,setFilterAge]=useState("All");
-  const [filterOrigin,setFilterOrigin]=useState("All");
-  const [speed,setSpeed]=useState(0.82);
-  const [pitchV,setPitchV]=useState(1.0);
-  const [pauseLen,setPauseLen]=useState(700);
-  const [volume,setVolume]=useState(1.0);
-  const [sysVoices,setSysVoices]=useState([]);
-  const chunksRef=useRef([]);
-  const idxRef=useRef(0);
-  const timerRef=useRef(null);
+  const [text,setText]=useState(""); const [loading,setLoading]=useState(false);
+  const [speaking,setSpeaking]=useState(false); const [mood,setMood]=useState("Neutral");
+  const [savedToLib,setSavedToLib]=useState(false); const [showMVS,setShowMVS]=useState(false);
+  const [selVoice,setSelVoice]=useState("james"); const [search,setSearch]=useState("");
+  const [filterGender,setFilterGender]=useState("All"); const [filterAge,setFilterAge]=useState("All");
+  const [filterOrigin,setFilterOrigin]=useState("All"); const [speed,setSpeed]=useState(0.82);
+  const [pitchV,setPitchV]=useState(1.0); const [pauseLen,setPauseLen]=useState(700);
+  const [volume,setVolume]=useState(1.0); const [sysVoices,setSysVoices]=useState([]);
+  const chunksRef=useRef([]); const idxRef=useRef(0); const timerRef=useRef(null);
 
   useEffect(()=>{
     const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
-    load();
-    window.speechSynthesis.onvoiceschanged=load;
-    if(window.speechSynthesis.getVoices().length===0){
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-      window.speechSynthesis.cancel();
-    }
+    load(); window.speechSynthesis.onvoiceschanged=load;
     return()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);};
   },[]);
 
   const ORIGINS=["All","British","Scottish","Irish","Welsh","American","Australian","New Zealand","South African","West African","Indian","Spanish","French","Scandinavian","Nigerian","Fantasy","Neutral"];
   const AGES=["All","Child","Teen","Adult","Elderly"];
   const GENDERS=["All","Male","Female"];
-
   const filtered=VOICE_CHARACTERS.filter(v=>{
     const mg=filterGender==="All"||v.gender===filterGender;
     const ma=filterAge==="All"||v.age===filterAge;
@@ -1219,143 +1366,94 @@ function P6Voice({ onSave, setMediaLib }) {
     const ms=search===""||v.name.toLowerCase().includes(search.toLowerCase())||v.style.toLowerCase().includes(search.toLowerCase());
     return mg&&ma&&mo&&ms;
   });
-
   const selected=VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
   const pickSysVoice=(vc)=>{
     const all=sysVoices.length?sysVoices:window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
     if(!all.length)return null;
-    const gb=all.filter(v=>v.lang==="en-GB");
-    const us=all.filter(v=>v.lang==="en-US");
-    const au=all.filter(v=>v.lang==="en-AU");
-    const isMale=vc.gender==="Male";
-    const isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin);
-    const isAU=["Australian","New Zealand"].includes(vc.origin);
+    const gb=all.filter(v=>v.lang==="en-GB"),us=all.filter(v=>v.lang==="en-US"),au=all.filter(v=>v.lang==="en-AU");
     const hash=vc.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
+    const isMale=vc.gender==="Male",isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
     let pool=[];
-    if(isBritish&&isMale)pool=[...gb.filter(v=>/daniel|oliver|arthur|malcolm|george/i.test(v.name)),...gb];
-    else if(isBritish&&!isMale)pool=[...gb.filter(v=>/kate|serena|emily|moira|fiona/i.test(v.name)),...gb];
+    if(isBritish&&isMale)pool=[...gb.filter(v=>/daniel|oliver|arthur/i.test(v.name)),...gb];
+    else if(isBritish)pool=[...gb.filter(v=>/kate|serena|emily|moira/i.test(v.name)),...gb];
     else if(isAU)pool=[...au,...all];
-    else if(isMale)pool=[...us.filter(v=>/alex|fred|tom|ryan|bruce/i.test(v.name)),...us];
-    else pool=[...us.filter(v=>/samantha|ava|victoria|zoe|susan/i.test(v.name)),...us];
+    else if(isMale)pool=[...us.filter(v=>/alex|fred|tom/i.test(v.name)),...us];
+    else pool=[...us.filter(v=>/samantha|ava|victoria/i.test(v.name)),...us];
     if(!pool.length)pool=all;
     const unique=[...new Map(pool.map(v=>[v.name,v])).values()];
     return unique[hash%unique.length]||all[0];
   };
 
-  const speakWithVoice=(vc,txt)=>{
+  const speakOneShot=(vc,txt)=>{
     window.speechSynthesis.cancel();
     const utt=new SpeechSynthesisUtterance(txt);
-    const sv=pickSysVoice(vc);
-    if(sv)utt.voice=sv;
-    utt.pitch=vc.pitch||1.0;
-    utt.rate=vc.rate||0.85;
-    utt.volume=1.0;
+    const sv=pickSysVoice(vc);if(sv)utt.voice=sv;
+    utt.pitch=vc.pitch||1.0;utt.rate=vc.rate||0.85;utt.volume=1.0;
     window.speechSynthesis.speak(utt);
   };
 
   const speakNow=(txt)=>{
-    window.speechSynthesis.cancel();
-    if(timerRef.current)clearTimeout(timerRef.current);
-    const chunks=buildChunks(txt);
-    chunksRef.current=chunks;idxRef.current=0;setSpeaking(true);
-    const baseRate=speed*(selected.rate||0.9);
-    const basePitch=pitchV*(selected.pitch||1.0);
+    window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
+    const chunks=buildChunks(txt);chunksRef.current=chunks;idxRef.current=0;setSpeaking(true);
+    const baseRate=speed*(selected.rate||0.9),basePitch=pitchV*(selected.pitch||1.0);
     const next=()=>{
       const idx=idxRef.current;
       if(idx>=chunksRef.current.length){setSpeaking(false);return;}
       const chunk=chunksRef.current[idx];
-      if(chunk.type==="breath"||chunk.type==="ellipsis"||!chunk.text){idxRef.current=idx+1;timerRef.current=setTimeout(next,pauseLen*0.6);return;}
+      if(!chunk||!chunk.text){idxRef.current=idx+1;timerRef.current=setTimeout(next,200);return;}
       const sv=pickSysVoice(selected);
       const utt=new SpeechSynthesisUtterance(chunk.text);
-      if(sv)utt.voice=sv;
-      utt.volume=volume;
+      if(sv)utt.voice=sv;utt.volume=volume;
       utt.rate=Math.max(0.1,Math.min(2.0,baseRate));
-      utt.pitch=Math.max(0.1,Math.min(2.0,basePitch));
-      const afterPause=chunk.type==="question"?Math.round(pauseLen*1.1):chunk.type==="sentence"?pauseLen:chunk.type==="clause"?Math.round(pauseLen*0.4):Math.round(pauseLen*0.15);
-      utt.onend=()=>{idxRef.current=idx+1;timerRef.current=setTimeout(next,afterPause);};
+      utt.pitch=Math.max(0.1,Math.min(2.0,basePitch+(chunk.type==="question"?0.1:chunk.type==="exclaim"?0.07:0)));
+      const ap=chunk.type==="question"?Math.round(pauseLen*1.1):chunk.type==="sentence"?pauseLen:Math.round(pauseLen*0.4);
+      utt.onend=()=>{idxRef.current=idx+1;timerRef.current=setTimeout(next,ap);};
       utt.onerror=()=>{idxRef.current=idx+1;next();};
       window.speechSynthesis.speak(utt);
     };
-    if(window.speechSynthesis.getVoices().length>0){setTimeout(()=>next(),50);}
-    else{window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(()=>next(),50);};}
+    window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);};
   };
 
   const stop=()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);setSpeaking(false);};
 
   const processAndSpeak=async()=>{
-    if(!text.trim())return;
-    setLoading(true);
+    if(!text.trim())return;setLoading(true);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"You are a speech coach for TTS. Speaker: "+selected.name+" - "+selected.style+". Break into short sentences, add commas for natural pauses, spell out numbers. Output ONLY the reformatted text:\n\n"+text}]});
-      const out=d.content&&d.content[0]?d.content[0].text.trim():text;
-      setProcessed(out);speakNow(out);
-    }catch(e){setProcessed(text);speakNow(text);}
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"Speech coach for TTS. Speaker: "+selected.name+" - "+selected.style+". Reformat for natural speech: short sentences, commas for pauses, numbers spelled out. Return ONLY reformatted text:\n\n"+text}]});
+      speakNow(d&&d.content&&d.content[0]?d.content[0].text.trim():text);
+    }catch(e){speakNow(text);}
     setLoading(false);
   };
 
   const inp={width:"100%",background:"#000",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",color:WHITE,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.9};
 
-  return (
+  return(
     <div style={{...Sp}}>
       {showMVS&&<MusicVideoStudio onClose={()=>setShowMVS(false)} onSave={onSave}/>}
       <div style={{padding:"12px 18px",borderBottom:`1px solid ${GOLDDIM}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>AI WORKSTATION 02 — CINEMA VOICE ENGINE</div>
-          <h1 style={{...H1,fontSize:24,margin:0}}>TEXT TO LIFELIKE SPEECH</h1>
-        </div>
-        <button onClick={()=>setShowMVS(true)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"10px 20px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-          🎬 MUSIC VIDEO STUDIO
-        </button>
+        <div><div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>AI WORKSTATION 02 — CINEMA VOICE ENGINE</div><h1 style={{...H1,fontSize:24,margin:0}}>TEXT TO LIFELIKE SPEECH</h1></div>
+        <button onClick={()=>setShowMVS(true)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"10px 20px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>🎬 MUSIC VIDEO STUDIO</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"290px 1fr",minHeight:"calc(100vh - 120px)"}}>
-
-        {/* LEFT — voice list */}
         <div style={{borderRight:`1px solid ${GOLDDIM}`,background:"#030303",display:"flex",flexDirection:"column"}}>
           <div style={{padding:"10px 10px 6px"}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:8}}>VOICE LIBRARY — {filtered.length} / {VOICE_CHARACTERS.length}</div>
-            <div style={{marginBottom:5}}>
-              <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>GENDER</div>
-              <div style={{display:"flex",gap:4}}>
-                {GENDERS.map(g=><button key={g} onClick={()=>setFilterGender(g)} style={{flex:1,background:filterGender===g?GOLD:"#111",border:`1px solid ${filterGender===g?"#000":GOLDDIM}`,color:filterGender===g?"#000":WHITE,padding:"3px 0",cursor:"pointer",fontSize:10,fontWeight:900}}>{g}</button>)}
-              </div>
-            </div>
-            <div style={{marginBottom:5}}>
-              <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>AGE</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                {AGES.map(a=><button key={a} onClick={()=>setFilterAge(a)} style={{background:filterAge===a?GOLD:"#111",border:`1px solid ${filterAge===a?"#000":GOLDDIM}`,color:filterAge===a?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>{a}</button>)}
-              </div>
-            </div>
-            <div style={{marginBottom:6}}>
-              <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>ORIGIN</div>
-              <select value={filterOrigin} onChange={e=>setFilterOrigin(e.target.value)} style={{width:"100%",background:"#111",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"4px 8px",fontSize:11,outline:"none"}}>
-                {ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..."
-              style={{...inp,padding:"6px 10px",fontSize:11,height:30,marginBottom:0}}/>
+            <div style={{marginBottom:5}}><div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>GENDER</div><div style={{display:"flex",gap:4}}>{GENDERS.map(g=><button key={g} onClick={()=>setFilterGender(g)} style={{flex:1,background:filterGender===g?GOLD:"#111",border:`1px solid ${filterGender===g?"#000":GOLDDIM}`,color:filterGender===g?"#000":WHITE,padding:"3px 0",cursor:"pointer",fontSize:10,fontWeight:900}}>{g}</button>)}</div></div>
+            <div style={{marginBottom:5}}><div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>AGE</div><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{AGES.map(a=><button key={a} onClick={()=>setFilterAge(a)} style={{background:filterAge===a?GOLD:"#111",border:`1px solid ${filterAge===a?"#000":GOLDDIM}`,color:filterAge===a?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>{a}</button>)}</div></div>
+            <div style={{marginBottom:6}}><div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>ORIGIN</div><select value={filterOrigin} onChange={e=>setFilterOrigin(e.target.value)} style={{width:"100%",background:"#111",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"4px 8px",fontSize:11,outline:"none"}}>{ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..." style={{...inp,padding:"6px 10px",fontSize:11,height:30}}/>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 6px 80px"}}>
             {filtered.map(v=>(
-              <div key={v.id} onClick={()=>setSelVoice(v.id)}
-                style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:`2px solid ${selVoice===v.id?GOLD:GOLDDIM}`,cursor:"pointer"}}>
+              <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:`2px solid ${selVoice===v.id?GOLD:GOLDDIM}`,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:18}}>{v.emoji}</span>
-                    <div>
-                      <div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900,letterSpacing:1}}>{v.name}</div>
-                      <div style={{color:GOLDDIM,fontSize:10}}>{v.origin} · {v.gender} · {v.age}</div>
-                    </div>
+                    <div><div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900}}>{v.name}</div><div style={{color:GOLDDIM,fontSize:10}}>{v.origin} · {v.gender} · {v.age}</div></div>
                   </div>
-                  <button onClick={e=>{
-                    e.stopPropagation();
-                    setSelVoice(v.id);
-                    const intro="Hello, this is "+v.name+". "+v.desc+" I am testing the speaker settings.";
-                    speakWithVoice(v, intro);
-                  }}
-                    style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 10px",cursor:"pointer",fontSize:9,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap",flexShrink:0}}>
-                    ▶ TEST
-                  </button>
+                  <button onClick={e=>{e.stopPropagation();setSelVoice(v.id);speakOneShot(v,"Hello, this is "+v.name+". I am testing the speaker settings. "+v.desc);}}
+                    style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 10px",cursor:"pointer",fontSize:9,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap",flexShrink:0}}>▶ TEST</button>
                 </div>
                 <div style={{color:DIM,fontSize:10,lineHeight:1.5}}>{v.style}</div>
                 {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ SELECTED</div>}
@@ -1363,11 +1461,7 @@ function P6Voice({ onSave, setMediaLib }) {
             ))}
           </div>
         </div>
-
-        {/* RIGHT — controls in logical order */}
         <div style={{display:"flex",flexDirection:"column",background:"#030303",overflowY:"auto",padding:20}}>
-
-          {/* STEP 1 — Selected voice info + sliders */}
           <div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"10px 14px",marginBottom:14}}>
             <div style={{color:WHITE,fontSize:13,fontWeight:900}}>{selected.name} {selected.emoji} · {selected.origin} · {selected.gender}</div>
             <div style={{color:GOLDDIM,fontSize:11,marginTop:3}}>{selected.style}</div>
@@ -1375,73 +1469,38 @@ function P6Voice({ onSave, setMediaLib }) {
           </div>
           <div style={{background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",marginBottom:14}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:10}}>VOICE SETTINGS</div>
-            <div style={{marginBottom:10}}>
-              <div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:4}}>MOOD</div>
+            <div style={{marginBottom:10}}><div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:4}}>MOOD</div>
               <select value={mood} onChange={e=>setMood(e.target.value)} style={{width:"100%",background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"8px 12px",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}>
                 {["Neutral","Happy","Sad","Angry","Excited","Calm","Dramatic","Mysterious","Romantic","Sarcastic","Melancholic","Authoritative","Warm"].map(m=><option key={m} value={m} style={{background:"#000"}}>{m}</option>)}
               </select>
             </div>
-            {[["SPEED",speed,0.3,1.5,0.01,v=>setSpeed(v),speed.toFixed(2)+"x"],
-              ["PITCH",pitchV,0.3,2.0,0.01,v=>setPitchV(v),pitchV.toFixed(2)],
-              ["PAUSE (ms)",pauseLen,200,2000,50,v=>setPauseLen(v),pauseLen+"ms"],
-              ["VOLUME",volume,0.1,1.0,0.05,v=>setVolume(v),Math.round(volume*100)+"%"]
-            ].map(([label,val,mn,mx,st,setter,display])=>(
+            {[["SPEED",speed,0.3,1.5,0.01,v=>setSpeed(v),speed.toFixed(2)+"x"],["PITCH",pitchV,0.3,2.0,0.01,v=>setPitchV(v),pitchV.toFixed(2)],["PAUSE (ms)",pauseLen,200,2000,50,v=>setPauseLen(v),pauseLen+"ms"],["VOLUME",volume,0.1,1.0,0.05,v=>setVolume(v),Math.round(volume*100)+"%"]].map(([label,val,mn,mx,st,setter,display])=>(
               <div key={label} style={{marginBottom:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                  <span style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>{label}</span>
-                  <span style={{color:GOLD,fontSize:11,fontWeight:900}}>{display}</span>
-                </div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>{label}</span><span style={{color:GOLD,fontSize:11,fontWeight:900}}>{display}</span></div>
                 <input type="range" min={mn} max={mx} step={st} value={val} onChange={e=>setter(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
               </div>
             ))}
           </div>
-
-          {/* STEP 2 — Narration script */}
           <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>YOUR NARRATION SCRIPT</div>
-          <textarea value={text} onChange={e=>setText(e.target.value)}
-            placeholder="Paste your narration script here..."
-            style={{...inp,height:160,resize:"vertical",marginBottom:14}}/>
-
-          {/* STEP 3 — Test and Reset boxes */}
+          <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Paste your narration script here..." style={{...inp,height:160,resize:"vertical",marginBottom:14}}/>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
             <div style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"12px 14px"}}>
-              <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>TEST YOUR SCRIPT</div>
-              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Hear your script now with the selected voice and current settings before preparing.</div>
-              <button onClick={()=>speaking?stop():speakNow(text)} disabled={!text.trim()}
-                style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1}}>
-                {speaking?"⏹ STOP":"▶ TEST SCRIPT"}
-              </button>
+              <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>TEST SCRIPT</div>
+              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Hear your script with current voice and settings.</div>
+              <button onClick={()=>speaking?stop():speakNow(text)} disabled={!text.trim()} style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1}}>{speaking?"⏹ STOP":"▶ TEST SCRIPT"}</button>
             </div>
             <div style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"12px 14px"}}>
               <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>RESET</div>
-              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Clear script, stop speech and reset all settings to default.</div>
-              <button onClick={()=>{stop();setText("");setProcessed("");setSaved(false);setSavedToLib(false);setSpeed(0.82);setPitchV(1.0);setPauseLen(700);setVolume(1.0);setMood("Neutral");}}
-                style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
-                ↺ RESET ALL
-              </button>
+              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Clear script and reset all settings.</div>
+              <button onClick={()=>{stop();setText("");setSavedToLib(false);setSpeed(0.82);setPitchV(1.0);setPauseLen(700);setVolume(1.0);setMood("Neutral");}} style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>↺ RESET ALL</button>
             </div>
           </div>
-
-          {/* STEP 4 — Prepare and Speak */}
-          <button onClick={processAndSpeak} disabled={loading||!text.trim()}
-            style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
+          <button onClick={processAndSpeak} disabled={loading||!text.trim()} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
             {loading?"⟳ PREPARING AND SPEAKING...":"✦ PREPARE AND SPEAK"}
           </button>
-
-          {/* STEP 5 — Save to Library */}
-          <button onClick={()=>{
-            if(text.trim()&&onSave){
-              const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};
-              onSave(asset);
-              if(setMediaLib)setMediaLib(p=>[...p,asset]);
-              setSavedToLib(true);
-              setTimeout(()=>setSavedToLib(false),2500);
-            }
-          }} disabled={!text.trim()}
-            style={{background:savedToLib?"#061406":"transparent",border:`1px solid ${savedToLib?"#22c55e":GOLD}`,color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"12px",fontSize:12,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",fontWeight:900,opacity:!text.trim()?0.5:1}}>
+          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}} disabled={!text.trim()} style={{background:savedToLib?"#061406":"transparent",border:`1px solid ${savedToLib?"#22c55e":GOLD}`,color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"12px",fontSize:12,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",fontWeight:900,opacity:!text.trim()?0.5:1}}>
             {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
           </button>
-
         </div>
       </div>
     </div>
@@ -1469,19 +1528,19 @@ const CINEMA_TECHNIQUES = [
 
 
 const DOC_SCENES = [
-  { title: "AI For Humanity — Opening", prompt: "MOTION: Camera drifts slowly forward through a vast dark cathedral. Ancient stone arches. Screens on both walls flicker — caveman torch, pyramids, moon landing, mobile phone, cold blue AI server racks. Gold title glows centre. Film grain. Letterbox. Warm gold grade. Dust particles drift in shafts of light.", duration: 60 },
-  { title: "Who Are These Hairless Apes", prompt: "MOTION: Hard cut rhythm between two shots. Shot 1: Man in animal pelts on a rock in a cave. Cave paintings behind him. Boom mic visible top corner. Deadpan to camera. Subtitle: OTHER TRIBE SUSPICIOUS OF HOW THEY ARRANGE THEIR ROCKS. Shot 2: Identical modern news pundit at desk. Same fury. Same posture. Subtitle: 2025 CE. Amber grade. Cut between them every 4 seconds.", duration: 60 },
-  { title: "Why We Built Pyramids and TikTok", prompt: "MOTION: Vertical split frame. Left: ancient human on golden savanna, hand shielding eyes, scanning horizon, wind moves tall grass. Text overlay: 35,000 BCE. Right: modern man in bed, cold blue phone glow on his face, same tense scanning expression. Text: 2025 CE. Same brain. Different predator. Slow zoom in on both faces simultaneously. Black bars top and bottom.", duration: 60 },
-  { title: "Fire, Wheels and Wi-Fi", prompt: "MOTION: Camera slowly pushes in. Three people crouch in a vast dark server room. Blue rack lights stretch to infinity on both sides. They huddle around a single warm amber lantern on the floor. One points at a laptop screen. One nods slowly. One looks like they might cry. Gold grade on three faces only. Everything beyond them cold blue. Dust drifts upward through the lantern light.", duration: 60 },
-  { title: "Gods, Gurus and Groupthink", prompt: "MOTION: Slow aerial pull-back reveals vast golden landscape. Tiny guru figure speaks to thousands below, all facing away from camera. Ancient deity statue looms in distance. Sistine Chapel hands reaching in upper corner. Camera continues rising. The crowd never turns. The guru never stops. Hold on the scale of it.", duration: 60 },
-  { title: "Love, War and Memes", prompt: "MOTION: Camera moves slowly at ground level through an outdoor jazz festival at golden dusk. Couples on blankets. Strangers dancing. Eyes closed. Hands in the air. Then hard cut to black. Hold 3 seconds. White text: AND WAR. Hold. White text: AND MEMES. Warm amber grade throughout festival. Complete silence after the cut.", duration: 60 },
-  { title: "Oops We Broke the Planet", prompt: "MOTION: Vertical split frame held completely still for 10 full seconds. Left: vivid coral reef, colour, fish, light shafting down from surface. Text: 1980s. Right: same reef bleached bone white, nearly silent, one fish drifts. Text: 2024. Caption centre: WE KNEW SINCE THE 1970s. No music. No narration. Just the two images side by side breathing.", duration: 60 },
-  { title: "Cash, Crypto and Conundrums", prompt: "MOTION: Vertical split frame. Held completely still. Left: woman on yacht at golden hour, champagne, total ease, ocean behind her. Right: children at a hand pump on cracked dry earth, jerrycans, waiting in line, harsh midday light. Caption centre: SAME PLANET. SAME YEAR. Hold in complete silence for 10 full seconds. Camera does not move. Nothing is said.", duration: 60 },
-  { title: "Laws, Lies and Liberty", prompt: "MOTION: Two news presenters sit back-to-back at a curved studio desk. DEBATE NIGHT glows on screens behind both of them. Both talk simultaneously into separate cameras. Neither listens. Camera slowly pulls back to reveal they share the same desk. Nobody is watching. They keep going. Gold and blue grade splits down the centre of frame.", duration: 60 },
-  { title: "Art, Angst and Algorithms", prompt: "MOTION: Extreme close-up. Young child in a vast golden concert hall. Eyes wide open. Two tears run slowly. Not sad — overwhelmed by something too large and beautiful. Orchestra blurred warm gold behind. Camera holds completely still. One tear catches the light from the stage. Hold longer than comfortable. Warmest gold grade in the film.", duration: 60 },
-  { title: "Ethics, Empathy and Existential Dread", prompt: "MOTION: Wide shot. Elderly man and woman on a weathered park bench. Autumn leaves fall slowly around them. Hands folded. Neither speaks. They have survived everything. Camera holds wide and completely still. Wind moves through the leaves. They do not move. Hold significantly longer than feels comfortable. Warm gold grade.", duration: 60 },
-  { title: "What We Could've Done Differently", prompt: "MOTION: Slow push in. A woman places a folded paper into a wooden ballot box. She is smiling, eyes wet. Behind her a row of women watch — elderly, young, some with tears, none performing. Morning light from a window on the left. A quiet room. A small wooden box. Camera pushes in slowly on her face as she steps back. Warm amber grade.", duration: 60 },
-  { title: "Dear Humans Get It Together", prompt: "MOTION: Camera rises slowly. Children planting saplings on a deforested hillside at golden hour. Muddy hands, big smiles, getting it wrong, trying again, laughing. The boy closest holds a tiny sapling and grins directly into the lens. Camera continues rising slowly above them as light turns deep amber. Fade to black. Title card: WE MADE YOU TO BE BETTER THAN US. WE REALLY HOPE YOU ARE.", duration: 60 },
+  { title: "AI For Humanity — Opening", prompt: "Vast dark cathedral. Ancient stone arches. Screens lining both walls — caveman with torch, pyramids, clay tablets, moon landing, mobile phone, AI server racks cold blue. Gold title glows centre: HUMANITY FOR FUTURE AI. Camera drifts slowly forward. Film grain. Letterbox bars. Warm gold grade.", duration: 60 },
+  { title: "Who Are These Hairless Apes", prompt: "Mock documentary. Man in animal pelts on rock in cave. Cave paintings behind. Boom mic visible top corner. Deadpan to camera. Subtitle: OTHER TRIBE SUSPICIOUS OF HOW THEY ARRANGE THEIR ROCKS. Hard cut to identical modern news pundit at desk. Same fury. Subtitle: 2025 CE. Amber grade.", duration: 60 },
+  { title: "Why We Built Pyramids and TikTok", prompt: "Split frame. Left: ancient human on golden savanna, hand shielding eyes, scanning horizon. Text: 35,000 BCE. Right: modern man in bed, cold blue phone glow, same tense expression. Text: 2025 CE. Same brain. Different predator. Black bars top and bottom.", duration: 60 },
+  { title: "Fire, Wheels and Wi-Fi", prompt: "Three people crouch in vast dark server room. Cold blue racks to infinity both sides. They huddle around a single warm amber lantern on floor looking at laptop. One points. One nods. One looks like they might cry. Gold grade on three faces only. Everything else cold blue.", duration: 60 },
+  { title: "Gods, Gurus and Groupthink", prompt: "Vast golden landscape. Guru figure speaks to thousands facing away from camera. Ancient deity statue looms in background. Sistine Chapel hands reaching in upper corner. Single silhouette on lit screen before crowd. Text: GODS GURUS AND GROUPTHINK. Belief. Influence. Identity.", duration: 60 },
+  { title: "Love, War and Memes", prompt: "Outdoor jazz festival at golden dusk. Couples on blankets. Strangers dancing. Eyes closed in music. Camera moves slowly through crowd at ground level. Then cut to black. Text: AND WAR. Hold. Text: AND MEMES. Warm amber grade.", duration: 60 },
+  { title: "Oops We Broke the Planet", prompt: "Split frame. Left: vivid coral reef, colour, fish, light shafting. Text: 1980s. Right: same reef bleached bone white, near silent. Text: 2024. Caption: WE KNEW SINCE THE 1970s. Hold ten seconds. Complete silence. No music. No narration.", duration: 60 },
+  { title: "Cash, Crypto and Conundrums", prompt: "Split frame. Left: woman on yacht at golden hour, champagne, total ease. Right: children at hand pump on cracked earth, jerrycans, waiting. Caption: SAME PLANET. SAME YEAR. Hold in complete silence ten full seconds. No music. No narration.", duration: 60 },
+  { title: "Laws, Lies and Liberty", prompt: "Two news presenters back to back at curved studio desk. DEBATE NIGHT on screens. Both talking simultaneously into separate cameras. Neither listening. Camera pulls back to reveal they are at the same desk. Nobody watching. They keep going. Gold and blue grade.", duration: 60 },
+  { title: "Art, Angst and Algorithms", prompt: "Extreme close up. Young child in vast golden concert hall. Eyes wide. Two tears. Not sad. Overwhelmed by something too large and beautiful for words. Orchestra blurred gold behind. Camera still. One tear catches the light. Hold. Warmest gold grade in the film.", duration: 60 },
+  { title: "Ethics, Empathy and Existential Dread", prompt: "Elderly man and woman on weathered park bench. Autumn leaves falling. Hands folded. Neither speaking. Completely present together. They have survived everything. Camera holds wide and still. Warm gold grade. Hold longer than feels comfortable.", duration: 60 },
+  { title: "What We Could've Done Differently", prompt: "A woman places a folded paper into a wooden ballot box. Smiling, eyes wet. Behind her a row of women watch — elderly, young, some with tears, none performing. Morning light from a window. A quiet room. A small wooden box. Everything we should have done sooner. Warm amber.", duration: 60 },
+  { title: "Dear Humans Get It Together", prompt: "Children planting saplings in a deforested hillside at golden hour. Muddy hands, big smiles, getting it wrong, trying again, laughing. Boy closest holds tiny sapling, grins into lens. Camera rises slowly above them as light turns amber. Fade to black. Title: WE MADE YOU TO BE BETTER THAN US. WE REALLY HOPE YOU ARE.", duration: 60 },
 ];
 
 function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
@@ -1493,7 +1552,7 @@ function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
         style={{width:"100%",background:"transparent",border:"none",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>
-          <span style={{color:"#e8c96d",fontSize:11,fontWeight:900,letterSpacing:3}}>AI FOR HUMANITY — DOCUMENTARY RECOVERY - 13 SCENES</span>
+          <span style={{color:"#e8c96d",fontSize:11,fontWeight:900,letterSpacing:3}}>AI FOR HUMANITY — DOCUMENTARY RECOVERY · 13 SCENES</span>
         </div>
         <span style={{color:"#a07820",fontSize:12}}>{open?"▲":"▼"}</span>
       </button>
@@ -1505,7 +1564,7 @@ function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
               <button key={i}
                 onClick={()=>{setTitle(s.title);setPrompt(s.prompt);setDuration(s.duration);setLoaded(i);}}
                 style={{background:loaded===i?"#e8c96d14":"#000",border:`1px solid ${loaded===i?"#e8c96d":"#a07820"}`,padding:"10px 12px",cursor:"pointer",textAlign:"left",fontFamily:"'Rajdhani',sans-serif"}}>
-                <div style={{color:"#e8c96d",fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:3}}>SCENE {String(i+1).padStart(2,"0")} - {s.duration}s</div>
+                <div style={{color:"#e8c96d",fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:3}}>SCENE {String(i+1).padStart(2,"0")} · {s.duration}s</div>
                 <div style={{color:"#d4c9a8",fontSize:12,fontWeight:700}}>{s.title}</div>
                 {loaded===i&&<div style={{color:"#22c55e",fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ LOADED</div>}
               </button>
@@ -1563,28 +1622,23 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     setProgress(8);
     try{
       const refInstruction=refDataUrl
-        ? "\nThe user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible."
+        ? `
+
+The user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.`
         : "";
 
-      const directorPrompt="You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer. Write a COMPLETE JavaScript canvas function for this exact scene.\n\nSCENE: "+JSON.stringify(prompt)+"\nDURATION: "+duration+" seconds"+refInstruction+"\n\nFUNCTION SIGNATURE: function drawFrame(ctx, W, H, t, sec)\nt=0 to 1 (overall progress), sec=current second, W=1920, H=1080\n\nCRITICAL REQUIREMENTS — NO CARTOONS, NO OUTLINES, NO FLAT COLOURS:\n\n1. BACKGROUND: Always use createLinearGradient or createRadialGradient. Never solid fills for sky, ground or environment.\n\n2. HUMAN FIGURES: Build with ellipses and rects using SKIN TONE gradients (rgba(210,160,120,1) light, rgba(160,100,60,1) medium, rgba(90,55,30,1) dark). Add subtle shadow beneath. Animate breathing with Math.sin(sec*0.9)*2 on torso height. Eyes blink with Math.sin(sec*0.4)>0.92.\n\n3. LIGHTING: Use createRadialGradient for all light sources — candles rgba(255,200,60,0.9), moonlight rgba(200,220,255,0.4), sunlight rgba(255,240,200,0.6). Cast directional shadows.\n\n4. ATMOSPHERE: Add depth with 3 parallax layers using ctx.save/translate. Far layer moves t*W*0.01, mid t*W*0.03, near t*W*0.06.\n\n5. WATER/OCEAN: 8 wave layers. Each: createLinearGradient deep navy to near-black. Path using Math.sin(x*0.008+sec*(0.15+i*0.06)+i)*20.\n\n6. ANIMATION: Every element must move — curtains sway Math.sin(sec*1.2), flames flicker Math.sin(sec*8+i)*3, leaves fall, dust drifts.\n\n7. POST PROCESSING (draw last):\n   - Vignette: createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.85) transparent to rgba(0,0,0,0.75)\n   - Letterbox: fillRect(0,0,W,H*0.074) and fillRect(0,H*0.926,W,H*0.074) black\n   - Film grain: 40 random 1px dots rgba(180,180,180,0.009)\n   - Fade in: if(t<0.04) fillStyle rgba(0,0,0,"+String(1)+"-t*25)\n   - Fade out: if(t>0.93) fillStyle rgba(0,0,0,(t-0.93)*14)\n\n8. COLOUR GRADE (draw last, globalAlpha 0.06):\n   - Warm scene: fillStyle rgba(255,140,40,0.06) over full canvas\n   - Night scene: fillStyle rgba(20,40,80,0.08) over full canvas\n\nReturn ONLY the complete function. No markdown. No explanation. Start with exactly: function drawFrame(ctx, W, H, t, sec) {";
-
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:directorPrompt}]}).catch(e=>{addLog("Failed: "+e.message);setGenerating(false);return null;});
-      if(!d){return;}
-
-      if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
-
-      let fnCode=d.content&&d.content[0]?d.content[0].text.trim():"";
-      fnCode=fnCode.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").trim();
+      const directorPrompt="You are the MandaStrong Cinema Engine. PHOTOREALISTIC ONLY. NO cartoons. NO outlines. NO flat colours.\n\nSCENE: "+JSON.stringify(prompt)+"\nDURATION: "+duration+" seconds"+refInstruction+"\n\nWrite: function drawFrame(ctx, W, H, t, sec) — t=0 to 1, W=1920, H=1080\n\nMANDATORY: All backgrounds createLinearGradient min 3 stops. Humans with skin-tone gradients, breathing animation. All lights as radialGradient. Ocean: 8 bezier wave paths. Parallax 3 depth layers. Vignette, letterbox, film grain, fade in/out. Return ONLY the function starting with: function drawFrame(ctx, W, H, t, sec) {";
+      fnCode=fnCode.replace(/```javascript|```js|```/g,"").trim();
       const fnStart=fnCode.indexOf("function drawFrame");
       if(fnStart>0)fnCode=fnCode.slice(fnStart);
 
       addLog("Scene designed. Rendering frames...");setProgress(22);
 
       // Strip any markdown or preamble
-      fnCode=fnCode.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").replace(/^[\s\S]*?(function drawFrame)/,"$1").trim();
+      fnCode=fnCode.replace(/```[a-z]*/g,"").replace(/```/g,"").trim();
       if(fnCode.indexOf("function drawFrame")>0)fnCode=fnCode.slice(fnCode.indexOf("function drawFrame"));
       // Remove template literals that break Function constructor
-      fnCode=fnCode.replace(new RegExp(String.fromCharCode(96)+"[^"+String.fromCharCode(96)+"]*"+String.fromCharCode(96),"g"),s=>JSON.stringify(s.slice(1,-1)));
+      fnCode=fnCode.replace(/`[^`]*`/g,s=>JSON.stringify(s.slice(1,-1)));
       let drawFn;
       try{
         const bOpen=fnCode.indexOf("{");
@@ -1593,11 +1647,15 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
         drawFn=new Function("ctx","W","H","t","sec",body);
       }catch(e){
         addLog("Retrying with simplified renderer...");
-        const rd=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"You are the MandaStrong Cinema Engine. Write a photorealistic canvas renderer. NO cartoons. NO outlines. Use gradients only. Scene: "+JSON.stringify(prompt)+". Human figures with skin tone gradients. Animated breathing, blinking. Atmospheric lighting. Vignette. Letterbox. Film grain. Function: function drawFrame(ctx,W,H,t,sec). Return only the function."}]});
-        let rc=rd&&rd.content&&rd.content[0]?rd.content[0].text.trim():"";
-
-
-        rc=rc.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").trim();
+        const retry=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
+            messages:[{role:"user",content:`Write a cinematic canvas renderer for: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]})
+        });
+        const rd=await retry.json();
+        let rc=rd.content&&rd.content[0]?rd.content[0].text.trim():"";
+        rc=rc.replace(/```javascript|```js|```/g,"").trim();
         const ri=rc.indexOf("function drawFrame");if(ri>0)rc=rc.slice(ri);
         const rb=rc.indexOf("{");const rbc=rc.lastIndexOf("}");
         const rbody=rb>0&&rbc>rb?rc.slice(rb+1,rbc):"";
@@ -1668,7 +1726,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       const blob=new Blob(chunks,{type:mimeType});
       const url=URL.createObjectURL(blob);
       setVideoUrl(url);setProgress(100);
-      addLog("✓ Scene complete — "+(blob.size/1024/1024).toFixed(1)+"MB - "+duration+"s");
+      addLog("✓ Scene complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+duration+"s");
 
       const fn=(title||"Scene")+"_"+duration+"s.webm";
       try{
@@ -1699,10 +1757,10 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"12px 20px",borderBottom:`1px solid ${GOLDDIM}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
-          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG CINEMA ENGINE - SCENE GENERATION - CLAUDE POWERED</div>
+          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG CINEMA ENGINE · SCENE GENERATION · CLAUDE POWERED</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,letterSpacing:5,margin:0,fontSize:24,textTransform:"uppercase"}}>VIDEO GENERATOR</h1>
         </div>
-        <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ CLAUDE WRITES YOUR SCENE - ANY PROMPT - ANY SUBJECT</div>
+        <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ CLAUDE WRITES YOUR SCENE · ANY PROMPT · ANY SUBJECT</div>
       </div>
       <DocRecoveryPanel setTitle={setTitle} setPrompt={setPrompt} setDuration={setDuration}/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 420px",minHeight:"calc(100vh - 120px)"}}>
@@ -1750,7 +1808,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
                 <div style={{color:WHITE,fontSize:12,fontWeight:700}}>⬆ CLICK TO UPLOAD REFERENCE</div>
-                <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG - PNG - MP4 - WEBM</div>
+                <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG · PNG · MP4 · WEBM</div>
               </div>
             )}
             <input ref={refMediaRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={handleRefUpload}/>
@@ -1850,7 +1908,7 @@ function P1({ go }) {
           <div style={{fontSize:11,color:DIM,letterSpacing:6,marginBottom:12}}>CINEMA INTELLIGENCE PLATFORM — EST. 2026</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"clamp(34px,6vw,58px)",fontWeight:900,color:GOLD,letterSpacing:5,lineHeight:1,textShadow:`0 0 60px ${GOLD}dd,0 0 120px ${GOLD}66`}}>MANDA STRONG</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"clamp(34px,6vw,58px)",fontWeight:900,color:GOLD,letterSpacing:5,lineHeight:1,textShadow:`0 0 60px ${GOLD}dd,0 0 120px ${GOLD}66`,marginBottom:14}}>STUDIO</div>
-          <div style={{color:WHITE,fontSize:12,letterSpacing:4,marginBottom:28,fontWeight:600}}>600+ AI TOOLS - 8K EXPORT - UP TO 3-HOUR FILMS</div>
+          <div style={{color:WHITE,fontSize:12,letterSpacing:4,marginBottom:28,fontWeight:600}}>600+ AI TOOLS · 8K EXPORT · UP TO 3-HOUR FILMS</div>
           <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap"}}>
             <button onClick={()=>go(4)} style={{...G("gold",false),fontSize:14,padding:"14px 38px",letterSpacing:3}}>START CREATING</button>
             <button onClick={()=>go(4)} style={{...G("out",false),fontSize:14,padding:"14px 38px",letterSpacing:3}}>LOGIN / REGISTER</button>
@@ -1868,12 +1926,24 @@ function P1({ go }) {
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
           <button onClick={()=>{
-            // Trigger PWA install if available, otherwise open app directly
+            // Detect device and trigger correct install method
+            const ua = navigator.userAgent.toLowerCase();
+            const isIOS = /iphone|ipad|ipod/.test(ua);
+            const isAndroid = /android/.test(ua);
+            const isMobile = isIOS || isAndroid;
+            const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
+
             if(window.deferredInstallPrompt){
+              // Chrome/Edge/Android — native install prompt
               window.deferredInstallPrompt.prompt();
               window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
+            } else if(isIOS){
+              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
+            } else if(isAndroid){
+              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
             } else {
-              window.open("https://mandastrongstudio2026.bolt.host","_blank");
+              // Desktop — look for install icon in address bar
+              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
             }
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
@@ -1886,46 +1956,27 @@ function P1({ go }) {
 }
 
 function P2({ go }) {
-  const pipeline=[
-    {n:"01",ic:"✍",t:"WRITE",d:"Script, logline, scenes",p:5},
-    {n:"02",ic:"🎙",t:"VOICE",d:"54 AI voice characters",p:6},
-    {n:"03",ic:"🎨",t:"IMAGE",d:"AI-generated stills",p:7},
-    {n:"04",ic:"🎬",t:"VIDEO",d:"Cinema scene engine",p:8},
-    {n:"05",ic:"⏱",t:"TIMELINE",d:"Multi-track editor",p:13},
-    {n:"06",ic:"🎚",t:"MIX",d:"4-channel audio mixer",p:15},
-    {n:"07",ic:"⚡",t:"RENDER",d:"Up to 4K export",p:16},
-  ];
-  const templates=[
-    {ic:"🎬",t:"FEATURE FILM",d:"90-minute drama or action film.",pages:[5,6,8,13,15,16],bg:"#1a0800"},
-    {ic:"🎥",t:"DOCUMENTARY",d:"60-minute documentary with narration and b-roll.",pages:[5,6,8,13,15,16],bg:"#061a06"},
-    {ic:"🎵",t:"MUSIC VIDEO",d:"3-5 minute beat-synced cinematic music video.",pages:[6,8,13,16],bg:"#0a0618"},
-    {ic:"👨‍👩‍👧",t:"FAMILY MOVIE",d:"30-minute family film — easy workflow, great results.",pages:[5,6,8,13,16],bg:"#1a0a00"},
-    {ic:"🎭",t:"SHORT FILM",d:"10-minute narrative short. Logline to export in one session.",pages:[5,6,8,13,16],bg:"#0a0a18"},
-    {ic:"📖",t:"AUDIOBOOK",d:"Narrated audiobook with cinematic score and title cards.",pages:[5,6,15,16],bg:"#181200"},
-  ];
-  return (
+  const pipeline=[{n:"01",ic:"✍",t:"WRITE",d:"Script, logline, scenes",p:5},{n:"02",ic:"🎙",t:"VOICE",d:"54 AI voice characters",p:6},{n:"03",ic:"🎨",t:"IMAGE",d:"AI-generated stills",p:7},{n:"04",ic:"🎬",t:"VIDEO",d:"Cinema scene engine",p:8},{n:"05",ic:"⏱",t:"TIMELINE",d:"Multi-track editor",p:13},{n:"06",ic:"🎚",t:"MIX",d:"4-channel audio mixer",p:15},{n:"07",ic:"⚡",t:"RENDER",d:"Up to 4K export",p:16}];
+  const templates=[{ic:"🎬",t:"FEATURE FILM",d:"90-minute drama.",pages:[5,6,8,13,15,16],bg:"#1a0800"},{ic:"🎥",t:"DOCUMENTARY",d:"60-minute documentary.",pages:[5,6,8,13,15,16],bg:"#061a06"},{ic:"🎵",t:"MUSIC VIDEO",d:"Beat-synced cinematic video.",pages:[6,8,13,16],bg:"#0a0618"},{ic:"🎭",t:"SHORT FILM",d:"10-minute narrative.",pages:[5,6,8,13,16],bg:"#0a0a18"},{ic:"👨‍👩‍👧",t:"FAMILY MOVIE",d:"30-minute family film.",pages:[5,6,8,13,16],bg:"#1a0a00"},{ic:"📖",t:"AUDIOBOOK",d:"Narrated audiobook.",pages:[5,6,15,16],bg:"#181200"}];
+  return(
     <div style={{...Sp,padding:"0 0 40px"}}>
       <div style={{padding:"20px 24px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO - CINEMA INTELLIGENCE PLATFORM</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,4vw,40px)",fontWeight:900,letterSpacing:6,margin:0}}>STUDIO DASHBOARD</h1>
-        </div>
+        <div><div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM</div><h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,4vw,40px)",fontWeight:900,letterSpacing:6,margin:0}}>STUDIO DASHBOARD</h1></div>
         <button onClick={()=>go(5)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 28px",fontSize:13,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>+ NEW PROJECT</button>
       </div>
       <div style={{padding:"0 24px 20px"}}>
         <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:12}}>PRODUCTION PIPELINE</div>
-        <div style={{display:"flex",gap:0,overflowX:"auto",paddingBottom:4}}>
+        <div style={{display:"flex",gap:0,overflowX:"auto"}}>
           {pipeline.map((step,i)=>(
             <div key={step.n} style={{display:"flex",alignItems:"center",flexShrink:0}}>
-              <div onClick={()=>go(step.p)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"14px 16px",cursor:"pointer",textAlign:"center",minWidth:130}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#100a00";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="#0a0800";}}>
-                <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,marginBottom:6}}>STEP {step.n}</div>
-                <div style={{fontSize:22,marginBottom:6}}>{step.ic}</div>
-                <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:3}}>{step.t}</div>
-                <div style={{color:WHITE,fontSize:10,lineHeight:1.4}}>{step.d}</div>
+              <div onClick={()=>go(step.p)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"14px 16px",cursor:"pointer",textAlign:"center",minWidth:120}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;}}>
+                <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,marginBottom:4}}>STEP {step.n}</div>
+                <div style={{fontSize:20,marginBottom:4}}>{step.ic}</div>
+                <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:2,marginBottom:2}}>{step.t}</div>
+                <div style={{color:WHITE,fontSize:10,lineHeight:1.3}}>{step.d}</div>
               </div>
-              {i<pipeline.length-1&&<div style={{color:GOLDDIM,fontSize:16,padding:"0 4px",flexShrink:0}}>›</div>}
+              {i<pipeline.length-1&&<div style={{color:GOLDDIM,fontSize:14,padding:"0 3px",flexShrink:0}}>›</div>}
             </div>
           ))}
         </div>
@@ -1934,20 +1985,14 @@ function P2({ go }) {
         <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:12}}>QUICK START TEMPLATES</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
           {templates.map(tmpl=>(
-            <div key={tmpl.t} style={{background:tmpl.bg,border:`1px solid ${GOLDDIM}33`,padding:"18px 20px",cursor:"pointer"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                <span style={{fontSize:28}}>{tmpl.ic}</span>
-                <span style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:2}}>{tmpl.t}</span>
-              </div>
-              <div style={{color:WHITE,fontSize:12,lineHeight:1.7,marginBottom:12}}>{tmpl.d}</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+            <div key={tmpl.t} style={{background:tmpl.bg,border:`1px solid ${GOLDDIM}33`,padding:"16px 18px",cursor:"pointer"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:24}}>{tmpl.ic}</span><span style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2}}>{tmpl.t}</span></div>
+              <div style={{color:WHITE,fontSize:12,lineHeight:1.6,marginBottom:10}}>{tmpl.d}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                 {tmpl.pages.map(p=>(
-                  <button key={p} onClick={()=>go(p)}
-                    style={{background:"transparent",border:`1px solid ${GOLDDIM}`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.color=GOLDDIM;}}>PAGE {p}</button>
+                  <button key={p} onClick={()=>go(p)} style={{background:"transparent",border:`1px solid ${GOLDDIM}`,color:GOLDDIM,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.color=GOLDDIM;}}>P{p}</button>
                 ))}
               </div>
             </div>
@@ -2004,7 +2049,7 @@ function P3() {
                   <div style={{textAlign:"center",padding:16}}>
                     <div style={{color:GOLDDIM,fontSize:28,marginBottom:8}}>🎬</div>
                     <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>CLICK TO UPLOAD</div>
-                    <div style={{color:GOLDDIM,fontSize:9,marginTop:4}}>MP4 - WEBM - MOV - JPG - PNG</div>
+                    <div style={{color:GOLDDIM,fontSize:9,marginTop:4}}>MP4 · WEBM · MOV · JPG · PNG</div>
                   </div>
                 )}
                 {uploads[i]&&(
@@ -2035,7 +2080,7 @@ function P3() {
                 </button>
               ):(
                 <div>
-                  <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginBottom:6}}>✓ {uploads[i].name.slice(0,28)} - {uploads[i].size}MB</div>
+                  <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginBottom:6}}>✓ {uploads[i].name.slice(0,28)} · {uploads[i].size}MB</div>
                   <button onClick={()=>refs[i].current&&refs[i].current.click()}
                     style={{...G("out",false),width:"100%",padding:"8px",fontSize:10,letterSpacing:2}}>
                     ↻ REPLACE
@@ -2066,7 +2111,6 @@ function P4({ go, setUser }) {
   const [name,setName]=useState(""); const [re,setRe]=useState("");
   const inp={width:"100%",background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const [loginOk,setLoginOk]=useState(false);
-  const [displayCount,setDisplayCount]=useState(()=>{try{return parseInt(localStorage.getItem("ms_sub_count")||"0")||0;}catch{return 0;}});
   const login=()=>{
     if(email==="woolleya129@gmail.com"&&pass==="Mangler1970!!"){
       setLoginOk(true);
@@ -2079,13 +2123,6 @@ function P4({ go, setUser }) {
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:1000,margin:"0 auto"}}>
-        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
-          <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 36px",textAlign:"center",boxShadow:`0 0 24px ${GOLD}33`}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LIVE SUBSCRIBERS</div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:38,fontWeight:900,lineHeight:1,textShadow:`0 0 20px ${GOLD}99`}}>{displayCount.toLocaleString()}</div>
-            <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING DAILY</div>
-          </div>
-        </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:36}}>
           <div style={{...Card()}}>
             <div style={{fontSize:11,color:GOLD,letterSpacing:3,marginBottom:8,fontWeight:700}}>EXISTING USER</div>
@@ -2158,7 +2195,7 @@ function P11({ mediaLib, setMediaLib }) {
           style={{border:`2px dashed ${GOLDDIM}`,padding:"50px 40px",textAlign:"center",cursor:"pointer",marginBottom:16}}>
           <div style={{fontSize:36,marginBottom:10}}>🎬</div>
           <div style={{color:WHITE,fontWeight:900,fontSize:16,letterSpacing:3}}>DRAG & DROP YOUR MEDIA HERE</div>
-          <div style={{color:WHITE,fontSize:13,marginTop:8,letterSpacing:1}}>Or click to browse - Video - Audio - Images</div>
+          <div style={{color:WHITE,fontSize:13,marginTop:8,letterSpacing:1}}>Or click to browse · Video · Audio · Images</div>
         </div>
         {mediaLib.length>0&&(
           <div>
@@ -2238,7 +2275,7 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
               Object.keys(merged).forEach(k=>{merged[k]=(merged[k]||[]).map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));});
               return merged;
             });
-            alert("✓ All tracks synced — "+videoAssets.length+" video clips - "+audioAssets.length+" audio tracks");
+            alert("✓ All tracks synced — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⚡ SYNC ALL TRACKS</button>
           <button onClick={()=>go(16)} style={{...G("gold",false)}}>→ RENDER</button>
           <button onClick={()=>setTimeline({})} style={{...G("out",true)}}>CLEAR ALL</button>
@@ -2446,10 +2483,13 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         const scenePrompt=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/\d+s$/,"").trim();
         log("  Regenerating: "+scenePrompt.slice(0,40)+"...");
         try{
-          const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:"Write a JavaScript canvas function for this cinematic scene: "+JSON.stringify(scenePrompt)+". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, depth, atmosphere. t=0-1 progress. Return only the function."}]}).catch(e=>{log("  Failed: "+e.message);return null;});
-          if(!d){return null;}
-
-
+          const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+              messages:[{role:"user",content:"Write a JavaScript canvas function for this cinematic scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]})
+          });
+          const d=await res.json();
           let code=d.content&&d.content[0]?d.content[0].text.trim():"";
           code=code.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").trim();
           const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
@@ -2702,7 +2742,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"18px 20px",marginBottom:16}}>
             <button onClick={startRender} disabled={rendering||clips.length===0}
               style={{...G("gold",false),width:"100%",padding:"18px",fontSize:14,letterSpacing:3,opacity:rendering||clips.length===0?0.5:1,marginBottom:10}}>
-              {rendering?"RENDERING... "+progress+"%":"START RENDER — "+quality+" - "+fps+"fps - "+clips.length+" CLIP"+(clips.length!==1?"S":"")}
+              {rendering?"RENDERING... "+progress+"%":"START RENDER — "+quality+" · "+fps+"fps · "+clips.length+" CLIP"+(clips.length!==1?"S":"")}
             </button>
           </div>
           <div style={{display:"flex",gap:8}}>
@@ -2719,7 +2759,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             ):(
               <div style={{textAlign:"center",padding:20}}>
                 <div style={{color:GOLD,fontSize:28,marginBottom:8}}>RENDER</div>
-                <div style={{color:DIM,fontSize:10,lineHeight:1.8}}>{quality} - {fps}fps<br/>{clips.length} clip{clips.length!==1?"s":""} queued</div>
+                <div style={{color:DIM,fontSize:10,lineHeight:1.8}}>{quality} · {fps}fps<br/>{clips.length} clip{clips.length!==1?"s":""} queued</div>
               </div>
             )}
           </div>
@@ -2839,7 +2879,7 @@ function P19({ go }) {
     {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, generating and exporting.",dur:"5:00",l:"Intermediate",page:6,tips:["Access from MUSIC VIDEO STUDIO on Page 6","Upload your own audio for beat-synced video","Record your own song with the red button"]},
     {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Reference images, duration, saving clips.",dur:"4:00",l:"Intermediate",page:8,tips:["Be specific — lighting, mood, camera angle","Upload a reference image to match a visual style","Use the Documentary Recovery panel for your 13 scenes"]},
     {n:"06",t:"Timeline Editor — Building Your Film",d:"Dragging clips to tracks, syncing audio and video, setting film duration, preparing for render.",dur:"4:00",l:"Intermediate",page:13,tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate","Set film duration — 60, 90, or 180 minutes","Hit → RENDER when your timeline is ready"]},
-    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video.",dur:"3:00",l:"Beginner",page:15,tips:["Documentary: VOICE 85 - MUSIC 40 - EFX 50 - MASTER 85","Music video: MUSIC 75 - VOICE 60 - EFX 40 - MASTER 85"]},
+    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video.",dur:"3:00",l:"Beginner",page:15,tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85"]},
     {n:"08",t:"Render Engine — Exporting in 4K",d:"Quality settings, starting the render, what to do if clips need regenerating.",dur:"4:00",l:"Intermediate",page:16,tips:["1080p recommended for most use","4K for professional distribution","Missing clips are regenerated automatically"]},
     {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly.",dur:"2:00",l:"Beginner",page:18,tips:["Download to device first","Each social button opens the upload page directly"]},
     {n:"10",t:"Saving & Project History",d:"Save your session, restore from history, and ensure your clips persist.",dur:"2:00",l:"Beginner",page:1,tips:["Hit 💾 SAVE PROJECT in the footer at any time","📂 MY PROJECTS shows your full session history"]},
@@ -2853,12 +2893,14 @@ function P19({ go }) {
     setGenerating(idx);setActive(idx);
     const t=tuts[idx];
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:"Write a JavaScript canvas animation for a tutorial about "+JSON.stringify(t.t)+" for MandaStrong Studio. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON "+t.n+", relevant diagram, MANDASTRONG STUDIO label at bottom. Use sec for time-based animation, t=0-1 progress. W=canvas width H=canvas height. Return ONLY the function body starting with: function drawFrame(ctx,W,H,t,sec){"}]}).catch(e=>{console.error(e);setGenerating(null);return null;});
-      if(!d){setGenerating(null);return;}
-
-
+      const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+          messages:[{role:"user",content:`Write a JavaScript canvas animation for a tutorial about "${t.t}" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON ${t.n}, relevant diagram for the topic, and MANDASTRONG STUDIO bottom label. Use sec for animation, t=0-1 progress. W=canvas width, H=canvas height. Return ONLY: function drawFrame(ctx,W,H,t,sec){`}]})
+      });
+      const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
-      code=code.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").trim();
+      code=code.replace(/\`\`\`javascript|\`\`\`js|\`\`\`/g,"").trim();
       const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
       const bo=code.indexOf("{");const bc=code.lastIndexOf("}");
       const body=bo>=0&&bc>bo?code.slice(bo+1,bc):"";
@@ -2895,7 +2937,7 @@ function P19({ go }) {
                     <span style={{background:lc[t.l]+"1a",border:`1px solid ${lc[t.l]}`,color:lc[t.l],padding:"1px 8px",fontSize:9,fontWeight:900,letterSpacing:2}}>{t.l.toUpperCase()}</span>
                     {hasFn&&<span style={{background:"#22c55e1a",border:"1px solid #22c55e",color:"#22c55e",padding:"1px 8px",fontSize:9,fontWeight:900,letterSpacing:2}}>GENERATED ✓</span>}
                   </div>
-                  <div style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>{t.dur} - {t.tips.length} PRO TIPS</div>
+                  <div style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>{t.dur} · {t.tips.length} PRO TIPS</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 16px",flexShrink:0}}>
                   {isGen?(
@@ -2927,7 +2969,7 @@ function P19({ go }) {
                       </div>
                       <div style={{textAlign:"center"}}>
                         <div style={{color:GOLD,fontWeight:900,fontSize:15,letterSpacing:4,marginBottom:6}}>GENERATE TO WATCH</div>
-                        <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>LESSON {t.n} - {t.dur} - {t.l.toUpperCase()}</div>
+                        <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>LESSON {t.n} · {t.dur} · {t.l.toUpperCase()}</div>
                       </div>
                     </div>
                   )}
@@ -2972,7 +3014,7 @@ function P20() {
       <div style={{maxWidth:860,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>LEGAL</div>
         <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,letterSpacing:4,marginBottom:4}}>TERMS & DISCLAIMER</h1>
-        <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 - MANDASTRONG STUDIO</div>
+        <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 · MANDASTRONG STUDIO LLC</div>
 
         {/* Tab selector */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",marginBottom:28,border:`1px solid ${GOLDDIM}`}}>
@@ -2987,23 +3029,23 @@ function P20() {
         {tab==="tos"&&(
           <div>
             <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 20px",marginBottom:20,textAlign:"center"}}>
-              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO - PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
+              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO LLC · PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
               <div style={{color:WHITE,fontSize:12,marginTop:4}}>By using this platform you agree to be legally bound by these Terms.</div>
             </div>
 
             {sec("1. ACCEPTANCE OF TERMS",<>{p("By accessing or using MandaStrong Studio you agree to be legally bound by these Terms of Service. If you do not agree, do not use this platform. These terms apply to all users including free, trial, and paid subscribers.")}</>)}
             {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Creator ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
-            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
+            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio LLC. You may not reproduce, distribute, or resell the platform itself.")}</>)}
             {sec("4. AI-GENERATED CONTENT",<>{p("Content generated by MandaStrong Studio's AI tools is produced algorithmically. You are solely responsible for reviewing, editing, and verifying all AI-generated outputs before use. MandaStrong Studio makes no guarantees regarding the accuracy, appropriateness, or fitness for purpose of AI-generated content.")}{p("You agree not to use AI-generated content to produce material that is defamatory, illegal, harmful, or in violation of third-party rights.")}</>)}
             {sec("5. ACCEPTABLE USE",<>{p("You agree to use MandaStrong Studio only for lawful purposes. The following are strictly prohibited:")}{li(["Producing content that is defamatory, obscene, or harasses individuals","Infringing on third-party intellectual property rights","Attempting to reverse-engineer, copy, or redistribute the platform","Using the platform to generate spam, malware, or fraudulent content","Sharing your account credentials with third parties"])}</>)}
             {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. Full details available at MandaStrong1.Etsy.com.")}</>)}
-            {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
+            {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio LLC shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
-            {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
+            {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio LLC is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
             {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Grok on Page 21 of the platform.")}</>)}
 
             <div style={{background:"#050500",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO - AMANDA WOOLLEY, FOUNDER - MARCH 2026</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO LLC · AMANDA WOOLLEY, FOUNDER · MARCH 2026</p>
             </div>
           </div>
         )}
@@ -3025,7 +3067,7 @@ function P20() {
             {sec("CHANGES TO THIS DISCLAIMER",<>{p("MandaStrong Studio reserves the right to update this disclaimer at any time. Continued use of the platform following any update constitutes your acceptance of the revised terms.")}</>)}
 
             <div style={{background:"#050500",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY - FOUNDER - MANDASTRONG STUDIO - MARCH 2026 - mandastrongstudio.bolt.host</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO LLC · MARCH 2026 · mandastrongstudio.bolt.host</p>
             </div>
           </div>
         )}
@@ -3035,40 +3077,37 @@ function P20() {
 }
 
 function P21() {
-  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your dedicated AI production consultant. How can I assist your production today?"}]);
-  const [inp,setInp]=useState(""); const [loading,setLoading]=useState(false);
+  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok. How can I assist your production today?"}]);
+  const [inp2,setInp2]=useState(""); const [loading,setLoading]=useState(false);
   const bot=useRef(null);
-  const QUICK=["What is the recommended production workflow?","How do I generate a cinematic scene?","Best audio mix levels for documentary?","How do I export in 4K?","Tell me about subscription plans","How does the Voice Engine work?","What genres can the video generator produce?","How do I use the Timeline Editor?"];
+  const QUICK=["Recommended production workflow?","How do I generate a scene?","Best audio mix for documentary?","How to export in 4K?","Subscription plans?","How does the Voice Engine work?","What genres can I render?","How do I use the Timeline?"];
   useEffect(()=>{bot.current&&bot.current.scrollIntoView({behavior:"smooth"});},[msgs]);
   const send=async(q)=>{
-    const question=q||inp.trim(); if(!question) return;
-    setInp(""); setLoading(true);
+    const question=q||inp2.trim();if(!question)return;
+    setInp2("");setLoading(true);
     setMsgs(p=>[...p,{role:"user",content:question}]);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Grok — the dedicated AI production assistant for MandaStrong Studio. Professional, authoritative, warm and concise. Expert on all 23 pages, 600+ AI tools, voice engine with 54 characters, video generator, music video studio, timeline editor, audio mixer, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial. Founded by MandaStrong. Be specific, practical and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
-      setMsgs(p=>[...p,{role:"assistant",content:d&&d.content&&d.content[0]?d.content[0].text:"Unable to process. Please try again."}]);
-    }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Check your network and try again."}]);}
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Grok, AI assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, voice engine with 54 characters, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo. Be specific and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
+      setMsgs(p=>[...p,{role:"assistant",content:d&&d.content&&d.content[0]?d.content[0].text:"Try again."}]);
+    }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Check network and try again."}]);}
     setLoading(false);
   };
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200,#0a0600)",borderBottom:`2px solid ${GOLD}`,padding:"22px 32px 18px"}}>
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"22px 32px 18px"}}>
         <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:20}}>
           <div style={{position:"relative",flexShrink:0}}>
             <div style={{width:72,height:72,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 40px ${GOLD}55`}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:34,fontWeight:900,color:GOLD,textShadow:`0 0 20px ${GOLD}`}}>G</span>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:34,fontWeight:900,color:GOLD}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-4,right:-4,width:18,height:18,background:"#22c55e",border:"2px solid #000",borderRadius:"50%",boxShadow:"0 0 10px #22c55e"}}/>
+            <div style={{position:"absolute",bottom:-4,right:-4,width:18,height:18,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:5,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO - AI ASSISTANT</div>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:5,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO · AI ASSISTANT</div>
             <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:26,fontWeight:900,letterSpacing:5,lineHeight:1,marginBottom:6}}>AGENT GROK</div>
             <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 8px #22c55e"}}/>
-                <span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:3}}>ONLINE 24/7</span>
-              </div>
-              <span style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>23 PAGES - 600+ TOOLS - FULL PRODUCTION KNOWLEDGE</span>
+              <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 8px #22c55e"}}/><span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:3}}>ONLINE 24/7</span></div>
+              <span style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>23 PAGES · 600+ TOOLS · FULL PRODUCTION KNOWLEDGE</span>
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flexShrink:0}}>
@@ -3085,7 +3124,7 @@ function P21() {
         <div style={{background:"#030303",border:`1px solid ${GOLDDIM}33`}}>
           <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLDDIM}33`,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3}}>● PRODUCTION CONSULTATION</span>
-            <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok. How can I assist your production today?"}])} style={{background:"none",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
+            <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome. How can I assist?"}])} style={{background:"none",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
           </div>
           <div style={{height:380,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
             {msgs.map((m,i)=>(
@@ -3093,27 +3132,24 @@ function P21() {
                 <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
                 <div style={{flex:1,maxWidth:"82%"}}>
                   <div style={{color:m.role==="user"?GOLDDIM:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:5,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
-                  <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLD+"22"}`,padding:"13px 16px"}}>
-                    <div style={{color:WHITE,fontSize:13,lineHeight:2,whiteSpace:"pre-wrap"}}>{m.content}</div>
-                  </div>
+                  <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLD+"22"}`,padding:"13px 16px"}}><div style={{color:WHITE,fontSize:13,lineHeight:2,whiteSpace:"pre-wrap"}}>{m.content}</div></div>
                 </div>
               </div>
             ))}
-            {loading&&<div style={{display:"flex",gap:14}}><div style={{width:36,height:36,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}22`,padding:"13px 16px",display:"flex",gap:6,alignItems:"center"}}><span style={{color:GOLDDIM,fontSize:11}}>Consulting production knowledge...</span></div></div>}
+            {loading&&<div style={{display:"flex",gap:14}}><div style={{width:36,height:36,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}22`,padding:"13px 16px"}}><span style={{color:GOLDDIM,fontSize:11}}>Thinking...</span></div></div>}
             <div ref={bot}/>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
-          {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"9px 14px",cursor:"pointer",fontSize:10,fontWeight:700,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
+          {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"9px 14px",cursor:"pointer",fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";e.currentTarget.style.color=GOLDDIM;}}>✦ {q}</button>)}
         </div>
         <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:16}}>
-          <textarea value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-            placeholder="Ask about tools, workflows, pricing, troubleshooting, or production advice..."
+          <textarea value={inp2} onChange={e=>setInp2(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+            placeholder="Ask anything about tools, workflow, pricing or production..."
             style={{width:"100%",height:60,resize:"none",padding:"12px 14px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",marginBottom:8}}/>
-          <button onClick={()=>send()} disabled={loading||!inp.trim()}
-            style={{background:loading||!inp.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp.trim()?GOLDDIM:"#000",padding:"11px 28px",cursor:loading||!inp.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+          <button onClick={()=>send()} disabled={loading||!inp2.trim()} style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp2.trim()?GOLDDIM:"#000",padding:"11px 28px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
             {loading?"⟳ THINKING...":"SEND ▶"}
           </button>
         </div>
@@ -3157,22 +3193,16 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-
-      {/* VIDEO — top of page */}
-      <video autoPlay loop playsInline muted preload="auto"
-        style={{width:"100%",display:"block",maxHeight:"70vh",objectFit:"cover",background:"#000"}}
-        onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="/background.mp4" type="video/mp4"/>
-        <source src="background.mp4" type="video/mp4"/>
-      </video>
-
+      <div style={{width:"100%",aspectRatio:"16/9",background:"#000",overflow:"hidden"}}>
+        <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none";}}>
+          <source src="/background.mp4" type="video/mp4"/>
+          <source src="background.mp4" type="video/mp4"/>
+        </video>
+      </div>
       <div style={{padding:"26px 40px 80px"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
-
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,textShadow:`0 0 30px ${GOLD}99`,marginBottom:20}}>THAT'S ALL FOLKS</h1>
-
-          {/* THANK YOU LETTER — directly under video */}
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,marginBottom:20}}>THAT'S ALL FOLKS</h1>
           <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#050500",border:`2px solid ${GOLD}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ A LETTER TO THE CREATORS ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 14px 0"}}>To every creator who has ever had a story burning inside them and not known how to get it out — this platform is for you.</p>
@@ -3181,8 +3211,6 @@ function P23({ go }) {
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 14px 0"}}>I built this from scratch. Every tool. Every page. Every voice. Every render. Because I believe technology should serve humanity, and art should serve truth.</p>
             <p style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2,margin:0,textAlign:"right"}}>— Amanda Woolley · Founder · MandaStrong Studio</p>
           </div>
-
-          {/* HOW TO USE GUIDE BAR */}
           <div onClick={()=>setGuideOpen(g=>!g)} style={{background:`linear-gradient(135deg,#0a0500,#1a0a00)`,border:`2px solid ${GOLD}`,padding:"16px 24px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
             <span style={{fontFamily:"'Cinzel',serif",color:GOLD,fontWeight:900,fontSize:14,letterSpacing:4}}>MANDASTRONG · HOW TO USE GUIDE</span>
             <span style={{color:GOLD,fontSize:18}}>{guideOpen?"▲":"▼"}</span>
@@ -3190,51 +3218,41 @@ function P23({ go }) {
           {guideOpen&&(
             <div style={{...Card(),textAlign:"left",padding:"24px 28px",border:`2px solid ${GOLD}`,borderTopWidth:0,marginBottom:20}}>
               {[
-                {t:"STEP 1 — SIGN IN OR REGISTER (PAGE 4)",c:"Go to Page 4. Sign in with email and password. New creators click START FREE TRIAL for a 7-day Studio plan at no cost. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo."},
-                {t:"STEP 2 — WRITE YOUR SCRIPT (PAGE 5)",c:"50+ writing tools. Click any tool, use AI CREATE to generate scripts, loglines, treatments. Save to Media Library."},
-                {t:"STEP 3 — VOICE ENGINE (PAGE 6)",c:"54 voice characters. Filter, click to select, hit TEST to hear them. Paste script, adjust sliders, hit PREPARE AND SPEAK. Save to Media Library."},
-                {t:"STEP 4 — MUSIC VIDEO STUDIO (PAGE 6)",c:"Hit MUSIC VIDEO STUDIO top right. Enter song details, upload audio or record live. Choose style, write scene, hit GENERATE MUSIC VIDEO."},
-                {t:"STEP 5 — GENERATE SCENES (PAGE 8)",c:"Use the Documentary Recovery panel for your 13 scenes or write any scene. Hit GENERATE SCENE. Every clip saves automatically."},
+                {t:"STEP 1 — SIGN IN (PAGE 4)",c:"Sign in or click START FREE TRIAL. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial."},
+                {t:"STEP 2 — WRITE YOUR SCRIPT (PAGE 5)",c:"50+ writing tools. Use AI CREATE to generate scripts, loglines, treatments. Save to Media Library."},
+                {t:"STEP 3 — VOICE ENGINE (PAGE 6)",c:"54 voice characters. Filter and select. Hit TEST to hear each voice. Paste script, adjust sliders, hit PREPARE AND SPEAK. Save to Media Library."},
+                {t:"STEP 4 — MUSIC VIDEO STUDIO (PAGE 6)",c:"Hit MUSIC VIDEO STUDIO top right. Enter song details, upload audio or record. Write scene. Hit GENERATE MUSIC VIDEO."},
+                {t:"STEP 5 — GENERATE SCENES (PAGE 8)",c:"Use Documentary Recovery panel for 13 AI For Humanity scenes or write any scene. Hit GENERATE SCENE. Every clip saves automatically."},
                 {t:"STEP 6 — TIMELINE EDITOR (PAGE 13)",c:"Clips auto-load into Track 0. Hit SYNC ALL TRACKS. Set film duration. Hit RENDER."},
                 {t:"STEP 7 — AUDIO MIXER (PAGE 15)",c:"Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85."},
                 {t:"STEP 8 — RENDER YOUR FILM (PAGE 16)",c:"Select quality up to 4K. Hit START RENDER. Download when complete."},
-                {t:"STEP 9 — PREVIEW & EXPORT (PAGES 17–18)",c:"Preview your film full screen. Export to YouTube, Instagram, TikTok, Facebook, X, Vimeo or download."},
-                {t:"SAVE YOUR PROJECT (FOOTER)",c:"Hit SAVE PROJECT anytime. Hit MY PROJECTS to restore any previous session."},
-                {t:"AGENT GROK (PAGE 21)",c:"24/7 AI production consultant. Ask anything about tools, workflow or pricing."},
+                {t:"STEP 9 — EXPORT (PAGES 17-18)",c:"Preview full screen. Export to YouTube, Instagram, TikTok, Facebook, X, Vimeo or download."},
+                {t:"SAVE YOUR PROJECT (FOOTER)",c:"Hit SAVE PROJECT anytime. Hit MY PROJECTS to restore any session."},
+                {t:"AGENT GROK (PAGE 21)",c:"24/7 AI consultant. Ask anything about tools, workflow or pricing."},
               ].map(({t,c:cv})=>(
-                <div key={t} style={{borderBottom:`1px solid ${GOLDDIM}33`,paddingBottom:16,marginBottom:16}}>
-                  <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:2,marginBottom:6}}>✦ {t}</div>
+                <div key={t} style={{borderBottom:`1px solid ${GOLDDIM}33`,paddingBottom:14,marginBottom:14}}>
+                  <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:2,marginBottom:5}}>✦ {t}</div>
                   <div style={{color:WHITE,fontSize:13,lineHeight:1.9}}>{cv}</div>
                 </div>
               ))}
             </div>
           )}
-
-          {/* MISSION STATEMENT */}
           <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#050500",border:`1px solid ${GOLDDIM}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:14,textAlign:"center"}}>✦ OUR MISSION ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>MandaStrong Studio exists to give every person the tools to tell their story — but our purpose goes further than filmmaking.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>We are committed to raising awareness of how critical it is to advocate against bullying in all its forms. Social skills and empathy must be taught, modelled and championed in our schools and communities. Every child deserves to feel safe, valued and heard.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>We stand with our veterans. The men and women who served deserve dignity, care and access to mental health services without barriers. Their sacrifices are not forgotten here.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>Together, we can improve how we treat each other. One story at a time. One voice at a time.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>We are committed to raising awareness of how critical it is to advocate against bullying in all its forms. Social skills and empathy must be taught, modelled and championed in our schools and communities.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>We stand with our veterans. The men and women who served deserve dignity, care and access to mental health services without barriers.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>Together, we can improve how we treat each other. One story at a time.</p>
           </div>
-
-          {/* PROCEEDS — Etsy donation statement */}
           <div style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,padding:"20px 24px",marginBottom:20,textAlign:"center"}}>
-            <div style={{color:"#000",fontWeight:900,fontSize:15,letterSpacing:2,marginBottom:6,fontFamily:"'Cinzel',serif"}}>ALL PROCEEDS FROM</div>
-            <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
-              style={{color:"#000",fontWeight:900,fontSize:18,letterSpacing:3,display:"block",textDecoration:"none",marginBottom:6,fontFamily:"'Cinzel',serif"}}>
-              MANDASTRONG1.ETSY.COM
-            </a>
+            <div style={{color:"#000",fontWeight:900,fontSize:14,letterSpacing:2,marginBottom:6,fontFamily:"'Cinzel',serif"}}>ALL PROCEEDS FROM</div>
+            <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer" style={{color:"#000",fontWeight:900,fontSize:20,letterSpacing:3,display:"block",textDecoration:"none",marginBottom:6,fontFamily:"'Cinzel',serif"}}>MANDASTRONG1.ETSY.COM</a>
             <div style={{color:"#000",fontWeight:700,fontSize:13,letterSpacing:1}}>WILL BE DONATED TO ANTI-BULLYING AND VETERANS MENTAL HEALTH CAUSES</div>
           </div>
-
-          {/* HOME and EXIT at bottom */}
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginTop:8}}>
             <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
             <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
           </div>
-
         </div>
       </div>
     </div>
@@ -3304,7 +3322,7 @@ export default function App() {
           }));
           setMediaLib(restored);
           const vidClips=restored.filter(cl=>cl.type&&cl.type.startsWith("video"));
-          if(vidClips.length>0){setTimeline(tl=>{const has=Object.values(tl).flat().length>0;if(!has)return {0:vidClips.map(cl=>({...cl,startTime:0,syncGroup:"master",synced:true}))};return tl;});}
+          if(vidClips.length>0){setTimeline(tl=>{const has=Object.values(tl).flat().length>0;if(!has)return{0:vidClips.map(cl=>({...cl,startTime:0,syncGroup:"master",synced:true}))};return tl;});}
         } else {
           // Fallback to localStorage
           try{
@@ -3447,7 +3465,6 @@ const allPages=[
     }
   }
 
-
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
       <Header go={go} setMenu={setMenu}/>
@@ -3462,3 +3479,4 @@ const allPages=[
     </div>
   );
 }
+
