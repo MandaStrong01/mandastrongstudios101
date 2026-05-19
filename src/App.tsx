@@ -1197,9 +1197,18 @@ function P6Voice({ onSave, setMediaLib }) {
   const timerRef=useRef(null);
 
   useEffect(()=>{
-    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
+    const load=()=>{
+      const v=window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
+      setSysVoices(v);
+    };
+    // Load immediately + on change
     load();
     window.speechSynthesis.onvoiceschanged=load;
+    // Force load on some browsers that need a trigger
+    if(window.speechSynthesis.getVoices().length===0){
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+      window.speechSynthesis.cancel();
+    }
     return()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);};
   },[]);
 
@@ -1379,7 +1388,7 @@ function P6Voice({ onSave, setMediaLib }) {
                       setSelVoice(v.id);
                       // Use speakText directly so we don't affect main state
                       window.speechSynthesis.cancel();
-                      const utt=new SpeechSynthesisUtterance("Hello. I am "+v.name+". "+v.desc);
+                      const utt=new SpeechSynthesisUtterance("Hello, this is "+v.name+". I am testing the speaker settings. My style is "+v.style+".");
                       // Pick the right system voice for THIS character
                       const allVoices=window.speechSynthesis.getVoices().filter(sv=>sv.lang&&sv.lang.startsWith("en"));
                       const gb=allVoices.filter(sv=>sv.lang==="en-GB");
@@ -1463,20 +1472,25 @@ function P6Voice({ onSave, setMediaLib }) {
             style={{background:savedToLib?`linear-gradient(135deg,#064406,#0a640a)`:"transparent",border:`1px solid ${savedToLib?"#22c55e":GOLD}`,color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"10px",fontSize:11,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",marginBottom:14,opacity:!text.trim()?0.5:1}}>
             {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
           </button>
-          {processed&&(
-            <div>
-              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>AI-FORMATTED RESULT</div>
-              <textarea value={processed} onChange={e=>setProcessed(e.target.value)}
-                style={{...inp,height:140,resize:"vertical",marginBottom:8}}/>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                <button onClick={()=>speakNow(processed)} style={{...G("gold",false),padding:"10px"}}>▶ PLAY</button>
-                <button onClick={stop} style={{...G("out",false),padding:"10px"}}>⏹ STOP</button>
-                <button onClick={()=>{if(onSave)onSave({id:Date.now()+Math.random(),name:selected.name+" Narration",type:"audio/narration",content:processed,url:""});setSaved(true);}}
-                  style={{...G(saved?"out":"gold",false),padding:"10px"}}>{saved?"✓ SAVED":"💾 SAVE"}</button>
-              </div>
-              {saved&&<div style={{marginTop:8,background:"#061406",border:"1px solid #22c55e",padding:"8px",textAlign:"center",color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:2}}>✓ SAVED TO MEDIA LIBRARY</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+            <div style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"12px 14px"}}>
+              <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:8}}>PREPARE SPEECH</div>
+              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Claude reformats your script for natural speech — short sentences, commas for pauses, numbers spelled out.</div>
+              <button onClick={processAndSpeak} disabled={loading||!text.trim()}
+                style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1}}>
+                {loading?"⟳ PREPARING...":"✦ PREPARE & SPEAK"}
+              </button>
             </div>
-          )}
+            <div style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"12px 14px"}}>
+              <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:8}}>RESET</div>
+              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Clear script, stop all speech and reset voice settings to default.</div>
+              <button onClick={()=>{stop();setText("");setProcessed("");setSaved(false);setSavedToLib(false);setSpeed(0.82);setPitchV(1.0);setPauseLen(700);setVolume(1.0);setMood("Neutral");}}
+                style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
+                ↺ RESET ALL
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
