@@ -3192,13 +3192,11 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      {/* background.mp4 — full width top of page */}
       <video autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",maxHeight:"70vh",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
-        <source src="./background.mp4" type="video/mp4"/>
       </video>
       <div style={{padding:"26px 40px 80px"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
@@ -3212,20 +3210,16 @@ function P23({ go }) {
             <source src="ThatsAllFolks.mp4" type="video/mp4"/>
           </video>
           <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:24}}/>
-
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
             style={{display:"block",background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,color:"#000",padding:"20px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",marginBottom:20,width:"100%",boxSizing:"border-box",boxShadow:`0 0 30px ${GOLD}44`}}>
             🛍 VISIT MANDASTRONG1.ETSY.COM · BOOKS · MERCH · SUPPORT THIS MISSION
           </a>
-
           <div style={{...Card(),textAlign:"left",marginBottom:16,background:"#050500",border:`2px solid ${GOLD}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:14,textAlign:"center"}}>✦ OUR MISSION ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>MandaStrong Studio was built with one belief: <strong style={{color:GOLD}}>that every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px 0"}}>We are a professional cinema intelligence platform giving creators access to <strong style={{color:GOLD}}>600+ AI filmmaking tools</strong>, a full production pipeline from script to screen, and films up to 3 hours long — all from a single platform.</p>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio. I built this because I believe technology should serve humanity, and art should serve truth.</p>
           </div>
-
-          {/* FULL HOW TO USE GUIDE — expanded by default */}
           <div onClick={()=>setGuideOpen(g=>!g)} style={{...Card(),marginBottom:0,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",textAlign:"left",border:`2px solid ${GOLD}`,background:"#0a0800"}}>
             <span style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3}}>📖 COMPLETE HOW TO USE GUIDE</span>
             <span style={{color:GOLD,fontSize:18}}>{guideOpen?"▲":"▼"}</span>
@@ -3233,19 +3227,19 @@ function P23({ go }) {
           {guideOpen&&(
             <div style={{...Card(),textAlign:"left",padding:"24px 28px",border:`2px solid ${GOLD}`,borderTopWidth:0}}>
               {[
-                {t:"STEP 1 — SIGN IN OR REGISTER (PAGE 4)",c:"Go to Page 4. Existing users sign in with email and password. New creators enter your name and email then click START FREE TRIAL to begin your 7-day Studio plan trial at no cost. To explore without an account click BROWSE AS GUEST. Choose your subscription plan — Creator $20/mo, Pro $30/mo, Studio $50/mo. Studio gives you 8K export, 600+ tools, 1TB storage and full commercial rights."},
-                {t:"STEP 2 — WRITE YOUR SCRIPT (PAGE 5)",c:"Page 5 has 50+ professional writing tools. Click any tool card to open it. Use AI CREATE to generate a complete script, logline, treatment, synopsis, or full feature from a single prompt. Be specific — include genre, tone, setting and characters. Save your results to the Media Library using the SAVE TO LIBRARY button inside each tool. Use PLOT HOLE DETECTOR and CONTINUITY CHECKER before moving to production."},
-                {t:"STEP 3 — VOICE ENGINE (PAGE 6)",c:"Page 6 has 54 cinematic voice characters. Filter by gender, age and origin using the left panel. Click any voice card to select it — selected voice shows gold border. Hit ▶ TEST on any card to hear that character's distinct voice immediately. Paste your narration script in the right panel. Set mood, speed, pitch, pause length and volume using the sliders. Hit ✦ PREPARE & SPEAK to have Claude professionally reformat your script for natural speech, then speak it. Hit ▶ SPEAK NOW to speak your raw text directly. Hit 💾 SAVE TO MEDIA LIBRARY to save the narration as an asset."},
-                {t:"STEP 4 — MUSIC VIDEO STUDIO (PAGE 6)",c:"Hit the 🎬 MUSIC VIDEO STUDIO button at the top right of Page 6. Step 1: Enter song title, artist, choose genre, mood and tempo. Upload your audio file (MP3, WAV, M4A) or hit the red ● RECORD YOUR OWN SONG button to record live. Step 2: Choose video style, colour grade, visual effects and editing style. Step 3: Write a detailed scene description — be specific about what you see, the lighting, the setting, who is in it. Step 4: Hit GENERATE MUSIC VIDEO. Claude writes a complete cinematic renderer and produces a full beat-synced music video. Download or save to your Media Library when done."},
-                {t:"STEP 5 — GENERATE SCENES (PAGE 8)",c:"Page 8 is the Cinema Scene Generator. Click the green AI FOR HUMANITY — DOCUMENTARY RECOVERY panel at the top to access your 13 pre-written documentary scenes. Click any scene to load it, then hit 🎬 GENERATE SCENE. Each clip is automatically saved to IndexedDB and your Media Library. For custom scenes: write any scene description in plain English in the text box. Upload a reference image to match its colour, lighting and mood. Set duration (5–60 seconds). Hit GENERATE SCENE. Every clip saves automatically. Repeat for all scenes you need."},
-                {t:"STEP 6 — TIMELINE EDITOR (PAGE 13)",c:"Go to Page 13. Your clips from Page 8 will auto-load into Track 0 on startup. Hit ⚡ SYNC ALL TRACKS to automatically populate all tracks from your Media Library — video clips to Track 0, audio to Track 1. Set your film duration using the slider (60, 90 or 180 minutes). To manually arrange clips drag them from the DRAG TO TIMELINE panel at the bottom into any track. Hit → RENDER when your timeline is ready."},
-                {t:"STEP 7 — AUDIO MIXER (PAGE 15)",c:"Page 15 is the 4-channel audio mixer. Recommended settings for documentary: VOICE 85, MUSIC 40, EFX 50, MASTER 85. For music video: VOICE 60, MUSIC 75, EFX 40, MASTER 85. Adjust each channel using the vertical sliders. Hit SAVE PRESET to store your mix for the render."},
-                {t:"STEP 8 — RENDER YOUR FILM (PAGE 16)",c:"Go to Page 16. Your clips load automatically from storage. Select output quality — 480p, 720p, 1080p or 4K. Choose frame rate (24, 30 or 60fps) and codec (VP9 recommended). The render queue shows all your clips in order. Hit START RENDER. The engine processes every clip, applies your audio mix, adds vignette, letterbox and film grain, and assembles your complete film. If any clip is missing the engine regenerates it automatically using Claude. When complete hit DOWNLOAD FILM or go to PREVIEW (Page 17) or EXPORT (Page 18)."},
-                {t:"STEP 9 — PREVIEW (PAGE 17)",c:"Page 17 is the full-screen preview player. Use the playback controls to scrub through your completed film. Check timing, transitions and audio sync before distributing."},
-                {t:"STEP 10 — EXPORT AND DISTRIBUTE (PAGE 18)",c:"Page 18 has one-click export to YouTube, Instagram, TikTok, Facebook, X, Vimeo and WhatsApp. Hit DOWNLOAD TO DEVICE first to save your film locally. Then click any social platform button to open its upload page directly. Your film is in WebM format — compatible with all major platforms."},
-                {t:"SAVE YOUR PROJECT (FOOTER)",c:"Hit 💾 SAVE PROJECT in the footer at any time on any page. Give your session a name and optional note. Hit 📂 MY PROJECTS to see your full session history and continue where you left off. Your video clips are stored in IndexedDB and survive page refresh automatically."},
-                {t:"AGENT GROK (PAGE 21)",c:"Page 21 is your 24/7 AI production consultant. Ask Agent Grok anything — tool recommendations, workflow advice, troubleshooting, pricing, export formats, or how any feature works. Use the quick question buttons for instant answers or type your own question and hit SEND."},
-                {t:"TUTORIALS (PAGE 19)",c:"Page 19 has 12 video lessons. Hit ▶ GENERATE TO WATCH on any lesson. Claude writes a unique animated tutorial specifically for that topic and plays it instantly in the canvas. Hit OPEN PAGE to jump directly to the page being taught."},
+                {t:"STEP 1 — SIGN IN OR REGISTER (PAGE 4)",c:"Go to Page 4. Existing users sign in with email and password. New creators enter your name and email then click START FREE TRIAL for your 7-day Studio plan trial at no cost. Choose your plan — Creator $20/mo, Pro $30/mo, Studio $50/mo."},
+                {t:"STEP 2 — WRITE YOUR SCRIPT (PAGE 5)",c:"Page 5 has 50+ professional writing tools. Click any tool card to open it. Use AI CREATE to generate a complete script, logline, treatment or synopsis from a single prompt. Save results to Media Library."},
+                {t:"STEP 3 — VOICE ENGINE (PAGE 6)",c:"54 cinematic voice characters. Filter by gender, age and origin. Click any voice card to select it. Hit ▶ TEST to hear that character. Paste your script, hit ✦ PREPARE & SPEAK to AI-format and speak it. Hit 💾 SAVE TO MEDIA LIBRARY."},
+                {t:"STEP 4 — MUSIC VIDEO STUDIO (PAGE 6)",c:"Hit 🎬 MUSIC VIDEO STUDIO top right. Enter song details, choose genre, mood, tempo. Upload audio or hit ● RECORD YOUR OWN SONG. Choose style and colour grade. Write your scene description. Hit GENERATE MUSIC VIDEO."},
+                {t:"STEP 5 — GENERATE SCENES (PAGE 8)",c:"Click the green AI FOR HUMANITY — DOCUMENTARY RECOVERY panel for your 13 pre-written scenes. Click any scene to load it then hit GENERATE SCENE. Each clip saves automatically to IndexedDB and your Media Library. Repeat for all 13."},
+                {t:"STEP 6 — TIMELINE EDITOR (PAGE 13)",c:"Your clips auto-load into Track 0 on startup. Hit ⚡ SYNC ALL TRACKS to populate all tracks. Set film duration. Hit → RENDER when ready."},
+                {t:"STEP 7 — AUDIO MIXER (PAGE 15)",c:"Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85. Music video: VOICE 60 · MUSIC 75 · EFX 40 · MASTER 85."},
+                {t:"STEP 8 — RENDER YOUR FILM (PAGE 16)",c:"Select quality up to 4K. Hit START RENDER. The engine processes every clip, applies your mix, adds vignette, letterbox and film grain. If any clip is missing it regenerates automatically. Hit DOWNLOAD FILM when complete."},
+                {t:"STEP 9 — PREVIEW (PAGE 17)",c:"Full-screen preview player. Scrub through your completed film before distributing."},
+                {t:"STEP 10 — EXPORT AND DISTRIBUTE (PAGE 18)",c:"One-click export to YouTube, Instagram, TikTok, Facebook, X, Vimeo and WhatsApp. Download to device first then share."},
+                {t:"SAVE YOUR PROJECT (FOOTER)",c:"Hit 💾 SAVE PROJECT in the footer at any time. Hit 📂 MY PROJECTS to restore any previous session. Clips persist in IndexedDB automatically."},
+                {t:"AGENT GROK (PAGE 21)",c:"Your 24/7 AI production consultant. Ask anything — tools, workflow, troubleshooting, pricing. Use quick question buttons or type your own."},
+                {t:"TUTORIALS (PAGE 19)",c:"12 video lessons. Hit ▶ GENERATE TO WATCH on any lesson for a Claude-written animated tutorial. Hit OPEN PAGE to jump to the page being taught."},
               ].map(({t,c:cv})=>(
                 <div key={t} style={{borderBottom:`1px solid ${GOLDDIM}33`,paddingBottom:16,marginBottom:16}}>
                   <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:2,marginBottom:6}}>✦ {t}</div>
@@ -3254,8 +3248,6 @@ function P23({ go }) {
               ))}
             </div>
           )}
-
-          {/* HOME and EXIT at the bottom */}
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginTop:28}}>
             <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
             <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
