@@ -1965,6 +1965,7 @@ function P4({ go, setUser }) {
   const [name,setName]=useState(""); const [re,setRe]=useState("");
   const inp={width:"100%",background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const [loginOk,setLoginOk]=useState(false);
+  const [displayCount,setDisplayCount]=useState(()=>{try{return parseInt(localStorage.getItem("ms_sub_count")||"0")||0;}catch{return 0;}});
   const login=()=>{
     if(email==="woolleya129@gmail.com"&&pass==="Mangler1970!!"){
       setLoginOk(true);
@@ -1977,6 +1978,13 @@ function P4({ go, setUser }) {
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:1000,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+          <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 36px",textAlign:"center",boxShadow:`0 0 24px ${GOLD}33`}}>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LIVE SUBSCRIBERS</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:38,fontWeight:900,lineHeight:1,textShadow:`0 0 20px ${GOLD}99`}}>{displayCount.toLocaleString()}</div>
+            <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING</div>
+          </div>
+        </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:36}}>
           <div style={{...Card()}}>
             <div style={{fontSize:11,color:GOLD,letterSpacing:3,marginBottom:8,fontWeight:700}}>EXISTING USER</div>
@@ -2948,27 +2956,26 @@ function P21() {
   };
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"12px 24px 10px"}}>
-        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:20}}>
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"8px 20px"}}>
+        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:14}}>
           <div style={{position:"relative",flexShrink:0}}>
-            <div style={{width:72,height:72,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 40px ${GOLD}55`}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:34,fontWeight:900,color:GOLD}}>G</span>
+            <div style={{width:44,height:44,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,color:GOLD}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-4,right:-4,width:18,height:18,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
+            <div style={{position:"absolute",bottom:-3,right:-3,width:12,height:12,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:5,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO · AI ASSISTANT</div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:26,fontWeight:900,letterSpacing:5,lineHeight:1,marginBottom:6}}>AGENT GROK</div>
-            <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 8px #22c55e"}}/><span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:3}}>ONLINE 24/7</span></div>
-              <span style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>23 PAGES · 600+ TOOLS · FULL PRODUCTION KNOWLEDGE</span>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:18,fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:3,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
+              <span style={{color:GOLDDIM,fontSize:9,letterSpacing:1}}>23 PAGES · 600+ TOOLS · 54 VOICES</span>
             </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flexShrink:0}}>
-            {[["23","PAGES"],["600+","TOOLS"],["54","VOICES"],["24/7","SUPPORT"]].map(([v,l])=>(
-              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"8px 12px",textAlign:"center"}}>
-                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900}}>{v}</div>
-                <div style={{color:GOLDDIM,fontSize:8,letterSpacing:2,marginTop:2}}>{l}</div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            {[["23","PG"],["600+","TOOLS"],["54","VOICES"]].map(([v,l])=>(
+              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"4px 8px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:12,fontWeight:900}}>{v}</div>
+                <div style={{color:GOLDDIM,fontSize:7,letterSpacing:1}}>{l}</div>
               </div>
             ))}
           </div>
