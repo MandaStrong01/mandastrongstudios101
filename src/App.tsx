@@ -3067,7 +3067,13 @@ function P23({ go }) {
       <div style={{padding:"26px 40px 80px"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,marginBottom:20}}>THAT'S ALL FOLKS</h1>
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,marginBottom:16}}>THAT'S ALL FOLKS</h1>
+          <video autoPlay loop playsInline muted preload="auto"
+            style={{width:"100%",maxWidth:640,display:"block",margin:"0 auto 20px",border:`1px solid ${GOLD}`,background:"#000"}}
+            onError={e=>{e.currentTarget.style.display="none";}}>
+            <source src="/ThatsAllFolks.mp4" type="video/mp4"/>
+            <source src="ThatsAllFolks.mp4" type="video/mp4"/>
+          </video>
           <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#050500",border:`2px solid ${GOLD}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ A LETTER TO THE CREATORS ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 14px 0"}}>To every creator who has ever had a story burning inside them and not known how to get it out — this platform is for you.</p>
