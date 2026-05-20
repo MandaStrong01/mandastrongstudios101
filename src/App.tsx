@@ -2941,80 +2941,83 @@ function P20() {
 
 function P21() {
   const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok. How can I assist your production today?"}]);
-  const [inp2,setInp2]=useState(""); const [loading,setLoading]=useState(false);
+  const [inp2,setInp2]=useState("");
+  const [loading,setLoading]=useState(false);
   const bot=useRef(null);
-  const QUICK=["Recommended production workflow?","How do I generate a scene?","Best audio mix for documentary?","How to export in 4K?","Subscription plans?","How does the Voice Engine work?","What genres can I render?","How do I use the Timeline?"];
+  const QUICK=["Production workflow?","Generate a scene?","Best audio mix?","Export in 4K?","Subscription plans?","Voice Engine?","What genres?","Timeline Editor?"];
   useEffect(()=>{bot.current&&bot.current.scrollIntoView({behavior:"smooth"});},[msgs]);
   const send=async(q)=>{
     const question=q||inp2.trim();if(!question)return;
     setInp2("");setLoading(true);
     setMsgs(p=>[...p,{role:"user",content:question}]);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Grok, AI assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, voice engine with 54 characters, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo. Be specific and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:800,system:"You are Agent Grok, AI assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, voice engine, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo. Be concise and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
       setMsgs(p=>[...p,{role:"assistant",content:d&&d.content&&d.content[0]?d.content[0].text:"Try again."}]);
-    }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Check network and try again."}]);}
+    }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Check network."}]);}
     setLoading(false);
   };
   return(
-    <div style={{...Sp,padding:0,background:"#000"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"8px 20px"}}>
-        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:14}}>
+    <div style={{height:"calc(100vh - 52px)",display:"flex",flexDirection:"column",background:"#000",overflow:"hidden"}}>
+      {/* Compact header */}
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"8px 20px",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
           <div style={{position:"relative",flexShrink:0}}>
-            <div style={{width:44,height:44,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,color:GOLD}}>G</span>
+            <div style={{width:40,height:40,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:900,color:GOLD}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-3,right:-3,width:12,height:12,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
+            <div style={{position:"absolute",bottom:-3,right:-3,width:11,height:11,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:18,fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:3,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginTop:2}}>
+              <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
               <span style={{color:GOLDDIM,fontSize:9,letterSpacing:1}}>23 PAGES · 600+ TOOLS · 54 VOICES</span>
             </div>
           </div>
-          <div style={{display:"flex",gap:6,flexShrink:0}}>
+          <div style={{display:"flex",gap:5,flexShrink:0}}>
             {[["23","PG"],["600+","TOOLS"],["54","VOICES"]].map(([v,l])=>(
               <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"4px 8px",textAlign:"center"}}>
-                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:12,fontWeight:900}}>{v}</div>
+                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:11,fontWeight:900}}>{v}</div>
                 <div style={{color:GOLDDIM,fontSize:7,letterSpacing:1}}>{l}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
-      <div style={{maxWidth:860,margin:"0 auto",padding:"24px 32px 80px",display:"flex",flexDirection:"column",gap:16}}>
-        <div style={{background:"#030303",border:`1px solid ${GOLDDIM}33`}}>
-          <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLDDIM}33`,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3}}>● PRODUCTION CONSULTATION</span>
-            <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome. How can I assist?"}])} style={{background:"none",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
-          </div>
-          <div style={{height:380,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
-            {msgs.map((m,i)=>(
-              <div key={i} style={{display:"flex",gap:14,flexDirection:m.role==="user"?"row-reverse":"row"}}>
-                <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
-                <div style={{flex:1,maxWidth:"82%"}}>
-                  <div style={{color:m.role==="user"?GOLDDIM:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:5,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
-                  <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLD+"22"}`,padding:"13px 16px"}}><div style={{color:WHITE,fontSize:13,lineHeight:2,whiteSpace:"pre-wrap"}}>{m.content}</div></div>
-                </div>
+
+      {/* Quick buttons - single row */}
+      <div style={{display:"flex",gap:4,padding:"6px 12px",flexShrink:0,flexWrap:"wrap",borderBottom:`1px solid ${GOLDDIM}22`,background:"#030303"}}>
+        {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"5px 10px",cursor:"pointer",fontSize:9,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";e.currentTarget.style.color=GOLDDIM;}}>✦ {q}</button>)}
+      </div>
+
+      {/* Chat messages - fills remaining space */}
+      <div style={{flex:1,overflowY:"auto",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+        {msgs.map((m,i)=>(
+          <div key={i} style={{display:"flex",gap:10,flexDirection:m.role==="user"?"row-reverse":"row"}}>
+            <div style={{width:30,height:30,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
+            <div style={{flex:1,maxWidth:"85%"}}>
+              <div style={{color:m.role==="user"?GOLDDIM:GOLD,fontSize:8,fontWeight:900,letterSpacing:2,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
+              <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLD+"22"}`,padding:"10px 12px"}}>
+                <div style={{color:WHITE,fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{m.content}</div>
               </div>
-            ))}
-            {loading&&<div style={{display:"flex",gap:14}}><div style={{width:36,height:36,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}22`,padding:"13px 16px"}}><span style={{color:GOLDDIM,fontSize:11}}>Thinking...</span></div></div>}
-            <div ref={bot}/>
+            </div>
           </div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
-          {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"9px 14px",cursor:"pointer",fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";e.currentTarget.style.color=GOLDDIM;}}>✦ {q}</button>)}
-        </div>
-        <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:16}}>
-          <textarea value={inp2} onChange={e=>setInp2(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-            placeholder="Ask anything about tools, workflow, pricing or production..."
-            style={{width:"100%",height:60,resize:"none",padding:"12px 14px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",marginBottom:8}}/>
-          <button onClick={()=>send()} disabled={loading||!inp2.trim()} style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp2.trim()?GOLDDIM:"#000",padding:"11px 28px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-            {loading?"⟳ THINKING...":"SEND ▶"}
-          </button>
-        </div>
+        ))}
+        {loading&&<div style={{display:"flex",gap:10}}><div style={{width:30,height:30,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}22`,padding:"10px 12px"}}><span style={{color:GOLDDIM,fontSize:11}}>Thinking...</span></div></div>}
+        <div ref={bot}/>
+      </div>
+
+      {/* Input — pinned to bottom */}
+      <div style={{borderTop:`1px solid ${GOLD}44`,padding:"10px 12px",background:"#030303",flexShrink:0,display:"flex",gap:8}}>
+        <textarea value={inp2} onChange={e=>setInp2(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+          placeholder="Ask anything..."
+          style={{flex:1,height:44,resize:"none",padding:"10px 12px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.5,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box"}}/>
+        <button onClick={()=>send()} disabled={loading||!inp2.trim()}
+          style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp2.trim()?GOLDDIM:"#000",padding:"0 20px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>
+          {loading?"⟳":"SEND ▶"}
+        </button>
       </div>
     </div>
   );
