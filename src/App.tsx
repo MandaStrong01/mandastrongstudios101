@@ -3004,28 +3004,20 @@ function P21() {
   };
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"5px 14px"}}>
-        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:10}}>
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"14px 28px"}}>
+        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:16}}>
           <div style={{position:"relative",flexShrink:0}}>
-            <div style={{width:32,height:32,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:900,color:GOLD}}>G</span>
+            <div style={{width:52,height:52,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:24,fontWeight:900,color:GOLD}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-2,right:-2,width:9,height:9,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
+            <div style={{position:"absolute",bottom:-3,right:-3,width:13,height:13,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:13,fontWeight:900,letterSpacing:3,lineHeight:1}}>AGENT GROK</div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:5,height:5,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:8,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
-              <span style={{color:GOLDDIM,fontSize:8,letterSpacing:1}}>23 PAGES · 600+ TOOLS · 54 VOICES</span>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:22,fontWeight:900,letterSpacing:5,lineHeight:1}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:5}}>
+              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
+              <span style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>AI PRODUCTION CONSULTANT · 23 PAGES · 600+ TOOLS · 54 VOICES</span>
             </div>
-          </div>
-          <div style={{display:"flex",gap:4,flexShrink:0}}>
-            {[["23","PG"],["600+","TOOLS"],["54","VOICES"]].map(([v,l])=>(
-              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"3px 6px",textAlign:"center"}}>
-                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:10,fontWeight:900}}>{v}</div>
-                <div style={{color:GOLDDIM,fontSize:6,letterSpacing:1}}>{l}</div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -3102,15 +3094,11 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      <div style={{width:"100%",aspectRatio:"16/6",background:"linear-gradient(135deg,#0a0500,#1a0800,#050200)",overflow:"hidden",position:"relative"}}>
-        <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block",position:"absolute",top:0,left:0}}>
+      <div style={{width:"100%",aspectRatio:"16/9",background:"#000",overflow:"hidden"}}>
+        <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}>
           <source src="background.mp4" type="video/mp4"/>
           <source src="/background.mp4" type="video/mp4"/>
-          <source src="./background.mp4" type="video/mp4"/>
         </video>
-        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-          <div style={{fontFamily:"'Cinzel',serif",color:`${GOLD}22`,fontSize:"clamp(30px,6vw,80px)",fontWeight:900,letterSpacing:12}}>MANDASTRONG</div>
-        </div>
       </div>
       <div style={{padding:"26px 40px 80px"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
