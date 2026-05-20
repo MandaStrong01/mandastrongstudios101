@@ -74,35 +74,83 @@ function speakText(voiceId, txt, onStart, onEnd) {
     utt.pitch = voiceChar ? voiceChar.pitch : 1.0;
     utt.rate  = voiceChar ? voiceChar.rate  : 0.85;
     utt.volume = 1.0;
-    const assignedName = VOICE_ASSIGNMENTS[voiceId];
+
+    // Known female voice name fragments — used to EXCLUDE from male picks
+    const FEMALE_NAMES = /zira|samantha|victoria|moira|karen|susan|lisa|fiona|kate|serena|tessa|ava|allison|linda|heather|emily|joanna|salli|kendra|kimberly|amy|emma|olivia|aria|jenny|natasha|veena|nicky|amelie|lekha|paulina|lucia|maged|carmit|damayanti|ioana|sin-ji|mei-jia|yuna|kyoko|o-ren|sinji|tülay|alice|alva|aaliyah|daria|ellen|ellen|ewa|zosia|mariam|petra|montserrat|yelena|milena|laura|marie|anna|sara|ananya|rishi/i;
+    // Known male voice name fragments
+    const MALE_NAMES   = /daniel|oliver|arthur|george|malcolm|david|james|alex|tom|fred|aaron|lee|gordon|bruce|ryan|eric|luca|onno|jorge|diego|juan|henrik|thomas|viktor|yuri|andrei|ravi|arjun|kofi|tarik|reed|rod|junior|xander|wayne|hunter|frank|wade|tyler|cooper|finn|ewan|paddy|dafydd|pierre|magnus|arjun|kaartan|eddy|stephan|jorge|luciano|carlos|miguel|paulo|vittorio|markus|oskar/i;
+
     let picked = null;
+
+    // 1. Use manually assigned voice if set
+    const assignedName = VOICE_ASSIGNMENTS[voiceId];
     if(assignedName) picked = allVoices.find(v=>v.name===assignedName);
+
+    // 2. Smart gender + origin matching
     if(!picked && voiceChar){
       const origin = (voiceChar.origin||"").toLowerCase();
       const gender = (voiceChar.gender||"").toLowerCase();
-      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm"];
-      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen"];
-      const premiumUSMale   = ["Alex","Tom","Fred","Aaron"];
-      const premiumAussie   = ["Karen","Lee"];
-      const premiumIrish    = ["Moira"];
-      const premiumScottish = ["Fiona"];
-      let candidates = [];
-      if(origin.includes("british")||origin.includes("english"))
-        candidates = gender==="female" ? ["Serena","Tessa","Kate"] : premiumBritish;
-      else if(origin.includes("irish"))    candidates = premiumIrish;
-      else if(origin.includes("scottish")) candidates = premiumScottish;
-      else if(origin.includes("australian")) candidates = premiumAussie;
-      else if(gender==="female") candidates = premiumUSFemale;
-      else candidates = premiumUSMale;
+      const isMale = gender==="male";
+
+      // Build ordered candidate name lists by origin + gender
+      let candidates: string[] = [];
+      if(origin.includes("british")||origin.includes("english")){
+        candidates = isMale
+          ? ["Daniel","Oliver","Arthur","George","Malcolm","David","James"]
+          : ["Serena","Tessa","Kate","Emma","Amy"];
+      } else if(origin.includes("scottish")){
+        candidates = isMale ? ["Gordon","Ewan"] : ["Fiona"];
+      } else if(origin.includes("irish")){
+        candidates = isMale ? ["Paddy","Seamus"] : ["Moira"];
+      } else if(origin.includes("welsh")){
+        candidates = isMale ? ["Rhys","Dafydd"] : ["Siân","Rhiannon"];
+      } else if(origin.includes("australian")){
+        candidates = isMale ? ["Lee","Bruce","Finn"] : ["Karen","Natasha"];
+      } else if(origin.includes("french")){
+        candidates = isMale ? ["Thomas","Pierre"] : ["Amelie","Marie"];
+      } else if(origin.includes("german")){
+        candidates = isMale ? ["Markus","Stefan"] : ["Anna","Petra"];
+      } else if(origin.includes("spanish")){
+        candidates = isMale ? ["Jorge","Diego","Carlos"] : ["Lucia","Monica","Paulina"];
+      } else if(origin.includes("indian")){
+        candidates = isMale ? ["Ravi","Arjun"] : ["Lekha","Ananya"];
+      } else if(origin.includes("african")||origin.includes("nigerian")){
+        candidates = isMale ? ["Kofi","Tarik"] : ["Yemi","Amara"];
+      } else {
+        // Generic American / Neutral
+        candidates = isMale
+          ? ["Alex","Tom","Fred","Aaron","Reed","Rod","Junior","Ryan","Eric","Wayne","Hunter","Frank","Wade","Tyler","Cooper"]
+          : ["Samantha","Ava","Victoria","Susan","Lisa","Allison","Joanna","Salli","Kendra","Kimberly","Aria","Jenny"];
+      }
+
+      // Try named candidates first
       for(const name of candidates){
-        picked = allVoices.find(v=>v.name.includes(name));
+        picked = allVoices.find(v=>v.name.toLowerCase().includes(name.toLowerCase()));
         if(picked) break;
       }
+
+      // Fallback: filter all English voices by gender pattern
+      if(!picked){
+        const enVoices = allVoices.filter(v=>v.lang&&v.lang.startsWith("en"));
+        if(isMale){
+          // Try voices whose names match male patterns
+          picked = enVoices.find(v=>MALE_NAMES.test(v.name));
+          // Then try voices that DON'T match female patterns
+          if(!picked) picked = enVoices.find(v=>!FEMALE_NAMES.test(v.name) && v !== enVoices[0]);
+          if(!picked) picked = enVoices.find(v=>!FEMALE_NAMES.test(v.name));
+        } else {
+          picked = enVoices.find(v=>FEMALE_NAMES.test(v.name));
+          if(!picked) picked = enVoices[0];
+        }
+      }
     }
+
+    // Final fallback
     if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
     if(!picked && allVoices.length) picked = allVoices[0];
+
     if(picked) utt.voice = picked;
-    utt.lang = "en-GB";
+    utt.lang = picked?.lang || "en-GB";
     utt.onstart  = ()=>{ currentUtterance=utt; if(onStart) onStart(); };
     utt.onend    = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
     utt.onerror  = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
@@ -2956,26 +3004,26 @@ function P21() {
   };
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"8px 20px"}}>
-        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:14}}>
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"5px 14px"}}>
+        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:10}}>
           <div style={{position:"relative",flexShrink:0}}>
-            <div style={{width:44,height:44,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,color:GOLD}}>G</span>
+            <div style={{width:32,height:32,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:900,color:GOLD}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-3,right:-3,width:12,height:12,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
+            <div style={{position:"absolute",bottom:-2,right:-2,width:9,height:9,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:18,fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:3,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
-              <span style={{color:GOLDDIM,fontSize:9,letterSpacing:1}}>23 PAGES · 600+ TOOLS · 54 VOICES</span>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:13,fontWeight:900,letterSpacing:3,lineHeight:1}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:5,height:5,borderRadius:"50%",background:"#22c55e"}}/><span style={{color:"#22c55e",fontSize:8,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
+              <span style={{color:GOLDDIM,fontSize:8,letterSpacing:1}}>23 PAGES · 600+ TOOLS · 54 VOICES</span>
             </div>
           </div>
-          <div style={{display:"flex",gap:6,flexShrink:0}}>
+          <div style={{display:"flex",gap:4,flexShrink:0}}>
             {[["23","PG"],["600+","TOOLS"],["54","VOICES"]].map(([v,l])=>(
-              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"4px 8px",textAlign:"center"}}>
-                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:12,fontWeight:900}}>{v}</div>
-                <div style={{color:GOLDDIM,fontSize:7,letterSpacing:1}}>{l}</div>
+              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}44`,padding:"3px 6px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:10,fontWeight:900}}>{v}</div>
+                <div style={{color:GOLDDIM,fontSize:6,letterSpacing:1}}>{l}</div>
               </div>
             ))}
           </div>
@@ -3054,11 +3102,15 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      <div style={{width:"100%",aspectRatio:"16/6",background:"#000",overflow:"hidden"}}>
-        <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none";}}>
-          <source src="/background.mp4" type="video/mp4"/>
+      <div style={{width:"100%",aspectRatio:"16/6",background:"linear-gradient(135deg,#0a0500,#1a0800,#050200)",overflow:"hidden",position:"relative"}}>
+        <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block",position:"absolute",top:0,left:0}}>
           <source src="background.mp4" type="video/mp4"/>
+          <source src="/background.mp4" type="video/mp4"/>
+          <source src="./background.mp4" type="video/mp4"/>
         </video>
+        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+          <div style={{fontFamily:"'Cinzel',serif",color:`${GOLD}22`,fontSize:"clamp(30px,6vw,80px)",fontWeight:900,letterSpacing:12}}>MANDASTRONG</div>
+        </div>
       </div>
       <div style={{padding:"26px 40px 80px"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
