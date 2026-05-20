@@ -593,7 +593,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(4);
 
       // ── BEAT ANALYSIS ─────────────────────────────────────────────
-      let totalDur = 180;
+      let totalDur = ({"2 Minutes":120,"3 Minutes":180,"4 Minutes":240,"5 Minutes":300}[config.duration]||180);
       let beatGrid = [];
       let audioCtx = null, audioDest = null, audioSource = null;
 
@@ -602,7 +602,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           audioCtx = new (window.AudioContext||window.webkitAudioContext)();
           const ab = await audioFile.arrayBuffer();
           const buf = await audioCtx.decodeAudioData(ab);
-          totalDur = buf.duration;
+          totalDur = (isFinite(buf.duration)&&buf.duration>0) ? Math.min(buf.duration, 600) : 180;
           // Energy-based beat detection
           const data = buf.getChannelData(0);
           const sr = buf.sampleRate;
@@ -637,166 +637,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       // One function. All scenes. Seamless transitions. Beat responsive.
       addLog("Claude is writing your film renderer...");
 
-      const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
-
-Write a SINGLE JavaScript function that renders a complete cinematic music video. NO cartoons. NO outlines. NO flat colours. PHOTOREALISTIC gradients only.
-
-SCENE: "${sceneDesc}"
-SONG: "${config.title}" by ${config.artist}
-MOOD: ${config.mood}
-COLOUR GRADE: ${config.colorGrade}
-TOTAL DURATION: ${totalDur.toFixed(0)} seconds
-
-Function signature: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
-- t = 0.0 to 1.0 (overall film progress)
-- sec = current second
-- beatNow = true on beat frames
-- W=1280, H=720
-
-PHOTOREALISM RULES — NEVER BREAK THESE:
-- NO cartoon outlines. NO thick strokes around shapes. NO cell shading.
-- Every surface built from gradients. Every shape has light side and shadow side.
-- Sky: multi-stop linearGradient matching time of day. Never flat colour.
-- Humans: skin = radialGradient (warm highlight centre, cooler edge). Face has real features.
-- Water/ocean: animated wave layers using Math.sin(x*freq+sec*speed) filled paths. Deep blue-black.
-- Moon: radialGradient white glow. Long silver shimmer column on water below.
-- Candle: radialGradient flicker with Math.sin(sec*9.1)*0.05. Warm amber glow fills room.
-- Room interior: dark walls, floor visible, furniture shapes, lamp glow radialGradients.
-- Silhouette: solid dark shape, NOT an outline — filled ellipses and rects for body parts.
-
-FOR THIS SPECIFIC SCENE — DRAW LITERALLY:
-${sceneDesc.includes('windowsill') || sceneDesc.includes('ocean') || sceneDesc.includes('guitar') ? `
-// NIGHT SKY gradient:
-const sky = ctx.createLinearGradient(0,0,0,H*0.55);
-sky.addColorStop(0,'rgb(2,4,15)');
-sky.addColorStop(1,'rgb(8,20,55)');
-ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
-
-// STARS: 180 dots with sin flicker
-for(let s=0;s<180;s++){
-  const sx=(s*137.5)%W, sy=(s*97.3)%H*0.5;
-  ctx.fillStyle='rgba(255,255,255,'+(0.4+Math.sin(sec*0.7+s)*0.3)+')';
-  ctx.fillRect(sx,sy,1,1);
-}
-
-// MOON at upper right:
-const moonX=W*0.72, moonY=H*0.15;
-const mg=ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,H*0.08);
-mg.addColorStop(0,'rgba(255,255,248,0.95)');
-mg.addColorStop(0.5,'rgba(240,240,220,0.6)');
-mg.addColorStop(1,'rgba(200,200,180,0)');
-ctx.fillStyle=mg; ctx.fillRect(moonX-H*0.1,moonY-H*0.1,H*0.2,H*0.2);
-
-// MOONLIGHT SHIMMER on water:
-const shim=ctx.createLinearGradient(moonX-20,H*0.5,moonX+20,H);
-shim.addColorStop(0,'rgba(255,255,220,0)');
-shim.addColorStop(0.4,'rgba(255,255,200,0.15)');
-shim.addColorStop(1,'rgba(255,255,180,0)');
-ctx.fillStyle=shim; ctx.fillRect(moonX-25,H*0.5,50,H*0.5);
-
-// OCEAN: 8 wave layers
-for(let w=0;w<8;w++){
-  const wg=ctx.createLinearGradient(0,H*0.54+w*12,0,H);
-  wg.addColorStop(0,'rgba('+(5+w*3)+','+(15+w*8)+','+(50+w*12)+','+(0.6+w*0.04)+')');
-  wg.addColorStop(1,'rgba(1,3,8,0.95)');
-  ctx.fillStyle=wg;
-  ctx.beginPath(); ctx.moveTo(-10,H);
-  for(let x=0;x<=W+10;x+=4){
-    const y=H*0.58+w*14+Math.sin(x*0.008+sec*(0.3+w*0.08)+w*1.2)*18+Math.sin(x*0.02+sec*0.6+w)*7;
-    x===0?ctx.lineTo(x,y):ctx.lineTo(x,y);
-  }
-  ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();
-}
-
-// ROOM INTERIOR (dark walls behind figure):
-const wall=ctx.createLinearGradient(0,0,0,H*0.6);
-wall.addColorStop(0,'rgba(8,5,3,0.95)');
-wall.addColorStop(1,'rgba(4,2,1,0.98)');
-ctx.fillStyle=wall; ctx.fillRect(0,0,W*0.55,H*0.9);
-
-// WINDOW FRAME:
-const wx=W*0.08, wy=H*0.08, ww=W*0.4, wh=H*0.75;
-ctx.strokeStyle='rgba(60,40,20,0.95)'; ctx.lineWidth=10;
-ctx.strokeRect(wx,wy,ww,wh);
-ctx.beginPath(); ctx.moveTo(wx,wy+wh*0.48); ctx.lineTo(wx+ww,wy+wh*0.48); ctx.stroke();
-ctx.beginPath(); ctx.moveTo(wx+ww*0.5,wy); ctx.lineTo(wx+ww*0.5,wy+wh); ctx.stroke();
-
-// FIGURE ON WINDOWSILL — silhouette, head bowed over guitar:
-const fx=W*0.22, fy=H*0.52;
-ctx.fillStyle='rgba(2,1,1,0.97)';
-// Head bowed forward
-ctx.beginPath(); ctx.ellipse(fx,fy-H*0.13,H*0.038,H*0.042,0.35,0,Math.PI*2); ctx.fill();
-// Torso
-ctx.fillRect(fx-H*0.028,fy-H*0.09,H*0.056,H*0.15);
-// Guitar body
-ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy+H*0.02,H*0.05,H*0.065,0.25,0,Math.PI*2); ctx.fill();
-ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy-H*0.04,H*0.04,H*0.05,0.25,0,Math.PI*2); ctx.fill();
-// Guitar neck
-ctx.fillRect(fx+H*0.025,fy-H*0.09,H*0.01,H*0.12);
-// Arm reaching to guitar
-ctx.save(); ctx.strokeStyle='rgba(2,1,1,0.97)'; ctx.lineWidth=H*0.022;
-ctx.beginPath(); ctx.moveTo(fx-H*0.02,fy); ctx.lineTo(fx+H*0.06,fy+H*0.02); ctx.stroke();
-ctx.restore();
-// Legs
-ctx.fillRect(fx-H*0.022,fy+H*0.06,H*0.018,H*0.1);
-ctx.fillRect(fx+H*0.004,fy+H*0.06,H*0.018,H*0.1);
-
-// CANDLE (right side of room):
-const cx2=W*0.68, cy2=H*0.6;
-const flicker=0.9+Math.sin(sec*8.3)*0.07+Math.sin(sec*13.1)*0.04;
-ctx.fillStyle='rgba(235,215,170,0.9)'; ctx.fillRect(cx2-5,cy2,10,32);
-const cf=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,32*flicker);
-cf.addColorStop(0,'rgba(255,255,200,0.95)');
-cf.addColorStop(0.3,'rgba(255,180,40,0.75)');
-cf.addColorStop(1,'rgba(255,100,0,0)');
-ctx.fillStyle=cf; ctx.fillRect(cx2-32,cy2-32,64,64);
-const rg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,W*0.3);
-rg.addColorStop(0,'rgba(255,140,30,0.1)');
-rg.addColorStop(1,'rgba(0,0,0,0)');
-ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
-
-// CURTAIN (flowing breeze):
-const ct=sec*0.6;
-ctx.strokeStyle='rgba(160,140,120,0.45)'; ctx.lineWidth=2.5;
-for(let ci=0;ci<2;ci++){
-  const cxb=wx+ww*(ci===0?0.02:0.96);
-  ctx.beginPath(); ctx.moveTo(cxb,wy);
-  ctx.bezierCurveTo(cxb+Math.sin(ct+ci)*22,wy+wh*0.3,cxb+Math.sin(ct+1+ci)*28,wy+wh*0.6,cxb+Math.sin(ct+2+ci)*18,wy+wh);
-  ctx.stroke();
-}
-` : ''}
-
-STRUCTURE — divide by t:
-- t 0.00-0.08: Fade in from black. Title card gold text.
-- t 0.08-0.30: Wide establishing shot. Camera slowly drifts forward.
-- t 0.30-0.55: Close ups — hands on strings, candle flame, curtains, moonlit water.
-- t 0.55-0.75: Pull back wide. Emotional peak. Ocean wider.
-- t 0.75-0.90: Return to figure silhouette. Stillness.
-- t 0.90-1.00: Fade to black. Final title.
-
-ALWAYS END WITH — in this exact order:
-1. Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.08,W/2,H/2,W*0.85); vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.92)'); ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
-2. Letterbox: ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);
-3. Grain: for(let g=0;g<25;g++){ctx.fillStyle='rgba(200,200,200,0.007)';ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
-4. Fade in: if(t<0.05){ctx.fillStyle='rgba(0,0,0,'+(1-t*20)+')';ctx.fillRect(0,0,W,H);}
-5. Fade out: if(t>0.92){ctx.fillStyle='rgba(0,0,0,'+((t-0.92)*12.5)+')';ctx.fillRect(0,0,W,H);}
-
-BEAT RESPONSE: if(beatNow){ctx.save();ctx.translate(W/2,H/2);ctx.scale(1.012,1.012);ctx.translate(-W/2,-H/2);}
-[draw scene]
-if(beatNow){ctx.restore();}
-
-Return ONLY the function starting with exactly:
-function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
-
-      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:filmPrompt}]})
-      });
-      const d = await res.json();
-      if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
-
-      let code = d.content&&d.content[0]?d.content[0].text.trim():"";
+      const filmPrompt = "You are the MandaStrong Cinema Engine. PHOTOREALISTIC ONLY. NO cartoons. NO outlines. NO flat colours. NO geometric shapes.\n\nRender this EXACT scene as the user described it:\nSCENE: "+JSON.stringify(sceneDesc)+"\nSONG: "+JSON.stringify(config.title||"Untitled")+" by "+(config.artist||"Artist")+"\nMOOD: "+(config.mood||"Cinematic")+"\nCOLOUR GRADE: "+(config.colorGrade||"Cinematic Teal and Orange")+"\nDURATION: "+Math.round(totalDur)+" seconds\n\nFUNCTION: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)\nt=0-1 overall progress, W=1280, H=720, beatNow=true on a beat hit.\n\nDivide into 6 acts by t: 0-0.15 intro, 0.15-0.35 build, 0.35-0.55 core, 0.55-0.75 escalation, 0.75-0.90 climax, 0.90-1.0 resolution.\n\nMANDATORY TECHNIQUES:\n- Sky/BG: createLinearGradient minimum 4 colour stops. No solid fills ever.\n- Humans: radialGradient skin tones only. Breathing Math.sin(sec*0.85)*0.007. Eye blink. No outlines, no stick figures.\n- Lights: ALL radialGradient. Candle rgba(255,220,80,0.9), moon rgba(220,235,255,0.85), city glow.\n- Water: 10 bezier wave paths with animated Math.sin offsets. Dark navy gradients.\n- Parallax: 3 depth layers with ctx.save/translate.\n- Beat response: when beatNow, briefly scale canvas 1.008 or flash rgba(255,255,255,0.04).\n- Vignette, letterbox, film grain, colour grade, fade in/out — always draw last.\n\nReturn ONLY the complete function starting with EXACTLY: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {";
       const bt=String.fromCharCode(96,96,96);
       code = code.replace(new RegExp(bt+"javascript|"+bt+"js|"+bt,"g"),"").trim();
       const fi = code.indexOf("function renderFilm"); if(fi>0)code=code.slice(fi);
@@ -1374,12 +1215,22 @@ function P6Voice({ onSave, setMediaLib }) {
     const gb=all.filter(v=>v.lang==="en-GB"),us=all.filter(v=>v.lang==="en-US"),au=all.filter(v=>v.lang==="en-AU");
     const hash=vc.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
     const isMale=vc.gender==="Male",isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
+    // Deep voice names for males, soft names for females
+    const deepMaleNames=/daniel|oliver|arthur|malcolm|george|alex|fred|tom|aaron|guy|bruce|lee|david|mark/i;
+    const softFemaleNames=/kate|serena|emily|moira|fiona|samantha|ava|victoria|zoe|susan|karen|tessa/i;
     let pool=[];
-    if(isBritish&&isMale)pool=[...gb.filter(v=>/daniel|oliver|arthur/i.test(v.name)),...gb];
-    else if(isBritish)pool=[...gb.filter(v=>/kate|serena|emily|moira/i.test(v.name)),...gb];
-    else if(isAU)pool=[...au,...all];
-    else if(isMale)pool=[...us.filter(v=>/alex|fred|tom/i.test(v.name)),...us];
-    else pool=[...us.filter(v=>/samantha|ava|victoria/i.test(v.name)),...us];
+    if(isBritish&&isMale){
+      pool=[...gb.filter(v=>deepMaleNames.test(v.name)),...gb.filter(v=>!softFemaleNames.test(v.name))];
+    } else if(isBritish&&!isMale){
+      pool=[...gb.filter(v=>softFemaleNames.test(v.name)),...gb.filter(v=>!deepMaleNames.test(v.name))];
+    } else if(isAU){
+      pool=[...au,...all];
+    } else if(isMale){
+      pool=[...us.filter(v=>deepMaleNames.test(v.name)),...us.filter(v=>!softFemaleNames.test(v.name)),...all.filter(v=>!softFemaleNames.test(v.name))];
+    } else {
+      pool=[...us.filter(v=>softFemaleNames.test(v.name)),...us.filter(v=>!deepMaleNames.test(v.name)),...all.filter(v=>!deepMaleNames.test(v.name))];
+    }
+    // Also apply pitch adjustment to reinforce gender
     if(!pool.length)pool=all;
     const unique=[...new Map(pool.map(v=>[v.name,v])).values()];
     return unique[hash%unique.length]||all[0];
@@ -1389,7 +1240,10 @@ function P6Voice({ onSave, setMediaLib }) {
     window.speechSynthesis.cancel();
     const utt=new SpeechSynthesisUtterance(txt);
     const sv=pickSysVoice(vc);if(sv)utt.voice=sv;
-    utt.pitch=vc.pitch||1.0;utt.rate=vc.rate||0.85;utt.volume=1.0;
+    // Males pitched lower, females higher for more human distinction
+    const pitchOffset=vc.gender==="Male"?-0.1:vc.gender==="Female"?0.1:0;
+    utt.pitch=Math.max(0.1,Math.min(2.0,(vc.pitch||1.0)+pitchOffset));
+    utt.rate=vc.rate||0.85;utt.volume=1.0;
     window.speechSynthesis.speak(utt);
   };
 
@@ -1627,7 +1481,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 The user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.`
         : "";
 
-      const directorPrompt="You are the MandaStrong Cinema Engine. PHOTOREALISTIC ONLY. NO cartoons. NO outlines. NO flat colours.\n\nSCENE: "+JSON.stringify(prompt)+"\nDURATION: "+duration+" seconds"+refInstruction+"\n\nWrite: function drawFrame(ctx, W, H, t, sec) — t=0 to 1, W=1920, H=1080\n\nMANDATORY: All backgrounds createLinearGradient min 3 stops. Humans with skin-tone gradients, breathing animation. All lights as radialGradient. Ocean: 8 bezier wave paths. Parallax 3 depth layers. Vignette, letterbox, film grain, fade in/out. Return ONLY the function starting with: function drawFrame(ctx, W, H, t, sec) {";
+      const directorPrompt="You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer. You produce PHOTOGRAPHIC QUALITY output. ZERO cartoons. ZERO outlines. ZERO flat colours. ZERO geometric shapes.\n\nSCENE TO RENDER: "+JSON.stringify(prompt)+"\nEXACT DURATION: "+duration+" seconds"+refInstruction+"\n\nFUNCTION SIGNATURE: function drawFrame(ctx, W, H, t, sec)\nt = 0.0 to 1.0 (progress through clip), sec = elapsed seconds, W=1920, H=1080\n\nYOU MUST USE THESE EXACT TECHNIQUES:\n\nSKY: ctx.createLinearGradient(0,0,0,H*0.6) with minimum 4 colour stops. Night: rgba(1,2,12,1) > rgba(3,6,25,1) > rgba(8,18,55,1) > rgba(12,28,70,1). Dawn: rgba(10,5,30,1) > rgba(80,20,10,1) > rgba(200,100,20,1) > rgba(255,200,100,1).\n\nOCEAN WAVES: Draw 10 separate wave layers. Each layer: ctx.beginPath(), moveTo(0, baseY), series of bezierCurveTo calls across full width using Math.sin(x*0.006+sec*(0.12+i*0.04)+i*1.1)*22 for vertical offset. Fill each with ctx.createLinearGradient — deep navy rgba(2,8,40,1) at top to near-black rgba(1,3,18,1) at bottom.\n\nHUMAN FIGURES — CRITICAL: Build every person from layered shapes with skin-tone gradients ONLY. Head: ctx.arc filled with ctx.createRadialGradient — centre rgba(220,170,120,1) to edge rgba(160,110,70,1). Body: ctx.fillRect with ctx.createLinearGradient skin tones. Hair: ctx.arc or bezier path filled dark brown/black. Eyes: two small ctx.arc shapes filled dark. Lips: small bezier path filled rgba(180,90,80,1). BREATHING: multiply torso height by (1+Math.sin(sec*0.85)*0.007). EYE BLINK: if(Math.sin(sec*0.37+hash)>0.94) draw thin ellipse over eye. ABSOLUTELY NO STICK FIGURES. ABSOLUTELY NO OUTLINES.\n\nLIGHTING — ALL radialGradient: Candle: ctx.createRadialGradient(cx,cy,0,cx,cy,130) rgba(255,230,100,0.9)>rgba(255,160,20,0.5)>rgba(0,0,0,0). Moon: ctx.createRadialGradient(mx,my,0,mx,my,220) rgba(230,240,255,0.85)>rgba(180,200,240,0.3)>rgba(0,0,0,0). Fire: 5 overlapping radialGradients with Math.sin(sec*7+i)*8 flicker.\n\nPARALLAX DEPTH: ctx.save(); ctx.translate(-t*W*0.012,0); [draw distant mountains/sky]; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.032,0); [draw mid elements]; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.068,0); [draw foreground]; ctx.restore();\n\nATMOSPHERE: 60 dust particles. Each: small ctx.arc rgba(255,255,240,0.04) at position (px+Math.sin(sec*0.3+i)*2, py-sec*0.4%H).\n\nPOST-PROCESSING — DRAW THESE LAST IN THIS ORDER:\n1. Vignette: ctx.createRadialGradient(W/2,H/2,W*0.28,W/2,H/2,W*0.88) rgba(0,0,0,0)>rgba(0,0,0,0.82). fillRect(0,0,W,H).\n2. Letterbox: ctx.fillStyle=rgba(0,0,0,1). fillRect(0,0,W,H*0.074). fillRect(0,H*0.926,W,H*0.074).\n3. Film grain: for i<50: ctx.fillStyle=rgba(rand>0.5?200:10,rand>0.5?200:10,rand>0.5?200:10,0.009). fillRect(rand*W,rand*H,1,1).\n4. Colour grade: ctx.globalAlpha=0.055. fillStyle rgba(255,140,40,1) for warm scenes OR rgba(20,40,90,1) for cool/night. fillRect. ctx.globalAlpha=1.\n5. Fade in: if(t<0.04) ctx.fillStyle=rgba(0,0,0,"+(1-t*25)+") fillRect(0,0,W,H).\n6. Fade out: if(t>0.93) ctx.fillStyle=rgba(0,0,0,"+((t-0.93)*14.3)+") fillRect(0,0,W,H).\n\nReturn ONLY the complete JavaScript function. Zero markdown. Zero explanation. Start with EXACTLY: function drawFrame(ctx, W, H, t, sec) {";
       fnCode=fnCode.replace(/```javascript|```js|```/g,"").trim();
       const fnStart=fnCode.indexOf("function drawFrame");
       if(fnStart>0)fnCode=fnCode.slice(fnStart);
@@ -3094,7 +2948,7 @@ function P21() {
   };
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"22px 32px 18px"}}>
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"12px 24px 10px"}}>
         <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center",gap:20}}>
           <div style={{position:"relative",flexShrink:0}}>
             <div style={{width:72,height:72,background:"linear-gradient(135deg,#1a0a00,#050200)",border:`2px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 40px ${GOLD}55`}}>
@@ -3193,7 +3047,7 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      <div style={{width:"100%",aspectRatio:"16/9",background:"#000",overflow:"hidden"}}>
+      <div style={{width:"100%",aspectRatio:"16/6",background:"#000",overflow:"hidden"}}>
         <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none";}}>
           <source src="/background.mp4" type="video/mp4"/>
           <source src="background.mp4" type="video/mp4"/>
