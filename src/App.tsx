@@ -3027,7 +3027,7 @@ function P21() {
             <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3}}>● PRODUCTION CONSULTATION</span>
             <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome. How can I assist?"}])} style={{background:"none",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
           </div>
-          <div style={{height:380,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{height:"calc(100vh - 320px)",minHeight:320,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
             {msgs.map((m,i)=>(
               <div key={i} style={{display:"flex",gap:14,flexDirection:m.role==="user"?"row-reverse":"row"}}>
                 <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
