@@ -1836,16 +1836,8 @@ function P1({ go }) {
             const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
 
             if(window.deferredInstallPrompt){
-              // Chrome/Edge/Android — native install prompt
               window.deferredInstallPrompt.prompt();
               window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
-            } else {
-              // Desktop — look for install icon in address bar
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
             }
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
@@ -3021,13 +3013,13 @@ function P21() {
           </div>
         </div>
       </div>
-      <div style={{maxWidth:860,margin:"0 auto",padding:"24px 32px 80px",display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{maxWidth:860,margin:"0 auto",padding:"16px 24px",display:"flex",flexDirection:"column",gap:10}}>
         <div style={{background:"#030303",border:`1px solid ${GOLDDIM}33`}}>
-          <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLDDIM}33`,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLDDIM}33`,padding:"8px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3}}>● PRODUCTION CONSULTATION</span>
             <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome. How can I assist?"}])} style={{background:"none",border:`1px solid ${GOLDDIM}44`,color:GOLDDIM,padding:"3px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
           </div>
-          <div style={{height:"calc(100vh - 320px)",minHeight:320,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{height:200,overflowY:"auto",padding:"12px 18px",display:"flex",flexDirection:"column",gap:10}}>
             {msgs.map((m,i)=>(
               <div key={i} style={{display:"flex",gap:14,flexDirection:m.role==="user"?"row-reverse":"row"}}>
                 <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${m.role==="user"?GOLDDIM:GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
@@ -3041,16 +3033,16 @@ function P21() {
             <div ref={bot}/>
           </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
-          {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"9px 14px",cursor:"pointer",fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:4}}>
+          {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}33`,color:GOLDDIM,padding:"7px 12px",cursor:"pointer",fontSize:9,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";e.currentTarget.style.color=GOLDDIM;}}>✦ {q}</button>)}
         </div>
-        <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:16}}>
+        <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:12}}>
           <textarea value={inp2} onChange={e=>setInp2(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
             placeholder="Ask anything about tools, workflow, pricing or production..."
-            style={{width:"100%",height:60,resize:"none",padding:"12px 14px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",marginBottom:8}}/>
-          <button onClick={()=>send()} disabled={loading||!inp2.trim()} style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp2.trim()?GOLDDIM:"#000",padding:"11px 28px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+            style={{width:"100%",height:50,resize:"none",padding:"10px 14px",fontSize:12,background:"#0a0800",border:`1px solid ${GOLDDIM}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",marginBottom:8}}/>
+          <button onClick={()=>send()} disabled={loading||!inp2.trim()} style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLDDIM+"33":GOLD}`,color:loading||!inp2.trim()?GOLDDIM:"#000",padding:"9px 24px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
             {loading?"⟳ THINKING...":"SEND ▶"}
           </button>
         </div>
@@ -3094,8 +3086,10 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      <div style={{width:"100%",aspectRatio:"16/9",background:"#000",overflow:"hidden"}}>
+      <div style={{width:"100%",height:"56vw",maxHeight:"80vh",minHeight:300,background:"#000",overflow:"hidden",display:"block"}}>
         <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}>
+          <source src="background (5).mp4" type="video/mp4"/>
+          <source src="/background (5).mp4" type="video/mp4"/>
           <source src="background.mp4" type="video/mp4"/>
           <source src="/background.mp4" type="video/mp4"/>
         </video>
