@@ -1316,34 +1316,19 @@ const VOICE_CHARACTERS = [
   {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal · Dreamy · Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
 
-function P6Voice({ onSave }) {
-  const [text,setText]=useState("");
-  const [processed,setProcessed]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [speaking,setSpeaking]=useState(false);
-  const [mood,setMood]=useState("Neutral");
-  const [saved,setSaved]=useState(false);
-  const [copied,setCopied]=useState(false);
-  const [showMVS,setShowMVS]=useState(false);
-  const [selVoice,setSelVoice]=useState("james");
-  const [search,setSearch]=useState("");
-  const [filterGender,setFilterGender]=useState("All");
-  const [filterAge,setFilterAge]=useState("All");
-  const [filterOrigin,setFilterOrigin]=useState("All");
-  const [speed,setSpeed]=useState(0.82);
-  const [pitchV,setPitchV]=useState(1.0);
-  const [pauseLen,setPauseLen]=useState(700);
-  const [volume,setVolume]=useState(1.0);
-  const [activeTab,setActiveTab]=useState("speak");
-  const [sysVoices,setSysVoices]=useState([]);
-  const [audioUrl,setAudioUrl]=useState("");
-  const [audioSaved,setAudioSaved]=useState(false);
-  const chunksRef=useRef([]);
-  const idxRef=useRef(0);
-  const timerRef=useRef(null);
+function P6Voice({ onSave, setMediaLib }) {
+  const [text,setText]=useState(""); const [loading,setLoading]=useState(false);
+  const [speaking,setSpeaking]=useState(false); const [mood,setMood]=useState("Neutral");
+  const [savedToLib,setSavedToLib]=useState(false); const [showMVS,setShowMVS]=useState(false);
+  const [selVoice,setSelVoice]=useState("james"); const [search,setSearch]=useState("");
+  const [filterGender,setFilterGender]=useState("All"); const [filterAge,setFilterAge]=useState("All");
+  const [filterOrigin,setFilterOrigin]=useState("All"); const [speed,setSpeed]=useState(0.62);
+  const [pitchV,setPitchV]=useState(0.86); const [pauseLen,setPauseLen]=useState(1600);
+  const [volume,setVolume]=useState(1.0); const [sysVoices,setSysVoices]=useState([]);
+  const chunksRef=useRef([]); const idxRef=useRef(0); const timerRef=useRef(null);
 
   useEffect(()=>{
-    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en")));
+    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
     load(); window.speechSynthesis.onvoiceschanged=load;
     return()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);};
   },[]);
@@ -1351,7 +1336,6 @@ function P6Voice({ onSave }) {
   const ORIGINS=["All","British","Scottish","Irish","Welsh","American","Australian","New Zealand","South African","West African","Indian","Spanish","French","Scandinavian","Nigerian","Fantasy","Neutral"];
   const AGES=["All","Child","Teen","Adult","Elderly"];
   const GENDERS=["All","Male","Female"];
-
   const filtered=VOICE_CHARACTERS.filter(v=>{
     const mg=filterGender==="All"||v.gender===filterGender;
     const ma=filterAge==="All"||v.age===filterAge;
@@ -1362,219 +1346,145 @@ function P6Voice({ onSave }) {
   const selected=VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
   const pickSysVoice=(vc)=>{
-    if(!sysVoices.length)return null;
-    // Priority: named premium voices first, then language match, then fallback
-    const allEn = sysVoices.filter(v=>v.lang.startsWith("en"));
-    const gb = allEn.filter(v=>v.lang==="en-GB");
-    const us = allEn.filter(v=>v.lang==="en-US");
-    const au = allEn.filter(v=>v.lang==="en-AU");
-    const isMale = vc.gender==="Male";
-    const isBritish = ["British","Scottish","Irish","Welsh"].includes(vc.origin);
-    const isAU = ["Australian","New Zealand"].includes(vc.origin);
-
-    // Premium named voices — highest quality
-    const premiumMaleGB = gb.find(v=>/daniel|oliver|arthur|malcolm/i.test(v.name));
-    const premiumFemaleGB = gb.find(v=>/kate|serena|moira|emily/i.test(v.name));
-    const premiumMaleUS = us.find(v=>/alex|fred|tom|ryan|guy/i.test(v.name));
-    const premiumFemaleUS = us.find(v=>/samantha|zoe|ava|susan|victoria/i.test(v.name));
-    const premiumAU = au.find(v=>/karen|lee/i.test(v.name));
-
-    if(isBritish) return isMale?(premiumMaleGB||gb.find(v=>v.name.toLowerCase().includes("male"))||gb[0]||premiumMaleUS||allEn[0]):(premiumFemaleGB||gb[0]||premiumFemaleUS||allEn[0]);
-    if(isAU) return premiumAU||au[0]||allEn[0];
-    if(vc.origin==="Irish") return gb.find(v=>/moira/i.test(v.name))||gb[0]||allEn[0];
-    // Default US/neutral
-    return isMale?(premiumMaleUS||us.find(v=>v.name.toLowerCase().includes("male"))||us[0]||allEn[0]):(premiumFemaleUS||us[0]||allEn[0]);
+    const all=sysVoices.length?sysVoices:window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
+    if(!all.length)return null;
+    const gb=all.filter(v=>v.lang==="en-GB"),us=all.filter(v=>v.lang==="en-US"),au=all.filter(v=>v.lang==="en-AU");
+    const hash=vc.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
+    const isMale=vc.gender==="Male",isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
+    const deepMaleNames=/daniel|oliver|arthur|malcolm|george|alex|fred|tom|aaron|guy|bruce|lee|david|mark/i;
+    const softFemaleNames=/kate|serena|emily|moira|fiona|samantha|ava|victoria|zoe|susan|karen|tessa/i;
+    let pool=[];
+    if(isBritish&&isMale){pool=[...gb.filter(v=>deepMaleNames.test(v.name)),...gb.filter(v=>!softFemaleNames.test(v.name))];}
+    else if(isBritish&&!isMale){pool=[...gb.filter(v=>softFemaleNames.test(v.name)),...gb.filter(v=>!deepMaleNames.test(v.name))];}
+    else if(isAU){pool=[...au,...all];}
+    else if(vc.origin==="Irish"){pool=gb.filter(v=>/moira/i.test(v.name));}
+    else if(isMale){pool=[...us.filter(v=>deepMaleNames.test(v.name)),...us.filter(v=>!softFemaleNames.test(v.name)),...all.filter(v=>!softFemaleNames.test(v.name))];}
+    else{pool=[...us.filter(v=>softFemaleNames.test(v.name)),...us.filter(v=>!deepMaleNames.test(v.name)),...all.filter(v=>!deepMaleNames.test(v.name))];}
+    if(!pool.length)pool=all;
+    const unique=[...new Map(pool.map(v=>[v.name,v])).values()];
+    return unique[hash%unique.length]||all[0];
   };
 
-  
+  const speakOneShot=(vc,txt)=>{
+    window.speechSynthesis.cancel();
+    const utt=new SpeechSynthesisUtterance(txt);
+    const sv=pickSysVoice(vc);if(sv)utt.voice=sv;
+    utt.pitch=Math.max(0.1,Math.min(2.0,vc.pitch||1.0));
+    utt.rate=vc.rate||0.85;utt.volume=1.0;
+    window.speechSynthesis.speak(utt);
+  };
+
   const speakNow=(txt)=>{
     window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
     const chunks=buildChunks(txt);chunksRef.current=chunks;idxRef.current=0;setSpeaking(true);
-    const baseRate=speed*(selected.rate||0.9);
-    const basePitch=pitchV*(selected.pitch||1.0);
-    const totalChunks=chunks.length;
+    const baseRate=speed*(selected.rate||0.9),basePitch=pitchV*(selected.pitch||1.0);
     const next=()=>{
       const idx=idxRef.current;
       if(idx>=chunksRef.current.length){setSpeaking(false);return;}
       const chunk=chunksRef.current[idx];
-      if(chunk.type==="breath"||chunk.type==="ellipsis"||!chunk.text){
-        idxRef.current=idx+1;timerRef.current=setTimeout(next,pauseLen*0.6);return;
-      }
-      const liveVoices=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-      const liveV=liveVoices.length>0?pickSysVoice(selected):null;
+      if(!chunk||!chunk.text){idxRef.current=idx+1;timerRef.current=setTimeout(next,200);return;}
+      const sv=pickSysVoice(selected);
       const utt=new SpeechSynthesisUtterance(chunk.text);
-      if(liveV)utt.voice=liveV;
-      utt.volume=volume;
-      const rVar=[0,0.03,-0.03,0.02,-0.015,0.025,-0.02,0.01]; // More natural variation
-      const pVar=[0,0.025,-0.02,0.04,-0.025,0.015,-0.03,0.02]; // Richer pitch contour
-      let pitchMod=chunk.type==="question"?0.12:chunk.type==="exclaim"?0.08:chunk.type==="sentence"&&idx===totalChunks-1?-0.06:0;
-      // Detect emphasis (ALL CAPS words) and slow down slightly
-      const hasEmphasis=/\b[A-Z]{2,}\b/.test(chunk.text);
-      const emphasisMod=hasEmphasis?-0.05:0;
-      const emphasisPitch=hasEmphasis?0.06:0;
-      utt.rate=Math.max(0.1,Math.min(2.0,baseRate+rVar[idx%rVar.length]+emphasisMod));
-      utt.pitch=Math.max(0.1,Math.min(2.0,basePitch+pVar[idx%pVar.length]+pitchMod+emphasisPitch));
-      const afterPause=chunk.type==="question"?Math.round(pauseLen*1.1):chunk.type==="sentence"?pauseLen:chunk.type==="clause"?Math.round(pauseLen*0.4):Math.round(pauseLen*0.15);
-      utt.onend=()=>{idxRef.current=idx+1;timerRef.current=setTimeout(next,afterPause);};
+      if(sv)utt.voice=sv;utt.volume=volume;
+      utt.rate=Math.max(0.1,Math.min(2.0,baseRate));
+      utt.pitch=Math.max(0.1,Math.min(2.0,basePitch+(chunk.type==="question"?0.1:chunk.type==="exclaim"?0.07:0)));
+      const ap=chunk.type==="question"?Math.round(pauseLen*1.1):chunk.type==="sentence"?pauseLen:Math.round(pauseLen*0.4);
+      utt.onend=()=>{idxRef.current=idx+1;timerRef.current=setTimeout(next,ap);};
       utt.onerror=()=>{idxRef.current=idx+1;next();};
       window.speechSynthesis.speak(utt);
     };
-    const voices=window.speechSynthesis.getVoices();
-    if(voices.length>0){setTimeout(()=>next(),50);}
-    else{window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(()=>next(),50);};}
-  };
-
-  const processAndSpeak=async()=>{
-    if(!text.trim())return;
-    setLoading(true);setProcessed("");setSaved(false);
-    try{
-      const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:`You are a speech coach preparing text for TTS. Speaker: ${selected.name} — ${selected.style}. Break into short sentences, add commas for natural pauses, spell out numbers. Output ONLY the reformatted text:\n\n${text}`}]})});
-      const d=await res.json();
-      const out=d.content&&d.content[0]?d.content[0].text.trim():text;
-      setProcessed(out);setActiveTab("result");speakNow(out);
-    }catch(e){setProcessed(text);speakNow(text);}
-    setLoading(false);
+    window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);};
   };
 
   const stop=()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);setSpeaking(false);};
+
+  const processAndSpeak=async()=>{
+    if(!text.trim())return;setLoading(true);
+    try{
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"Speech coach for TTS. Speaker: "+selected.name+" - "+selected.style+". Mood: "+mood+". Reformat for natural speech: short sentences, commas for pauses, numbers spelled out. Return ONLY reformatted text:\n\n"+text}]});
+      speakNow(d&&d.content&&d.content[0]?d.content[0].text.trim():text);
+    }catch(e){speakNow(text);}
+    setLoading(false);
+  };
+
   const inp={width:"100%",background:"#000",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",color:WHITE,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.9};
 
-  return (
+  return(
     <div style={{...Sp}}>
       {showMVS&&<MusicVideoStudio onClose={()=>setShowMVS(false)} onSave={onSave}/>}
       <div style={{padding:"12px 18px",borderBottom:`1px solid ${GOLDDIM}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>AI WORKSTATION 02 — CINEMA VOICE ENGINE</div>
-          <h1 style={{...H1,fontSize:24,margin:0}}>TEXT TO LIFELIKE SPEECH</h1>
-        </div>
-        <button onClick={()=>setShowMVS(true)} style={{...G("gold",true)}}>
-          🎬 MUSIC VIDEO STUDIO
-        </button>
+        <div><div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>AI WORKSTATION 02 — CINEMA VOICE ENGINE</div><h1 style={{...H1,fontSize:24,margin:0}}>TEXT TO LIFELIKE SPEECH</h1></div>
+        <button onClick={()=>setShowMVS(true)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"10px 20px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>🎬 MUSIC VIDEO STUDIO</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"290px 1fr",minHeight:"calc(100vh - 120px)"}}>
         <div style={{borderRight:`1px solid ${GOLDDIM}`,background:"#030303",display:"flex",flexDirection:"column"}}>
           <div style={{padding:"10px 10px 6px"}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:8}}>VOICE LIBRARY — {filtered.length} / {VOICE_CHARACTERS.length}</div>
-            <div style={{marginBottom:5}}>
-              <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>GENDER</div>
-              <div style={{display:"flex",gap:4}}>
-                {GENDERS.map(g=><button key={g} onClick={()=>setFilterGender(g)} style={{flex:1,background:filterGender===g?GOLD:"#111",border:`1px solid ${filterGender===g?"#000":GOLDDIM}`,color:filterGender===g?"#000":WHITE,padding:"3px 0",cursor:"pointer",fontSize:10,fontWeight:900}}>{g}</button>)}
-              </div>
-            </div>
-            <div style={{marginBottom:5}}>
-              <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>AGE</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                {AGES.map(a=><button key={a} onClick={()=>setFilterAge(a)} style={{background:filterAge===a?GOLD:"#111",border:`1px solid ${filterAge===a?"#000":GOLDDIM}`,color:filterAge===a?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>{a}</button>)}
-              </div>
-            </div>
-            <div style={{marginBottom:6}}>
-              <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>ORIGIN</div>
-              <select value={filterOrigin} onChange={e=>setFilterOrigin(e.target.value)} style={{width:"100%",background:"#111",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"4px 8px",fontSize:11,outline:"none"}}>
-                {ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..." style={{...inp,padding:"6px 10px",fontSize:11,height:30,marginBottom:0}}/>
+            <div style={{marginBottom:5}}><div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>GENDER</div><div style={{display:"flex",gap:4}}>{GENDERS.map(g=><button key={g} onClick={()=>setFilterGender(g)} style={{flex:1,background:filterGender===g?GOLD:"#111",border:`1px solid ${filterGender===g?"#000":GOLDDIM}`,color:filterGender===g?"#000":WHITE,padding:"3px 0",cursor:"pointer",fontSize:10,fontWeight:900}}>{g}</button>)}</div></div>
+            <div style={{marginBottom:5}}><div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>AGE</div><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{AGES.map(a=><button key={a} onClick={()=>setFilterAge(a)} style={{background:filterAge===a?GOLD:"#111",border:`1px solid ${filterAge===a?"#000":GOLDDIM}`,color:filterAge===a?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>{a}</button>)}</div></div>
+            <div style={{marginBottom:6}}><div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginBottom:3}}>ORIGIN</div><select value={filterOrigin} onChange={e=>setFilterOrigin(e.target.value)} style={{width:"100%",background:"#111",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"4px 8px",fontSize:11,outline:"none"}}>{ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..." style={{...inp,padding:"6px 10px",fontSize:11,height:30}}/>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 6px 80px"}}>
             {filtered.map(v=>(
-              <div key={v.id} onClick={()=>setSelVoice(v.id)}
-                style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:`2px solid ${selVoice===v.id?GOLD:GOLDDIM}`,cursor:"pointer",transition:"border-color .15s"}}>
+              <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:`2px solid ${selVoice===v.id?GOLD:GOLDDIM}`,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:18}}>{v.emoji}</span>
-                    <div>
-                      <div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900,letterSpacing:1}}>{v.name}</div>
-                      <div style={{color:GOLDDIM,fontSize:10,letterSpacing:1}}>{v.origin} · {v.gender} · {v.age}</div>
-                    </div>
+                    <div><div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900}}>{v.name}</div><div style={{color:GOLDDIM,fontSize:10}}>{v.origin} · {v.gender} · {v.age}</div></div>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{color:GOLDDIM,fontSize:9,letterSpacing:1}}>PITCH {v.pitch} · RATE {v.rate}</div>
-                    </div>
-                    <button onClick={e=>{e.stopPropagation();setSelVoice(v.id);setTimeout(()=>speakNow("Hello. This is "+v.name+". "+v.desc),100);}}
-                      style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 8px",cursor:"pointer",fontSize:9,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>
-                      ▶ TEST
-                    </button>
-                  </div>
+                  <button onClick={e=>{e.stopPropagation();setSelVoice(v.id);speakOneShot(v,"Hello, this is "+v.name+". "+v.desc);}}
+                    style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 10px",cursor:"pointer",fontSize:9,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap",flexShrink:0}}>▶ TEST</button>
                 </div>
                 <div style={{color:DIM,fontSize:10,lineHeight:1.5}}>{v.style}</div>
-                {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ SELECTED — SPEAK ABOVE TO USE THIS VOICE</div>}
+                {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ SELECTED</div>}
               </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
-        {/* RIGHT PANEL — speak + sliders always visible */}
         <div style={{display:"flex",flexDirection:"column",background:"#030303",overflowY:"auto",padding:20}}>
-          {/* Selected voice info */}
-          <div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"10px 14px",marginBottom:14,flexShrink:0}}>
+          <div style={{background:"#000",border:`1px solid ${GOLDDIM}`,padding:"10px 14px",marginBottom:14}}>
             <div style={{color:WHITE,fontSize:13,fontWeight:900}}>{selected.name} {selected.emoji} · {selected.origin} · {selected.gender}</div>
             <div style={{color:GOLDDIM,fontSize:11,marginTop:3}}>{selected.style}</div>
             <div style={{color:DIM,fontSize:11,marginTop:2,fontStyle:"italic"}}>{selected.desc}</div>
           </div>
-
-          {/* Script textarea */}
-          <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>YOUR NARRATION SCRIPT</div>
-          <textarea value={text} onChange={e=>setText(e.target.value)}
-            placeholder="Paste your narration script here..."
-            style={{width:"100%",background:"#000",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",color:WHITE,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.9,height:180,resize:"vertical",marginBottom:14}}/>
-
-          {/* Sliders — always visible */}
           <div style={{background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",marginBottom:14}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:10}}>VOICE SETTINGS</div>
-            <div style={{marginBottom:14}}>
-              <div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>MOOD</div>
-              <select value={mood} onChange={e=>setMood(e.target.value)} style={{width:"100%",background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"9px 12px",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}>
-                {["Neutral","Happy","Sad","Angry","Excited","Calm","Dramatic","Mysterious","Romantic","Sarcastic","Melancholic","Authoritative","Warm"].map(m=>(<option key={m} value={m} style={{background:"#000"}}>{m}</option>))}
+            <div style={{marginBottom:10}}><div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:4}}>MOOD</div>
+              <select value={mood} onChange={e=>setMood(e.target.value)} style={{width:"100%",background:"#0a0800",border:`1px solid ${GOLDDIM}`,color:WHITE,padding:"8px 12px",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}>
+                {["Neutral","Happy","Sad","Angry","Excited","Calm","Dramatic","Mysterious","Romantic","Sarcastic","Melancholic","Authoritative","Warm"].map(m=><option key={m} value={m} style={{background:"#000"}}>{m}</option>)}
               </select>
             </div>
-            {[
-              ["SPEED",speed,0.3,1.5,0.01,(v)=>setSpeed(v),`${speed.toFixed(2)}x`],
-              ["PITCH",pitchV,0.3,2.0,0.01,(v)=>setPitchV(v),`${pitchV.toFixed(2)}`],
-              ["PAUSE (ms)",pauseLen,200,2000,50,(v)=>setPauseLen(v),`${pauseLen}ms`],
-              ["VOLUME",volume,0.1,1.0,0.05,(v)=>setVolume(v),`${Math.round(volume*100)}%`],
-            ].map(([label,val,min,max,step,setter,display])=>(
+            {[["SPEED",speed,0.3,1.5,0.01,v=>setSpeed(v),speed.toFixed(2)+"x"],["PITCH",pitchV,0.3,2.0,0.01,v=>setPitchV(v),pitchV.toFixed(2)],["PAUSE (ms)",pauseLen,200,2000,50,v=>setPauseLen(v),pauseLen+"ms"],["VOLUME",volume,0.1,1.0,0.05,v=>setVolume(v),Math.round(volume*100)+"%"]].map(([label,val,mn,mx,st,setter,display])=>(
               <div key={label} style={{marginBottom:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                  <span style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>{label}</span>
-                  <span style={{color:GOLD,fontSize:11,fontWeight:900}}>{display}</span>
-                </div>
-                <input type="range" min={min} max={max} step={step} value={val}
-                  onChange={e=>setter(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>{label}</span><span style={{color:GOLD,fontSize:11,fontWeight:900}}>{display}</span></div>
+                <input type="range" min={mn} max={mx} step={st} value={val} onChange={e=>setter(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
               </div>
             ))}
-
           </div>
-
-          {/* Speak buttons */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-            <button onClick={processAndSpeak} disabled={loading||!text.trim()}
-              style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1}}>
-              {loading?"⟳ PREPARING...":"✦ PREPARE & SPEAK"}
-            </button>
-            <button onClick={()=>{if(speaking){stop();}else{speakNow(text);}}} disabled={!text.trim()}
-              style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1}}>
-              {speaking?"⏹ STOP":"▶ SPEAK NOW"}
-            </button>
-          </div>
-
-          {/* Result */}
-          {processed&&(
-            <div>
-              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>AI-FORMATTED RESULT</div>
-              <textarea value={processed} onChange={e=>setProcessed(e.target.value)}
-                style={{width:"100%",background:"#000",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.9,height:140,resize:"vertical",marginBottom:8}}/>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                <button onClick={()=>speakNow(processed)} style={{...G("gold",false),padding:"10px"}}>▶ PLAY</button>
-                <button onClick={stop} style={{...G("out",false),padding:"10px"}}>⏹ STOP</button>
-                <button onClick={()=>{if(onSave)onSave({id:Date.now()+Math.random(),name:`${selected.name} — Narration`,type:"audio/narration",content:processed,url:""});setSaved(true);}}
-                  style={{...G("gold",false),padding:"10px"}}>{saved?"✓ SAVED":"💾 SAVE"}</button>
-              </div>
-              {saved&&<div style={{marginTop:8,background:"#061406",border:"1px solid #22c55e",padding:"8px",textAlign:"center",color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:2}}>✓ SAVED TO MEDIA LIBRARY</div>}
+          <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>YOUR NARRATION SCRIPT</div>
+          <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Paste your narration script here..."
+            style={{...inp,height:160,resize:"vertical",marginBottom:14}}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+            <div style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"12px 14px"}}>
+              <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>TEST SCRIPT</div>
+              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Hear your script with current voice and settings.</div>
+              <button onClick={()=>speaking?stop():speakNow(text)} disabled={!text.trim()} style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1}}>{speaking?"⏹ STOP":"▶ TEST SCRIPT"}</button>
             </div>
-          )}
+            <div style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"12px 14px"}}>
+              <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,marginBottom:6}}>RESET</div>
+              <div style={{color:WHITE,fontSize:11,lineHeight:1.7,marginBottom:10}}>Clear script and reset all settings.</div>
+              <button onClick={()=>{stop();setText("");setSavedToLib(false);setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(1.0);setMood("Neutral");}} style={{background:"transparent",border:`1px solid ${GOLD}`,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>↺ RESET ALL</button>
+            </div>
+          </div>
+          <button onClick={processAndSpeak} disabled={loading||!text.trim()} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
+            {loading?"⟳ PREPARING AND SPEAKING...":"✦ PREPARE AND SPEAK"}
+          </button>
+          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}} disabled={!text.trim()} style={{background:savedToLib?"#061406":"transparent",border:`1px solid ${savedToLib?"#22c55e":GOLD}`,color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"12px",fontSize:12,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",fontWeight:900,opacity:!text.trim()?0.5:1}}>
+            {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
+          </button>
         </div>
+      </div>
     </div>
   );
 }
@@ -2088,21 +1998,48 @@ function P1({ go }) {
 }
 
 function P2({ go }) {
-  return (
-    <div style={{...Sp,padding:40}}>
-      <div style={{maxWidth:880,margin:"0 auto"}}>
-        <div style={{fontSize:12,color:GOLD,letterSpacing:4,marginBottom:8,fontWeight:700}}>AI CREATOR PLATFORM</div>
-        <h1 style={{...H1,fontSize:30,marginBottom:14}}>MAKE AWESOME FAMILY MOVIES OR TURN YOUR DREAMS INTO REALITY</h1>
-        <p style={{color:WHITE,fontSize:15,lineHeight:1.9,maxWidth:720,marginBottom:28}}>MandaStrong Studio combines 600+ professional AI tools with an intuitive cinematic workspace — so anyone can create stunning short films, family videos, or feature-length productions up to 3 hours long.</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:28}}>
-          {[["600+","AI Tools"],["8K","Export Quality"],["3 HOURS","Max Duration"],["1TB","Cloud Storage"]].map(([v,l])=>(
-            <div key={v} style={{...Card(),textAlign:"center",padding:14}}>
-              <div style={{color:GOLD,fontFamily:"'Cinzel',serif",fontSize:22,fontWeight:900}}>{v}</div>
-              <div style={{color:WHITE,fontSize:11,marginTop:4,fontWeight:600,letterSpacing:1}}>{l}</div>
+  const pipeline=[{n:"01",ic:"✍",t:"WRITE",d:"Script, logline, scenes",p:5},{n:"02",ic:"🎙",t:"VOICE",d:"54 AI voice characters",p:6},{n:"03",ic:"🎨",t:"IMAGE",d:"AI-generated stills",p:7},{n:"04",ic:"🎬",t:"VIDEO",d:"Cinema scene engine",p:8},{n:"05",ic:"⏱",t:"TIMELINE",d:"Multi-track editor",p:13},{n:"06",ic:"🎚",t:"MIX",d:"4-channel audio mixer",p:15},{n:"07",ic:"⚡",t:"RENDER",d:"Up to 4K export",p:16}];
+  const templates=[{ic:"🎬",t:"FEATURE FILM",d:"90-minute drama.",pages:[5,6,8,13,15,16],bg:"#1a0800"},{ic:"🎥",t:"DOCUMENTARY",d:"60-minute documentary.",pages:[5,6,8,13,15,16],bg:"#061a06"},{ic:"🎵",t:"MUSIC VIDEO",d:"Beat-synced cinematic video.",pages:[6,8,13,16],bg:"#0a0618"},{ic:"🎭",t:"SHORT FILM",d:"10-minute narrative.",pages:[5,6,8,13,16],bg:"#0a0a18"},{ic:"👨‍👩‍👧",t:"FAMILY MOVIE",d:"30-minute family film.",pages:[5,6,8,13,16],bg:"#1a0a00"},{ic:"📖",t:"AUDIOBOOK",d:"Narrated audiobook.",pages:[5,6,15,16],bg:"#181200"}];
+  return(
+    <div style={{...Sp,padding:"0 0 40px"}}>
+      <div style={{padding:"20px 24px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <div><div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM</div><h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,4vw,40px)",fontWeight:900,letterSpacing:6,margin:0}}>STUDIO DASHBOARD</h1></div>
+        <button onClick={()=>go(5)} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 28px",fontSize:13,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>+ NEW PROJECT</button>
+      </div>
+      <div style={{padding:"0 24px 20px"}}>
+        <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:12}}>PRODUCTION PIPELINE</div>
+        <div style={{display:"flex",gap:0,overflowX:"auto"}}>
+          {pipeline.map((step,i)=>(
+            <div key={step.n} style={{display:"flex",alignItems:"center",flexShrink:0}}>
+              <div onClick={()=>go(step.p)} style={{background:"#0a0800",border:`1px solid ${GOLDDIM}`,padding:"14px 16px",cursor:"pointer",textAlign:"center",minWidth:120}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;}}>
+                <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,marginBottom:4}}>STEP {step.n}</div>
+                <div style={{fontSize:20,marginBottom:4}}>{step.ic}</div>
+                <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:2,marginBottom:2}}>{step.t}</div>
+                <div style={{color:WHITE,fontSize:10,lineHeight:1.3}}>{step.d}</div>
+              </div>
+              {i<pipeline.length-1&&<div style={{color:GOLDDIM,fontSize:14,padding:"0 3px",flexShrink:0}}>›</div>}
             </div>
           ))}
         </div>
-        <button onClick={()=>go(4)} style={{...G("gold",false)}}>START CREATING</button>
+      </div>
+      <div style={{padding:"0 24px"}}>
+        <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:12}}>QUICK START TEMPLATES</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+          {templates.map(tmpl=>(
+            <div key={tmpl.t} style={{background:tmpl.bg,border:`1px solid ${GOLDDIM}33`,padding:"16px 18px",cursor:"pointer"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM+"33";}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:24}}>{tmpl.ic}</span><span style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2}}>{tmpl.t}</span></div>
+              <div style={{color:WHITE,fontSize:12,lineHeight:1.6,marginBottom:10}}>{tmpl.d}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {tmpl.pages.map(p=>(
+                  <button key={p} onClick={()=>go(p)} style={{background:"transparent",border:`1px solid ${GOLDDIM}`,color:GOLDDIM,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.color=GOLDDIM;}}>P{p}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
