@@ -3307,7 +3307,7 @@ function P23({ go }) {
       <div style={{padding:"20px 40px 80px"}}>
         <div style={{maxWidth:860,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,textShadow:`0 0 30px ${GOLD}99`,marginBottom:6}}>THAT'S ALL FOLKS</h1>
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:`0 0 40px ${GOLD}99`,marginBottom:24}}>THAT'S ALL FOLKS</h1>
           <div style={{color:WHITE,fontSize:12,letterSpacing:3,marginBottom:10}}>THANK YOU FOR CREATING WITH US</div>
           <video autoPlay loop playsInline muted preload="auto"
             style={{width:"100%",display:"block",margin:"0 auto 20px",border:`1px solid ${GOLD}`,background:"#000"}}
@@ -3485,46 +3485,8 @@ export default function App() {
     }
   };
 
-const allPages=[
-    {p:1,el:<P1 go={go}/>},
-    {p:2,el:<P2 go={go}/>},
-    {p:3,el:<P3/>},
-    {p:4,el:<P4 go={go} setUser={setUser}/>},
-    {p:5,el:<ToolPage title="WRITING TOOLS" subtitle="AI WORKSTATION 01 — WRITING" tools={WRITING} onSave={saveAsset}/>},
-    {p:6,el:<P6Voice onSave={saveAsset} setMediaLib={setMediaLib}/>},
-    {p:7,el:<ToolPage title="IMAGE TOOLS" subtitle="AI WORKSTATION 03 — IMAGE" tools={IMAGE_T} onSave={saveAsset}/>},
-    {p:8,el:<P8VideoGenerator onSave={saveAsset} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
-    {p:9,el:<ToolPage title="MOTION & VFX" subtitle="AI WORKSTATION 05 — MOTION" tools={MOTION} onSave={saveAsset}/>},
-    {p:10,el:<ToolPage title="ENHANCEMENT STUDIO" subtitle="AI WORKSTATION 06 — ENHANCE" tools={MOTION} onSave={saveAsset}/>},
-    {p:11,el:<P11 mediaLib={mediaLib} setMediaLib={setMediaLib}/>},
-    {p:12,el:<P12 go={go} mediaLib={mediaLib}/>},
-    {p:13,el:<P13 go={go} mediaLib={mediaLib} timeline={timeline} setTimeline={setTimeline} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
-    {p:14,el:<P14/>},
-    {p:15,el:<P15/>},
-    {p:16,el:<P16 go={go} timeline={timeline} setRendered={setRendered} mediaLib={mediaLib} setMediaLib={setMediaLib} user={user} filmDuration={filmDuration} setFilmDuration={setFilmDuration}/>},
-    {p:17,el:<P17 go={go} rendered={rendered} mediaLib={mediaLib}/>},
-    {p:18,el:<P18 rendered={rendered} mediaLib={mediaLib}/>},
-    {p:19,el:<P19 go={go}/>},
-    {p:20,el:<P20/>},
-    {p:21,el:<P21/>},
-    {p:22,el:<P22/>},
-    {p:23,el:<P23 go={go}/>},
-  ];
 
-  return (
-    <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      <Header go={go} setMenu={setMenu}/>
-      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
-      {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
-      {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
-      {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
-      <div style={{minHeight:"calc(100vh - 116px)"}}>
-        <div key={page}>{renderPage()}</div>
-      </div>
-      <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
-    </div>
-  );
-}  const renderPage=()=>{
+  const renderPage=()=>{
     switch(page){
       case 1: return <P1 go={go}/>;
       case 2: return <P2 go={go}/>;
@@ -3552,3 +3514,18 @@ const allPages=[
       default: return <P1 go={go}/>;
     }
   }
+
+  return (
+    <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
+      <Header go={go} setMenu={setMenu}/>
+      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
+      {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
+      {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
+      {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
+      <div style={{minHeight:"calc(100vh - 116px)"}}>
+        <div key={page}>{renderPage()}</div>
+      </div>
+      <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
+    </div>
+  );
+}  
