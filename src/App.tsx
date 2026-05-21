@@ -1937,6 +1937,26 @@ function drawFrame(ctx, W, H, t, sec) {`;
 
 
 function P1({ go }) {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+  const handleInstall = () => {
+    if (isStandalone) {
+      go(4);
+      return;
+    }
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
+    if (window.deferredInstallPrompt) {
+      window.deferredInstallPrompt.prompt();
+      window.deferredInstallPrompt.userChoice.then(() => { window.deferredInstallPrompt = null; });
+    } else if (isIOS) {
+      alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button \u2191 at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
+    } else if (isAndroid) {
+      alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu \u22ee in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
+    } else {
+      alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon \u2295 in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
+    }
+  };
   return (
     <div style={{...Sp}}>
       <div style={{background:"#000",padding:"56px 40px 36px",textAlign:"center",position:"relative",overflow:"hidden"}}>
@@ -1967,30 +1987,10 @@ function P1({ go }) {
       </div>
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-          <button onClick={()=>{
-            // Detect device and trigger correct install method
-            const ua = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua);
-            const isAndroid = /android/.test(ua);
-            const isMobile = isIOS || isAndroid;
-            const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
-
-            if(window.deferredInstallPrompt){
-              // Chrome/Edge/Android — native install prompt
-              window.deferredInstallPrompt.prompt();
-              window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
-            } else {
-              // Desktop — look for install icon in address bar
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
-            }
-          }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
-            ⬇ DOWNLOAD APP
+          <button onClick={handleInstall} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
+            {isStandalone ? "▶ OPEN APP" : "⬇ DOWNLOAD APP"}
           </button>
-          <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>BROWSER MENU → ADD TO HOME SCREEN</div>
+          <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>{isStandalone ? "TAP TO ENTER THE STUDIO" : "BROWSER MENU → ADD TO HOME SCREEN"}</div>
         </div>
       </div>
     </div>
@@ -3143,65 +3143,72 @@ function P21() {
     setLoading(false);
   };
   return(
-    <div style={{...Sp,display:"flex",flexDirection:"column",paddingBottom:160}}>
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"18px 24px",flexShrink:0}}>
-        <div style={{maxWidth:920,margin:"0 auto",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+    <div style={{...Sp,display:"flex",flexDirection:"column",height:"calc(100vh - 52px)",minHeight:"calc(100vh - 52px)",maxHeight:"calc(100vh - 52px)",overflow:"hidden",paddingBottom:0}}>
+      {/* Header — fixed at top */}
+      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"14px 20px",flexShrink:0}}>
+        <div style={{maxWidth:920,margin:"0 auto",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
           <div style={{position:"relative",flexShrink:0}}>
-            <div style={{width:72,height:72,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 28px ${GOLD}77`}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:38,fontWeight:900,color:"#000"}}>G</span>
+            <div style={{width:60,height:60,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 22px ${GOLD}77`}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:30,fontWeight:900,color:"#000"}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-2,right:-2,width:16,height:16,background:"#22c55e",border:"3px solid #000",borderRadius:"50%"}}/>
+            <div style={{position:"absolute",bottom:-2,right:-2,width:14,height:14,background:"#22c55e",border:"3px solid #000",borderRadius:"50%"}}/>
           </div>
-          <div style={{flex:1,minWidth:180}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(26px,4vw,42px)",fontWeight:900,letterSpacing:5,lineHeight:1,textShadow:`0 0 28px ${GOLD}88`}}>AGENT GROK</div>
-            <div style={{display:"flex",alignItems:"center",gap:14,marginTop:6,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:9,height:9,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 8px #22c55e"}}/><span style={{color:"#22c55e",fontSize:13,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
-              <span style={{color:GOLD,fontSize:13,letterSpacing:2,fontWeight:700}}>YOUR AI PRODUCTION CONSULTANT</span>
+          <div style={{flex:1,minWidth:160}}>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(20px,3vw,34px)",fontWeight:900,letterSpacing:5,lineHeight:1,textShadow:`0 0 22px ${GOLD}88`}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:5,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/><span style={{color:"#22c55e",fontSize:12,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
+              <span style={{color:GOLD,fontSize:12,letterSpacing:2,fontWeight:700}}>YOUR AI PRODUCTION CONSULTANT</span>
             </div>
           </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {[["23","PAGES"],["600+","TOOLS"],["54","VOICES"],["4K","RENDER"]].map(([v,l])=>(
-              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLD}55`,padding:"8px 12px",textAlign:"center",minWidth:52}}>
-                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900}}>{v}</div>
-                <div style={{color:"#22c55e",fontSize:10,letterSpacing:1,marginTop:2,fontWeight:700}}>{l}</div>
+              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLD}55`,padding:"6px 10px",textAlign:"center",minWidth:48}}>
+                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:14,fontWeight:900}}>{v}</div>
+                <div style={{color:"#22c55e",fontSize:9,letterSpacing:1,marginTop:2,fontWeight:700}}>{l}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
-      <div style={{flex:1,overflowY:"auto",padding:"20px 24px"}}>
-        <div style={{maxWidth:920,margin:"0 auto",display:"flex",flexDirection:"column",gap:12}}>
-          <div style={{background:"#030303",border:`1px solid ${GOLD}44`}}>
-            <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLD}44`,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:GOLD,fontSize:13,fontWeight:900,letterSpacing:3}}>● LIVE PRODUCTION CONSULTATION</span>
-              <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}])} style={{background:"none",border:`1px solid ${GOLD}44`,color:GOLD,padding:"4px 14px",cursor:"pointer",fontSize:11,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
+
+      {/* Chat panel header */}
+      <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLD}44`,padding:"8px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+        <span style={{color:GOLD,fontSize:12,fontWeight:900,letterSpacing:3}}>● LIVE PRODUCTION CONSULTATION</span>
+        <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}])} style={{background:"none",border:`1px solid ${GOLD}44`,color:GOLD,padding:"3px 12px",cursor:"pointer",fontSize:11,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
+      </div>
+
+      {/* Messages — grows to fill all remaining space */}
+      <div style={{flex:1,overflowY:"auto",padding:"14px 20px",display:"flex",flexDirection:"column",gap:10,background:"#030303"}}>
+        <div style={{maxWidth:920,margin:"0 auto",width:"100%",display:"flex",flexDirection:"column",gap:10}}>
+          {msgs.map((m,i)=>(
+            <div key={i} style={{display:"flex",gap:10,flexDirection:m.role==="user"?"row-reverse":"row"}}>
+              <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
+              <div style={{flex:1,maxWidth:"82%"}}>
+                <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
+                <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${GOLD}33`,padding:"10px 14px"}}><div style={{color:WHITE,fontSize:14,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{m.content}</div></div>
+              </div>
             </div>
-            <div style={{height:320,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              {msgs.map((m,i)=>(
-                <div key={i} style={{display:"flex",gap:12,flexDirection:m.role==="user"?"row-reverse":"row"}}>
-                  <div style={{width:40,height:40,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
-                  <div style={{flex:1,maxWidth:"82%"}}>
-                    <div style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:3,marginBottom:4,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
-                    <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${GOLD}33`,padding:"12px 16px"}}><div style={{color:WHITE,fontSize:14,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{m.content}</div></div>
-                  </div>
-                </div>
-              ))}
-              {loading&&<div style={{display:"flex",gap:12}}><div style={{width:40,height:40,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}33`,padding:"12px 16px"}}><span style={{color:GOLD,fontSize:13}}>Thinking...</span></div></div>}
-              <div ref={bot}/>
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:6}}>
-            {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLD}44`,color:GOLD,padding:"10px 14px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.5}}
+          ))}
+          {loading&&<div style={{display:"flex",gap:10}}><div style={{width:36,height:36,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}33`,padding:"10px 14px"}}><span style={{color:GOLD,fontSize:13}}>Thinking...</span></div></div>}
+          <div ref={bot}/>
+        </div>
+      </div>
+
+      {/* Quick questions + input — fixed at bottom */}
+      <div style={{flexShrink:0,borderTop:`1px solid ${GOLD}33`,background:"#030303"}}>
+        <div style={{maxWidth:920,margin:"0 auto",padding:"10px 20px",display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:5}}>
+            {QUICK.map(q=><button key={q} onClick={()=>send(q)} style={{background:"#0a0800",border:`1px solid ${GOLD}44`,color:GOLD,padding:"8px 12px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
               onMouseEnter={e=>{e.currentTarget.style.background="#150a00";e.currentTarget.style.borderColor=GOLD;}}
               onMouseLeave={e=>{e.currentTarget.style.background="#0a0800";e.currentTarget.style.borderColor=GOLD+"44";}}>✦ {q}</button>)}
           </div>
-          <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:16}}>
+          <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
             <textarea value={inp2} onChange={e=>setInp2(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
               placeholder="Ask anything about tools, workflow, pricing or production..."
-              style={{width:"100%",height:64,resize:"none",padding:"12px 14px",fontSize:14,background:"#0a0800",border:`1px solid ${GOLD}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",marginBottom:10}}/>
+              style={{flex:1,height:52,resize:"none",padding:"10px 12px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLD}44`,color:WHITE,outline:"none",lineHeight:1.5,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box"}}/>
             <button onClick={()=>send()} disabled={loading||!inp2.trim()}
-              style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLD+"33":GOLD}`,color:loading||!inp2.trim()?GOLD:"#000",padding:"12px 32px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-              {loading?"⟳ THINKING...":"SEND ▶"}
+              style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLD+"33":GOLD}`,color:loading||!inp2.trim()?GOLD:"#000",padding:"10px 22px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",height:52,flexShrink:0}}>
+              {loading?"THINKING...":"SEND ▶"}
             </button>
           </div>
         </div>
@@ -3268,7 +3275,7 @@ function HowToGuide() {
   return(
     <div style={{textAlign:"left",marginBottom:24}}>
       <button onClick={()=>setBarOpen(o=>!o)} style={{width:"100%",background:barOpen?"#0a0600":"#050400",border:`2px solid ${GOLD}`,padding:"18px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
-        <span style={{fontFamily:"'Cinzel',serif",color:GOLD,fontWeight:900,fontSize:15,letterSpacing:3}}>📖 MANDASTRONG STUDIO HOW TO USE GUIDE</span>
+        <span style={{fontFamily:"'Cinzel',serif",color:GOLD,fontWeight:900,fontSize:15,letterSpacing:3}}>📖 MANDASTRONG STUDIO HOW TO YO GUIDE</span>
         <span style={{color:GOLD,fontSize:20,fontWeight:900,flexShrink:0,marginLeft:16}}>{barOpen?"▲":"▼"}</span>
       </button>
       {barOpen&&(
@@ -3300,40 +3307,62 @@ function HowToGuide() {
 function P23({ go }) {
   return(
     <div style={{...Sp,padding:0}}>
+      <div style={{padding:"28px 40px 0",textAlign:"center",background:"#000"}}>
+        <div style={{maxWidth:880,margin:"0 auto"}}>
+          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:`0 0 40px ${GOLD}99`,margin:"0 0 24px"}}>THAT'S ALL FOLKS</h1>
+        </div>
+      </div>
+
+      {/* Background video */}
       <video key="bg-video" autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",aspectRatio:"16/9",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
       </video>
-      <div style={{padding:"24px 40px 80px"}}>
+
+      <div style={{padding:"28px 40px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
-          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:`0 0 40px ${GOLD}99`,marginBottom:20}}>THAT'S ALL FOLKS</h1>
-          <div style={{color:WHITE,fontSize:14,letterSpacing:3,marginBottom:16}}>THANK YOU FOR CREATING WITH US</div>
+
+          {/* Thank You Letter */}
+          <div style={{color:WHITE,fontSize:15,letterSpacing:3,marginBottom:24,fontWeight:600}}>THANK YOU FOR CREATING WITH US</div>
+
+          {/* ThatsAllFolks video */}
           <video autoPlay loop playsInline muted preload="auto"
-            style={{width:"100%",display:"block",marginBottom:20,border:`1px solid ${GOLD}`,background:"#000"}}
+            style={{width:"100%",display:"block",marginBottom:28,border:`1px solid ${GOLD}`,background:"#000"}}
             onError={e=>{e.currentTarget.style.display="none";}}>
             <source src="/ThatsAllFolks.mp4" type="video/mp4"/>
             <source src="ThatsAllFolks.mp4" type="video/mp4"/>
           </video>
-          <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:24}}/>
-          <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:28}}>
-            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
-            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
-          </div>
+
+          <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:28}}/>
+
+          {/* How To Guide */}
           <HowToGuide/>
+
           <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,margin:"28px 0"}}/>
+
+          {/* Mission statement */}
           <div style={{...Card(),textAlign:"left",marginBottom:24,background:"#050500",border:`2px solid ${GOLD}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ OUR MISSION ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>MandaStrong Studio was built with one belief: <strong style={{color:GOLD}}>that every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio. I built this because I believe technology should serve humanity, and art should serve truth.</p>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>Every subscription supports our commitment to anti-bullying programmes in schools, veterans mental health initiatives, and humanitarian causes. All proceeds from the Etsy store are donated directly to these organisations. When you create with MandaStrong Studio, you are part of something bigger than a film.</p>
           </div>
+
+          {/* Etsy link */}
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
-            style={{display:"block",background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,color:"#000",padding:"22px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",boxShadow:`0 0 40px ${GOLD}55`}}>
+            style={{display:"block",background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,color:"#000",padding:"22px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",boxShadow:`0 0 40px ${GOLD}55`,marginBottom:28}}>
             🛍 VISIT MANDASTRONG1.ETSY.COM · ALL PROCEEDS DONATED TO HUMANITARIAN, CHILDREN & VETERANS ORGANISATIONS
           </a>
+
+          {/* HOME / EXIT — bottom of page */}
+          <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:24}}/>
+          <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
+            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
+          </div>
         </div>
       </div>
     </div>
