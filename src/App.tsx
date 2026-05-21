@@ -545,17 +545,22 @@ function MusicVideoStudio({ onClose, onSave }) {
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioName, setAudioName] = useState("");
+  const [refVideoFile, setRefVideoFile] = useState(null);
+  const [refVideoUrl, setRefVideoUrl] = useState("");
+  const [refVideoName, setRefVideoName] = useState("");
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const audioInputRef = useRef(null);
+  const refVideoInputRef = useRef(null);
 
+  const [mvDuration, setMvDuration] = useState(3);
   const [config, setConfig] = useState({
     title:"If Only", artist:"Manda", genre:"Folk / Acoustic",
     mood:"Melancholic", tempo:"Slow (60-80 BPM)",
     videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
     effects:["Slow Motion","Film Grain","Vignette"],
-    cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",
+    cuts:"Long Takes", aspectRatio:"16:9",
     visualDesc:"",
   });
   const set = (k,v) => setConfig(p=>({...p,[k]:v}));
@@ -593,7 +598,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(4);
 
       // ── BEAT ANALYSIS ─────────────────────────────────────────────
-      let totalDur = 180;
+      let totalDur = Math.max(1, mvDuration) * 60;
       let beatGrid = [];
       let audioCtx = null, audioDest = null, audioSource = null;
 
@@ -602,7 +607,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           audioCtx = new (window.AudioContext||window.webkitAudioContext)();
           const ab = await audioFile.arrayBuffer();
           const buf = await audioCtx.decodeAudioData(ab);
-          totalDur = buf.duration;
+          totalDur = (isFinite(buf.duration) && buf.duration > 0) ? buf.duration : Math.max(1, mvDuration) * 60;
           // Energy-based beat detection
           const data = buf.getChannelData(0);
           const sr = buf.sampleRate;
@@ -628,15 +633,19 @@ function MusicVideoStudio({ onClose, onSave }) {
           gain.connect(audioCtx.destination);
         }catch(e){ addLog("Audio: "+e.message); audioCtx=null; }
       } else {
-        addLog("No audio — generating "+totalDur+"s visual");
+        addLog("No audio — generating "+Math.round(totalDur)+"s visual ("+Math.max(1,mvDuration)+" min)");
         for(let t=0;t<totalDur;t+=1.8) beatGrid.push(t);
       }
       setRenderProgress(10);
+
+      // Compute safe duration now so it's available in the film prompt
+      const safeDur=Math.max(1,isFinite(totalDur)&&totalDur>0?totalDur:Math.max(1,mvDuration)*60);
 
       // ── CLAUDE WRITES THE ENTIRE FILM AS ONE RENDERER ─────────────
       // One function. All scenes. Seamless transitions. Beat responsive.
       addLog("Claude is writing your film renderer...");
 
+      const refVideoNote = refVideoFile ? "\nREFERENCE VIDEO UPLOADED: \""+refVideoName+"\" — match its editing pace, colour grade, visual style, and cinematographic approach as closely as possible using canvas gradients and animation." : "";
       const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
 
 Write a SINGLE JavaScript function that renders a complete cinematic music video. NO cartoons. NO outlines. NO flat colours. PHOTOREALISTIC gradients only.
@@ -645,7 +654,7 @@ SCENE: "${sceneDesc}"
 SONG: "${config.title}" by ${config.artist}
 MOOD: ${config.mood}
 COLOUR GRADE: ${config.colorGrade}
-TOTAL DURATION: ${totalDur.toFixed(0)} seconds
+TOTAL DURATION: ${safeDur.toFixed(0)} seconds${refVideoNote}
 
 Function signature: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
 - t = 0.0 to 1.0 (overall film progress)
@@ -838,7 +847,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
       }
 
       setRenderProgress(30);
-      addLog("Rendering "+totalDur.toFixed(0)+"s film at 12fps...");
+      addLog("Rendering "+safeDur.toFixed(0)+"s film at 12fps ("+Math.max(1,mvDuration)+"min)...");
 
       // ── SET UP CANVAS + RECORDER ────────────────────────────────
       const canvas = canvasRef.current;
@@ -860,7 +869,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
       if(audioSource) audioSource.start(0);
 
       // ── RENDER EVERY FRAME ──────────────────────────────────────
-      const totalFrames=Math.round(totalDur*fps);
+      const totalFrames=Math.round(safeDur*fps);
       const msPerFrame=Math.round(1000/fps);
       const wallStart=performance.now();
 
@@ -869,7 +878,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
         const tick=()=>{
           if(frame>=totalFrames){resolve(null);return;}
           const sec=frame/fps;
-          const t=sec/totalDur;
+          const t=sec/safeDur;
           const beatNow=beatGrid.some(b=>Math.abs(sec-b)<0.055);
 
           ctx.clearRect(0,0,W,H);
@@ -879,7 +888,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
           ctx.save();
           ctx.translate(-drift*0.3,0);
 
-          try{ renderFn(ctx,W,H,t,sec,totalDur,beatNow); }
+          try{ renderFn(ctx,W,H,t,sec,safeDur,beatNow); }
           catch(e){
             // Graceful fallback — keep rendering
             const bg=ctx.createLinearGradient(0,0,0,H);
@@ -924,7 +933,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
           }
 
           setRenderProgress(30+Math.round((frame/totalFrames)*64));
-          if(frame%(fps*10)===0) addLog("  "+Math.round(sec)+"s / "+Math.round(totalDur)+"s");
+          if(frame%(fps*10)===0) addLog("  "+Math.round(sec)+"s / "+Math.round(safeDur)+"s");
           frame++;
           const due=wallStart+(frame*msPerFrame);
           setTimeout(tick,Math.max(4,due-performance.now()));
@@ -943,7 +952,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
       const url=URL.createObjectURL(blob);
       setVideoUrl(url); setVideoBlob(blob);
       setRenderProgress(100);
-      addLog("✓ "+config.title+" complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+Math.round(totalDur)+"s");
+      addLog("✓ "+config.title+" complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+Math.round(safeDur)+"s");
 
       const fn=(config.title||"MusicVideo")+"_"+config.artist+".webm";
       try{
@@ -1075,16 +1084,54 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                   value={config.visualDesc}
                   onChange={e=>set("visualDesc",e.target.value)}
                   placeholder="e.g. A man sits alone on a windowsill fingerpicking acoustic guitar. Only his back is visible. Facing the open ocean at night. Full moon low on the water. A single candle burns to his right. The room behind him is empty. A cold couch. A coat still on a hook. He does not move. A man who has lost someone."
-                  style={{...inp,height:160,resize:"vertical",lineHeight:1.8,border:`1px solid ${GOLD}`}}
+                  style={{...inp,height:140,resize:"vertical",lineHeight:1.8,border:`1px solid ${GOLD}`}}
                 />
+                {label("UPLOAD REFERENCE VIDEO (OPTIONAL)")}
+                <div style={{color:GOLDDIM,fontSize:11,marginBottom:8,lineHeight:1.7}}>
+                  Upload a reference video — the AI will match its visual style, colour grade, editing pace, and cinematography.
+                </div>
+                {refVideoFile?(
+                  <div style={{position:"relative",marginBottom:10}}>
+                    <video src={refVideoUrl} muted playsInline controls
+                      style={{width:"100%",maxHeight:140,objectFit:"cover",border:`1px solid ${GOLD}`,display:"block"}}/>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+                      <div style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:2}}>✓ REFERENCE VIDEO LOADED — {refVideoName.slice(0,36)}</div>
+                      <button onClick={()=>{setRefVideoFile(null);setRefVideoUrl("");setRefVideoName("");}}
+                        style={{background:"none",border:`1px solid #ef4444`,color:"#ef4444",padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900}}>✕ REMOVE</button>
+                    </div>
+                  </div>
+                ):(
+                  <div onClick={()=>refVideoInputRef.current&&refVideoInputRef.current.click()}
+                    style={{border:`1px dashed ${GOLDDIM}`,padding:"14px",textAlign:"center",cursor:"pointer",marginBottom:10,background:"#030200"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
+                    <div style={{color:WHITE,fontSize:12,fontWeight:700,letterSpacing:2}}>⬆ CLICK TO UPLOAD REFERENCE VIDEO</div>
+                    <div style={{color:DIM,fontSize:10,marginTop:4}}>MP4 · MOV · WEBM · MKV — the AI will study its style and apply it to your music video</div>
+                  </div>
+                )}
+                <input ref={refVideoInputRef} type="file" accept="video/*" style={{display:"none"}}
+                  onChange={e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefVideoFile(f);setRefVideoUrl(URL.createObjectURL(f));setRefVideoName(f.name);}}/>
                 {label("DURATION")}
-                <div style={{display:"flex",gap:6}}>
-                  {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
-                    <button key={d} onClick={()=>set("duration",d)}
-                      style={{background:config.duration===d?GOLD:"#111",border:`1px solid ${config.duration===d?"#000":GOLDDIM}`,color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
-                      {d}
-                    </button>
-                  ))}
+                <div style={{background:"#0a0a0a",border:`1px solid ${GOLDDIM}`,padding:"12px 14px",marginBottom:4}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>DURATION</span>
+                    <span style={{color:WHITE,fontSize:15,fontWeight:900,letterSpacing:2}}>{mvDuration} {mvDuration===1?"MINUTE":"MINUTES"}</span>
+                  </div>
+                  <input type="range" min={1} max={180} step={1} value={mvDuration}
+                    onChange={e=>setMvDuration(Math.max(1,+e.target.value))}
+                    style={{width:"100%",accentColor:GOLD,marginBottom:6}}/>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <span style={{color:DIM,fontSize:10}}>1 MIN</span>
+                    <span style={{color:DIM,fontSize:10}}>180 MIN (3 HRS)</span>
+                  </div>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                    {[1,2,3,5,10,15,30,60,90,120,180].map(m=>(
+                      <button key={m} onClick={()=>setMvDuration(m)}
+                        style={{background:mvDuration===m?GOLD:"#111",border:`1px solid ${mvDuration===m?"#000":GOLDDIM}`,color:mvDuration===m?"#000":WHITE,padding:"3px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>
+                        {m}m
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -1119,7 +1166,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                 )}
                 <div style={{...{background:"#0a0500",border:`1px solid ${GOLDDIM}`,padding:14},marginBottom:14}}>
                   <div style={{color:GOLD,fontSize:11,letterSpacing:2,marginBottom:8,fontWeight:900}}>YOUR MUSIC VIDEO</div>
-                  {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",config.duration||"—"],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
+                  {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",mvDuration+" minute"+(mvDuration===1?"":"s")],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
                     <div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:`1px solid #0a0800`}}>
                       <span style={{color:GOLDDIM,letterSpacing:2}}>{k}</span>
                       <span style={{color:WHITE,fontWeight:700}}>{v}</span>
