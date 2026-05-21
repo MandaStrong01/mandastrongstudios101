@@ -637,7 +637,17 @@ function MusicVideoStudio({ onClose, onSave }) {
       // One function. All scenes. Seamless transitions. Beat responsive.
       addLog("Claude is writing your film renderer...");
 
-      const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
+      const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer. You produce PHOTOGRAPHIC QUALITY output indistinguishable from real cinema.
+
+ABSOLUTE RULES — NEVER BREAK THESE:
+- ZERO cartoon outlines. ZERO thick strokes around shapes. ZERO cell shading. ZERO flat colour fills anywhere.
+- EVERY surface built from ctx.createLinearGradient or ctx.createRadialGradient ONLY. No solid fills except pure black backgrounds.
+- SKY/BACKGROUND: minimum 4-stop linearGradient matching time of day. Night: rgb(1,2,12) to rgb(8,18,55). Dawn: rgb(10,5,30) to rgb(180,50,10) to rgb(255,200,80). Never a flat colour.
+- HUMANS: Head = ctx.arc filled with ctx.createRadialGradient skin tone rgba(220,170,120,1) centre to rgba(160,110,70,1) edge. Body = ctx.fillRect with linearGradient. Eyes = small ctx.arc filled dark. Hair = bezier path filled dark brown. BREATHING: multiply torso height by (1+Math.sin(sec*0.85)*0.007). ZERO outlines around any body part. ZERO stick figures.
+- WATER: 10 separate wave paths. Each: ctx.beginPath, moveTo, series of lineTo with Math.sin(x*0.007+sec*(0.2+i*0.06)+i)*18 offset, filled with deep navy linearGradient rgba(2,8,40,1) to rgba(1,3,18,1).
+- ALL LIGHT SOURCES: ctx.createRadialGradient only. Candle: rgba(255,230,100,0.9) to rgba(255,160,20,0.5) to rgba(0,0,0,0). Moon: rgba(230,240,255,0.85) to rgba(180,200,240,0.3) to rgba(0,0,0,0).
+- PARALLAX: ctx.save(); ctx.translate(-t*W*0.012,0); far layer; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.032,0); mid layer; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.068,0); near layer; ctx.restore();
+- POST-PROCESSING — draw in this exact order last: (1) vignette radialGradient transparent centre to rgba(0,0,0,0.92) edge fillRect(0,0,W,H), (2) letterbox ctx.fillStyle="#000" fillRect(0,0,W,H*0.074) and fillRect(0,H*0.926,W,H*0.074), (3) grain 25 random 1px rgba(200,200,200,0.008) dots, (4) colour grade ctx.globalAlpha=0.055 fillStyle warm/cool overlay fillRect, (5) fade in if t<0.05, fade out if t>0.92.
 
 Write a SINGLE JavaScript function that renders a complete cinematic music video. NO cartoons. NO outlines. NO flat colours. PHOTOREALISTIC gradients only.
 
@@ -826,7 +836,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-            messages:[{role:"user",content:`Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) that renders a cinematic music video. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. t=0-1 overall progress. Draw ocean waves, a silhouetted figure on a windowsill with guitar, moonlight, candle glow, dark room. Use acts based on t. Return only the function.`}]})
+            messages:[{role:"user",content:`Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) that renders a PHOTOREALISTIC cinematic music video. ZERO cartoon outlines. ZERO flat colours. ALL gradients. Photorealistic humans with skin-tone radialGradients. Animated wave layers for ocean. All light sources as radialGradients. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. t=0-1 overall progress. Draw ocean waves, a silhouetted figure on a windowsill with guitar, moonlight, candle glow, dark room. Use acts based on t. Return only the function.`}]})
         });
         const sd = await simple.json();
         let sc = sd.content&&sd.content[0]?sd.content[0].text.trim():"";
@@ -1616,7 +1626,19 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 The user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.`
         : "";
 
-      const directorPrompt=`You are the MandaStrong Cinema Engine. Write JavaScript canvas rendering code that creates a CINEMATIC, PHOTOREALISTIC scene.
+      const directorPrompt=`You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer. You produce PHOTOGRAPHIC QUALITY output indistinguishable from real cinema.
+
+ABSOLUTE RULES — NEVER BREAK THESE:
+- ZERO cartoon outlines. ZERO thick strokes around shapes. ZERO cell shading. ZERO flat colour fills anywhere.
+- EVERY surface built from ctx.createLinearGradient or ctx.createRadialGradient ONLY. No solid fills except pure black backgrounds.
+- SKY/BACKGROUND: minimum 4-stop linearGradient matching time of day. Night: rgb(1,2,12) to rgb(8,18,55). Dawn: rgb(10,5,30) to rgb(180,50,10) to rgb(255,200,80). Never a flat colour.
+- HUMANS: Head = ctx.arc filled with ctx.createRadialGradient skin tone rgba(220,170,120,1) centre to rgba(160,110,70,1) edge. Body = ctx.fillRect with linearGradient. Eyes = small ctx.arc filled dark. Hair = bezier path filled dark brown. BREATHING: multiply torso height by (1+Math.sin(sec*0.85)*0.007). ZERO outlines around any body part. ZERO stick figures.
+- WATER: 10 separate wave paths. Each: ctx.beginPath, moveTo, series of lineTo with Math.sin(x*0.007+sec*(0.2+i*0.06)+i)*18 offset, filled with deep navy linearGradient rgba(2,8,40,1) to rgba(1,3,18,1).
+- ALL LIGHT SOURCES: ctx.createRadialGradient only. Candle: rgba(255,230,100,0.9) to rgba(255,160,20,0.5) to rgba(0,0,0,0). Moon: rgba(230,240,255,0.85) to rgba(180,200,240,0.3) to rgba(0,0,0,0).
+- PARALLAX: ctx.save(); ctx.translate(-t*W*0.012,0); far layer; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.032,0); mid layer; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.068,0); near layer; ctx.restore();
+- POST-PROCESSING — draw in this exact order last: (1) vignette radialGradient transparent centre to rgba(0,0,0,0.92) edge fillRect(0,0,W,H), (2) letterbox ctx.fillStyle="#000" fillRect(0,0,W,H*0.074) and fillRect(0,H*0.926,W,H*0.074), (3) grain 25 random 1px rgba(200,200,200,0.008) dots, (4) colour grade ctx.globalAlpha=0.055 fillStyle warm/cool overlay fillRect, (5) fade in if t<0.05, fade out if t>0.92.
+
+Write JavaScript canvas rendering code that creates a CINEMATIC, PHOTOREALISTIC scene.
 
 SCENE: "${prompt}"
 DURATION: ${duration} seconds${refInstruction}
@@ -1700,7 +1722,7 @@ function drawFrame(ctx, W, H, t, sec) {`;
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
-            messages:[{role:"user",content:`Write a cinematic canvas renderer for: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]})
+            messages:[{role:"user",content:`Write a PHOTOREALISTIC cinematic canvas renderer. ZERO cartoon outlines. ALL gradients. Photorealistic humans and environments. For: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]})
         });
         const rd=await retry.json();
         let rc=rd.content&&rd.content[0]?rd.content[0].text.trim():"";
@@ -2544,7 +2566,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-              messages:[{role:"user",content:"Write a JavaScript canvas function for this cinematic scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]})
+              messages:[{role:"user",content:"Write a PHOTOREALISTIC JavaScript canvas function. ZERO cartoon outlines, ZERO flat fills, ALL gradients, photorealistic humans with skin-tone radialGradients. Scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]})
           });
           const d=await res.json();
           let code=d.content&&d.content[0]?d.content[0].text.trim():"";
@@ -2953,7 +2975,7 @@ function P19({ go }) {
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-          messages:[{role:"user",content:`Write a JavaScript canvas animation for a tutorial about "${t.t}" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON ${t.n}, relevant diagram for the topic, and MANDASTRONG STUDIO bottom label. Use sec for animation, t=0-1 progress. W=canvas width, H=canvas height. Return ONLY: function drawFrame(ctx,W,H,t,sec){`}]})
+          messages:[{role:"user",content:`Write a PHOTOREALISTIC JavaScript canvas animation for a tutorial about "${t.t}" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON ${t.n}, relevant diagram for the topic, and MANDASTRONG STUDIO bottom label. Use sec for animation, t=0-1 progress. W=canvas width, H=canvas height. Return ONLY: function drawFrame(ctx,W,H,t,sec){`}]})
       });
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
