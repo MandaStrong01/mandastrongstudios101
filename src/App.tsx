@@ -3250,27 +3250,183 @@ function P22() {
 
 function HowToGuide() {
   const [barOpen,setBarOpen]=useState(false);
-  const [sec,setSec]=useState(null);
+  const [sec,setSec]=useState<number|null>(null);
   const SECTIONS=[
-    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Sign in with your email and password, or hit Browse as Guest. Admin login: woolleya129@gmail.com / Admin. Use the hamburger menu top left to jump to any of the 23 pages. The footer has Save Project and My Projects buttons. Hit Save Project regularly."},
-    {t:"PAGE 1 — HOME",c:"Your starting point. Hit Open Project to restore a previous session. Hit New Project to start fresh. Quick Access buttons take you to the most used tools."},
-    {t:"PAGE 2 — STUDIO DASHBOARD",c:"Overview of your full production pipeline. Shows your project status, quick start templates, and the six stage workflow from script to export. Use the template cards to start a new film, documentary, music video, or short form project instantly."},
-    {t:"PAGE 4 — LOGIN & PRICING",c:"Sign in, create a new account with your seven day free trial, or browse as guest.\nCreator Plan — $20/mo — HD Export, 100 AI Tools\nPro Plan — $30/mo — 4K Export, 300 AI Tools, Commercial License\nStudio Plan — $50/mo — 8K Export, 600+ AI Tools, Full Rights, API Access, 7-Day Free Trial\nAll payments processed securely by Stripe."},
-    {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools for every stage of your script. Type a description into any tool and hit AI Create. Tools include: logline generator, synopsis writer, screenplay formatter, dialogue sharpener, scene builder, character development, treatment writer, pitch deck creator, and many more. Use the search bar to find any tool fast. Save any result to your Media Library."},
-    {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voice characters. Filter by gender, age, and origin. Hit TEST on any voice card to hear it.\nSettings tab: adjust Speed, Pitch, Pause length, Volume, and Mood.\nJames recommended settings: Speed 0.62 · Pitch 0.86 · Pause 1600ms · Mood Sarcastic\nSpeak tab: paste your full narration script and hit Prepare and Speak.\nMusic Video Studio button is top right on Page 6."},
-    {t:"PAGE 7 — IMAGE TOOLS",c:"AI image generation and manipulation tools. Describe any image and generate it instantly. Includes photorealistic scene generation, character portraits, location builder, colour grade references, storyboard frames, poster and thumbnail maker, and style transfer. Save any image to your Media Library."},
-    {t:"PAGE 8 — VIDEO GENERATOR",c:"Your cinematic scene builder. This is where your film clips are created.\nAt the top is the Documentary Recovery Panel. Click to expand your 13 AI For Humanity scenes. Click any scene to load it into the generator. Hit Generate Scene.\nEvery clip saves automatically to IndexedDB. Work through all 13 scenes. When done go to Page 11."},
-    {t:"PAGE 11 — UPLOAD MEDIA",c:"Hit Reload Clips from Storage at the top. This loads all your generated clips from IndexedDB back into your active Media Library. You can also upload your own video files, audio tracks, images, and reference material here."},
-    {t:"PAGE 12 — EDITOR SUITE",c:"Your clip editor. Trim clips, adjust in and out points, add effects, layer audio, and arrange individual scenes before sending them to the timeline."},
-    {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit Sync All Tracks at the top. This automatically populates all tracks with your clips in the correct order — video, narration, music, and effects.\nSet your film duration. AI For Humanity: 60 seconds per scene across 13 scenes.\nWhen your timeline is assembled hit Render or navigate to Page 16."},
-    {t:"PAGE 15 — AUDIO MIXER",c:"Set your final audio mix before rendering.\nDocumentary: Voice 85 · Music 40 · Effects 50 · Master 85\nMusic Video: Voice 60 · Music 75 · Effects 40 · Master 85\nNarrative Film: Voice 80 · Music 55 · Effects 45 · Master 85"},
-    {t:"PAGE 16 — RENDER ENGINE",c:"Choose output quality — 720p, 1080p Full HD, or 4K Ultra HD. For AI For Humanity select 4K.\nHit Start Render. The engine processes every clip, applies your audio mix, colour grade, vignette, letterbox bars, film grain, and all post-processing.\nDo not close the browser tab during render. Download button appears when complete."},
-    {t:"PAGE 17 — FILM PREVIEW",c:"Watch your completed film before exporting. Full screen playback with volume control. Review the final cut before sharing."},
-    {t:"PAGE 18 — EXPORT & DISTRIBUTE",c:"Download your film in your chosen format. Share directly to YouTube, Instagram, TikTok, Facebook, X Twitter, and Vimeo. Each button opens the correct upload page for that platform."},
-    {t:"PAGE 19 — TUTORIALS",c:"12 lessons covering every part of the platform. Hit Generate to Watch on any lesson. Claude writes a unique animated tutorial and plays it instantly in the canvas. No video files. No loading. Generated in real time. Each lesson also has Pro Tips and an Open Page button."},
-    {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask Agent Grok anything about the platform, your project, filmmaking technique, tool selection, workflow decisions, or production questions. Available at any time. Type your question and hit Send."},
-    {t:"MUSIC VIDEO STUDIO",c:"Open from Page 6 top right.\nStep 1 — SONG: Enter title, artist, genre, mood.\nStep 2 — STYLE: Choose visual style, colour grade, duration 1-180 mins.\nStep 3 — SCENE: Write your full scene description. Upload audio or hit red Record Your Own Song button.\nStep 4 — GENERATE: Hit Generate Music Video. Download or Save to Media Library when done."},
-    {t:"RECOMMENDED WORKFLOW",c:"Page 5 — Write your script\nPage 6 — Record your narration\nPage 8 — Generate all your scenes\nPage 11 — Reload all clips\nPage 13 — Sync all tracks\nPage 15 — Set your audio mix\nPage 16 — Render your film\nPage 17 — Preview\nPage 18 — Export and share"},
+    {t:"GETTING STARTED — YOUR FIRST SESSION",paras:[
+      "Welcome to MandaStrong Studio — the world's first all-in-one Cinema Intelligence Platform. Before you do anything else, open the app at mandastrongstudio2026.bolt.host in Google Chrome or Microsoft Edge on a desktop or laptop computer. These browsers give you the full experience including PWA installation, IndexedDB clip storage, and the Web Speech API for voice recording.",
+      "When the app loads you will land on Page 1 — the Home screen. From here you can hit Start Creating which takes you directly to Page 4 to sign in or choose your subscription plan. You can also tap Download App to install MandaStrong Studio as a Progressive Web App on your device — this gives you a full-screen, app-like experience without needing the app store.",
+      "To sign in, go to Page 4 and enter your email address and password. If you are new, click Register and create your account. You will receive your seven-day free trial automatically on the Studio Plan. If you are the admin, use woolleya129@gmail.com with the password Admin. Guest mode is also available — you can explore the full interface without signing in, but your work will not be saved to the cloud.",
+      "Once signed in, use the hamburger menu (three lines) in the top-left corner to jump to any of the 23 pages at any time. The footer at the bottom of every page has a BACK button, a NEXT button, a page counter showing your current position, a Save Project button, and a My Projects button to restore previous sessions. Hit Save Project regularly — this saves your timeline, media library, and current page to your browser storage.",
+    ]},
+    {t:"PAGE 1 — HOME",paras:[
+      "Page 1 is your home base. Every time you open MandaStrong Studio you start here. The page displays the platform title, your key stats (600+ AI Tools, 8K Export, 3-Hour Films, 1TB Storage), and two primary action buttons.",
+      "START CREATING takes you immediately to Page 4 where you log in or choose your plan. LOGIN / REGISTER also goes to Page 4. The DOWNLOAD APP button detects your device and either triggers the native PWA install prompt (Chrome/Edge on desktop and Android) or shows you step-by-step instructions for iPhone and iPad.",
+      "If you have already installed MandaStrong Studio as a PWA on your device, the button changes to OPEN APP and takes you straight into the studio. This is the fastest way to launch your next session.",
+    ]},
+    {t:"PAGE 2 — STUDIO DASHBOARD",paras:[
+      "The Studio Dashboard gives you a bird's eye view of your entire production pipeline. It shows the seven-stage workflow from Writing all the way through to Export, with each stage displayed as a numbered card. Click any stage card to jump directly to that tool page.",
+      "Below the pipeline are Quick Start Templates. These let you begin a new project with a single click. Templates include Feature Film (90-minute drama), Documentary (60-minute), Music Video (beat-synced cinematic), Short Film (10-minute narrative), Family Movie (30-minute), and Audiobook (narrated). Each template pre-configures the recommended pages and tools for that format.",
+      "The dashboard also shows your current project status — how many clips you have in your Media Library, what page you last worked on, and any active timeline data. Use this page as your command centre to navigate the production at a glance.",
+    ]},
+    {t:"PAGE 3 — PROOF OF CONCEPT",paras:[
+      "Page 3 is the Proof of Concept showcase. This page demonstrates what MandaStrong Studio can produce — you can upload your own demo films, review example outputs, and understand the quality level achievable with the platform.",
+      "If you are evaluating the platform before subscribing, this is the best place to see real results. You can upload a short film clip to test the playback and export pipeline without committing to a full project.",
+    ]},
+    {t:"PAGE 4 — LOGIN & PRICING",paras:[
+      "Page 4 is where you sign in, create an account, or choose your subscription plan. Three plans are available, all processed securely through Stripe.",
+      "CREATOR PLAN — $20 per month. Includes HD Export up to 1080p, access to 100 AI tools, standard voice engine, and community access. Best for beginners and hobbyists starting their first project.",
+      "PRO PLAN — $30 per month. Includes 4K Export, access to 300 AI tools, full voice engine with all 54 characters, commercial licence, and priority rendering. Best for independent filmmakers and content creators.",
+      "STUDIO PLAN — $50 per month. Includes 8K Export, access to all 600+ AI tools, full rights and API access, Music Video Studio, multi-project storage, and a 7-Day Free Trial with no charge during the trial period. Best for professional productions, studios, and power users.",
+      "To subscribe, click the button under your chosen plan. You will be taken to a secure Stripe payment page. Once payment is confirmed, your account is upgraded instantly. You can cancel at any time from your account settings — cancellation takes effect at the end of the current billing period.",
+      "Guest mode is also available for users who want to explore the interface before subscribing. Guests can use most tools but cannot save to the cloud or access premium export formats.",
+    ]},
+    {t:"PAGE 5 — WRITING TOOLS (AI WORKSTATION 01)",paras:[
+      "Page 5 is your complete AI writing workstation with over 100 tools covering every stage of script development. This is where your film begins — with the written word.",
+      "To use any tool, click its card to open the tool panel. You will see three modes: CREATE (type a description or prompt and let AI generate the content), UPLOAD (paste or upload your existing text), and VOICE (speak your idea aloud and the platform transcribes and processes it).",
+      "Key writing tools include: Logline Generator, Synopsis Writer, Full Screenplay Formatter, Scene-by-Scene Builder, Dialogue Sharpener, Character Development Suite, Backstory Creator, Treatment Writer, Pitch Deck Builder, Production Budget Estimator, Shooting Schedule Creator, and Shot List Generator. There are also tools for adapting books into screenplays, writing documentary narration, creating podcast scripts, and building social media content from your film.",
+      "Use the search bar at the top of the tools grid to find any specific tool instantly. All tools support multiple passes — generate a first draft, then refine it with the next tool in the chain. Save any output to your Media Library by hitting the Save button inside the tool panel.",
+      "Pro Tip: Start with the Logline Generator to lock in your core concept in one sentence, then expand to Synopsis, then Scene Builder. This top-down approach produces the most coherent scripts.",
+    ]},
+    {t:"PAGE 6 — VOICE ENGINE (AI WORKSTATION 02)",paras:[
+      "Page 6 is the Voice Engine — your casting suite and narration studio. You have access to 54 cinematic voice characters spanning male, female, and neutral voices across British, American, Australian, and International accents. Each voice has its own personality, tone, and recommended settings.",
+      "To browse voices, use the filter buttons at the top: ALL, MALE, FEMALE, YOUNG, SENIOR, BRITISH, AMERICAN, AUSTRALIAN, INTERNATIONAL. Each voice card shows the character name, origin, and a short description of their tone. Hit the TEST button on any card to hear a sample of that voice speaking. Hit SELECT to choose that voice as your active narrator.",
+      "The SETTINGS tab lets you fine-tune your chosen voice. Adjust Speed (0.1 slow to 2.0 fast), Pitch (0.5 deep to 2.0 high), Pause length between sentences (in milliseconds), Volume, and Mood. Mood presets include: Neutral, Cinematic, Dramatic, Sarcastic, Warm, Authoritative, Whimsical, Melancholic, and Urgent. Experiment with these to find the right emotional tone for your project.",
+      "Recommended settings for James (cinematic narrator): Speed 0.62 · Pitch 0.86 · Pause 1600ms · Volume 95% · Mood Sarcastic. These settings produce a deep, measured, cinema-quality narration voice suitable for documentary and drama.",
+      "The SPEAK tab is where you record your narration. Paste your complete narration script into the text area — this can be a full screenplay, a documentary commentary, or any spoken text. Hit PREPARE AND SPEAK. The engine processes the full script in one pass using the Web Speech API and plays it back through your selected voice with your chosen settings. The audio is saved automatically.",
+      "The MUSIC VIDEO STUDIO button is located in the top-right corner of Page 6. See the Music Video Studio section of this guide for full instructions.",
+    ]},
+    {t:"PAGE 7 — IMAGE TOOLS (AI WORKSTATION 03)",paras:[
+      "Page 7 contains the AI image generation and manipulation suite. These tools generate reference images, scene stills, character portraits, location photographs, colour grade references, and marketing materials for your production.",
+      "To generate an image, open any tool card and type a detailed description of what you want to see. The more specific your description, the better the result. Include details such as lighting, camera angle, colour palette, time of day, and mood. Hit AI CREATE and the image generates within seconds.",
+      "Key image tools include: Photorealistic Scene Generator, Character Portrait Creator, Location Builder, Aerial and Drone Shot Simulator, Night Scene Generator, Historical Period Visualiser, Sci-Fi Environment Builder, Horror Atmosphere Creator, Documentary Reference Shot Maker, Film Poster Designer, Thumbnail Maker, and Style Transfer (apply the visual look of any film to your own images).",
+      "All generated images can be saved to your Media Library and used as reference material during video generation on Page 8, storyboarding on Page 12, or colour grading on Page 14.",
+      "Pro Tip: Generate a colour reference image before starting your video production. Use the Colour Grade Reference tool and describe the look you want — warm golden tones, cold blue desaturation, high contrast black and white, etc. Save this image and refer to it when setting your LUT on Page 14.",
+    ]},
+    {t:"PAGE 8 — VIDEO GENERATOR (AI WORKSTATION 04)",paras:[
+      "Page 8 is the heart of MandaStrong Studio — the cinematic scene generation engine. This is where your written script and voice narration become actual video clips.",
+      "At the very top of Page 8 is the Documentary Recovery Panel. Click the header bar to expand it. Inside you will find your 13 pre-configured AI For Humanity documentary scenes. Each scene has a title, a description, and a LOAD button. Click LOAD on Scene 1 to load all its settings into the generator below.",
+      "Once a scene is loaded, review the Scene Description field. You can edit this text to customise the visual content. Choose your Scene Style from the dropdown — options include Cinematic Documentary, Dramatic Narrative, Music Video, Corporate, Short Film, Animation, and more. Set the Duration for this clip (recommended 60 seconds per scene for AI For Humanity). Choose your output resolution based on your plan (720p, 1080p, or 4K).",
+      "Hit GENERATE SCENE. The platform uses an AI canvas rendering engine to build your scene in real time. You will see the progress on screen. When complete, the clip is automatically saved to your browser's IndexedDB storage — this means it survives page refreshes and browser restarts. You will see a confirmation message and the clip thumbnail appears in your local library.",
+      "Work through all 13 scenes one by one. For each scene: Load it from the Recovery Panel, review and edit the description if needed, hit Generate, wait for completion, then load the next scene. This process typically takes 15 to 30 minutes for all 13 scenes depending on your device speed.",
+      "When all 13 scenes are generated, navigate to Page 11 to reload all clips into your active Media Library.",
+    ]},
+    {t:"PAGE 9 — MOTION & VFX (AI WORKSTATION 05)",paras:[
+      "Page 9 is the Motion Graphics and Visual Effects workstation. This page contains tools for adding cinematic movement, particle effects, title animations, transitions, and compositing elements to your clips.",
+      "Tools include: Motion Title Generator, Cinematic Transition Builder, Particle System Creator (snow, rain, dust, embers, sparks), Lens Flare and Light Leak Simulator, Film Grain and Texture Overlay, Letterbox Bar Animator, End Credits Roller, Lower Third Caption Builder, VFX Composite Layer Creator, and 3D Text Animator.",
+      "To use any VFX tool, upload your base clip or generated scene, select the effect, adjust the parameters, and hit Apply. The result is saved to your Media Library and can be placed directly onto your timeline.",
+    ]},
+    {t:"PAGE 10 — ENHANCEMENT STUDIO (AI WORKSTATION 06)",paras:[
+      "Page 10 is the Enhancement Studio — a suite of tools for improving, upscaling, and refining your existing footage. If your clips were generated at 720p or 1080p and you want to bring them closer to 4K quality, the AI upscaling tools on this page can help.",
+      "Tools include: AI Video Upscaler, Noise and Grain Reducer, Stabilisation Engine, Sharpness and Clarity Enhancer, Slow Motion Creator, Time Lapse Converter, Frame Rate Converter, Colour Correction Auto-Fix, Exposure and Contrast Normaliser, and Audio Sync Checker.",
+      "These tools are most useful in post-production — after you have generated your scenes and before you send them to the timeline. Run your clips through the Enhancement Studio to ensure consistent quality across your whole film.",
+    ]},
+    {t:"PAGE 11 — UPLOAD MEDIA & ASSET MANAGER",paras:[
+      "Page 11 is your Media Library and Asset Manager. After generating all your scenes on Page 8, this is your next stop.",
+      "At the very top of Page 11 is the RELOAD CLIPS FROM STORAGE button. Hit this button and the platform reads all clips saved in your browser's IndexedDB database and loads them into your active Media Library. You will see thumbnails appear for every clip you have generated. This is the essential step that connects your generated scenes to the rest of the production pipeline.",
+      "You can also upload your own media files directly on this page. Supported formats include MP4, MOV, WebM, MKV, AVI for video; MP3, WAV, AAC, FLAC, OGG for audio; JPG, PNG, GIF, WebP for images; and PDF for documents and reference material. Click the upload zone or drag and drop files from your computer.",
+      "All assets in your Media Library are available on every subsequent page — the Timeline Editor (Page 13), the Audio Mixer (Page 15), the Render Engine (Page 16), the Film Preview (Page 17), and the Export page (Page 18).",
+      "Pro Tip: After reloading your clips, rename them by clicking the edit icon next to each clip name. Give each clip a descriptive name like Scene_01_OpeningShot or Scene_07_Climax. This makes it much easier to arrange them in the correct order on the timeline.",
+    ]},
+    {t:"PAGE 12 — STORYBOARD EDITOR",paras:[
+      "Page 12 is the Storyboard Editor. This is where you plan the visual sequence of your film shot by shot before committing to the timeline.",
+      "Add shots to your storyboard by clicking Add Shot. For each shot, enter a shot number, a brief description of the action, the camera angle (Wide, Medium, Close-Up, Extreme Close-Up, Over the Shoulder, POV, Aerial), the duration, and any notes for production. You can also attach a reference image from your Media Library to each shot card.",
+      "Once your storyboard is complete, you can use it as a blueprint when arranging clips on the Timeline Editor on Page 13. The storyboard is saved to your project automatically.",
+    ]},
+    {t:"PAGE 13 — TIMELINE EDITOR",paras:[
+      "Page 13 is the multi-track Timeline Editor — the central assembly point where all your production elements come together into a single film.",
+      "At the top of the page is the SYNC ALL TRACKS button. Hit this button and the platform automatically populates your timeline with all clips from your Media Library in sequence order. Video clips go to the Video track, narration audio goes to the Narration track, music files go to the Music track, and sound effects go to the Effects track. This single button does in seconds what would take hours to do manually.",
+      "The timeline has four tracks: VIDEO (your generated scenes and uploaded footage), NARRATION (your recorded voice and AI speech), MUSIC (background score and soundtrack), and EFFECTS (ambient sound, Foley, and atmospheric audio).",
+      "Set your film duration using the Duration slider or input field. For the AI For Humanity documentary with 13 scenes at 60 seconds each, the total duration is 13 minutes (780 seconds). You can set durations up to 180 minutes (3 hours) for feature-length productions.",
+      "You can manually drag and reorder clips within each track by clicking and dragging the clip tiles. Clips can be trimmed by dragging their edges. You can also delete any clip from the timeline by clicking the X button on its tile — this removes it from the timeline only, not from your Media Library.",
+      "When your timeline is assembled and you are satisfied with the sequence, hit the RENDER button at the bottom or navigate directly to Page 16 — the Render Engine.",
+    ]},
+    {t:"PAGE 14 — COLOUR GRADE",paras:[
+      "Page 14 is the Colour Grade suite. This is where you apply the visual look and colour palette that defines the mood and style of your film.",
+      "Choose from the LUT (Look-Up Table) preset library. Presets include: Cinema Warm (golden, amber tones), Cinema Cold (blue, teal desaturation), Documentary Natural (flat, realistic colour), Noir Black and White (high contrast monochrome), Horror Desaturate (drained, sickly pallor), Action Orange and Teal (Hollywood blockbuster look), Vintage Film (warm, slightly faded), Sci-Fi Cool (metallic, cyan-heavy), and Sunset Drama (deep oranges and purples for golden hour).",
+      "You can also perform manual colour correction using the sliders for Exposure, Contrast, Highlights, Shadows, Saturation, Vibrance, Warmth, Tint, and Sharpness. These adjustments are applied globally to your entire film during rendering.",
+      "Pro Tip: For AI For Humanity documentary, use the Documentary Natural LUT as your base, then reduce Saturation by 10 points and increase Contrast by 8 points. This gives a clean, trustworthy, broadcast-ready look.",
+    ]},
+    {t:"PAGE 15 — AUDIO MIXER",paras:[
+      "Page 15 is the professional four-channel Audio Mixer. Set your final audio levels before rendering. The four channels are: Voice (narration and dialogue), Music (background score and soundtrack), Effects (ambient sound, Foley, sound effects), and Master (the overall output volume).",
+      "Each channel has a vertical fader that goes from 0 (silent) to 100 (maximum). The faders are large and easy to control. There is also a numerical readout beside each fader so you can set precise values.",
+      "Recommended mix settings by project type:\n— Documentary: Voice 85 · Music 40 · Effects 50 · Master 85\n— Music Video: Voice 60 · Music 75 · Effects 40 · Master 85\n— Narrative Feature Film: Voice 80 · Music 55 · Effects 45 · Master 85\n— Short Film: Voice 82 · Music 50 · Effects 48 · Master 85\n— Audiobook: Voice 95 · Music 15 · Effects 20 · Master 90",
+      "These settings ensure the narration is always clearly audible above the music and effects — a critical requirement for documentary and narrative film. In music videos, the music takes prominence. Set your levels, hit Preview to hear a 10-second sample, then proceed to Page 16 when you are happy with the balance.",
+    ]},
+    {t:"PAGE 16 — RENDER ENGINE",paras:[
+      "Page 16 is the Render Engine — where your film is assembled and exported as a single video file. This is the final technical step before you can watch and share your film.",
+      "First, choose your output resolution. Options are 720p HD, 1080p Full HD, and 4K Ultra HD. Your available options depend on your subscription plan — Creator gets 1080p, Pro gets 4K, Studio gets 8K. For AI For Humanity, select 4K if your plan allows.",
+      "The render process applies everything in sequence: it loads all your timeline clips from IndexedDB, applies your colour grade LUT, adds film grain and texture, applies letterbox bars (for cinematic aspect ratio), composites all four audio tracks at your mixer levels, adds any VFX elements, and assembles the complete film into a single WebM file using the VP9 codec.",
+      "Hit START RENDER. A progress bar shows you the completion percentage in real time. Do not close or refresh the browser tab during rendering — this will interrupt the process and you will need to start again. The render time depends on the number of clips, the total duration, and your device's processing power. A 13-minute documentary typically takes 3 to 8 minutes to render.",
+      "When rendering is complete, a green DOWNLOAD button appears. Click it to save your film to your computer. The file is saved in WebM format, which is playable in all modern browsers and compatible with most video editing software. You can then proceed to Page 17 to preview or Page 18 to export and distribute.",
+    ]},
+    {t:"PAGE 17 — FILM PREVIEW",paras:[
+      "Page 17 is the Film Preview screen. Once your render is complete, come here to watch your finished film before sharing it with the world.",
+      "The preview player fills most of the screen. Hit Play to start your film. Use the volume control to adjust playback level. The full-screen button expands the player to fill your entire display — this is the best way to review your work as your audience will experience it.",
+      "If you spot issues — a clip that needs replacing, a timing problem, an audio level that feels wrong — note down the timestamp and go back to the relevant page to fix it. Then re-render on Page 16. The render process overwrites the previous file, so you always have the latest version available.",
+      "The Film Preview page also shows your project summary: total duration, number of clips, resolution, and export format. This information is useful when submitting to film festivals or uploading to streaming platforms.",
+    ]},
+    {t:"PAGE 18 — EXPORT & DISTRIBUTE",paras:[
+      "Page 18 is the Export and Distribution hub. This is the final page in your production workflow — from here your film goes out into the world.",
+      "The DOWNLOAD button saves your rendered film to your device in WebM format. If you need a different format (MP4, MOV, ProRes), you can convert the file using a free tool like HandBrake after downloading.",
+      "The platform also provides direct share buttons for the major platforms. Each button opens the correct upload page for that service in a new browser tab, ready for you to upload your film. Platforms supported include YouTube, Instagram (Reels and standard video), TikTok, Facebook, X (formerly Twitter), Vimeo, and DailyMotion.",
+      "Before sharing publicly, make sure your film title, description, and tags are ready. For YouTube, prepare a custom thumbnail using the Image Tools on Page 7. For Instagram and TikTok, consider exporting a vertical (9:16) cut of your best scenes as a trailer to drive traffic to the full film.",
+    ]},
+    {t:"PAGE 19 — TUTORIALS",paras:[
+      "Page 19 is the interactive tutorial library. It contains 12 AI-generated animated lessons covering every major section of the platform. These are not pre-recorded videos — they are generated fresh in real time every time you watch them.",
+      "To watch a tutorial, click on any lesson card. Hit GENERATE TO WATCH. The AI writes and animates a complete tutorial specifically for that topic and plays it instantly in the canvas below. Each generation takes about 5 to 10 seconds and produces a unique lesson with animated graphics and narrated explanation.",
+      "Topics covered include: Getting Started and Setup, Writing Your First Script, Using the Voice Engine, Generating Video Scenes, Building Your Timeline, Audio Mixing Fundamentals, Colour Grading Basics, Rendering and Exporting, Using Agent Grok, Creating a Music Video, the Recommended Production Workflow, and Advanced Tips and Tricks.",
+      "Each lesson card also has a PRO TIPS section that expands to reveal expert advice for that topic, and an OPEN PAGE button that takes you directly to the relevant page of the platform.",
+    ]},
+    {t:"PAGE 20 — COMMUNITY HUB",paras:[
+      "Page 20 is the Community Hub — a space to see what other MandaStrong Studio creators are making and to share your own work.",
+      "The community feed displays recent projects from subscribers around the world. Each post shows the project title, creator name, film genre, view count, and a like button. You can click any project to view more details.",
+      "To share your own film to the community, complete your project through to the export stage on Page 18, then return to Page 20 and use the Share to Community button. Add a title, description, and select the genre. Your film will appear in the community feed for other creators to discover.",
+    ]},
+    {t:"PAGE 21 — AGENT GROK (AI PRODUCTION CONSULTANT)",paras:[
+      "Page 21 is Agent Grok — your 24/7 AI production consultant. Agent Grok has complete knowledge of every page, every tool, every workflow, and every feature of MandaStrong Studio, plus deep expertise in filmmaking, screenwriting, cinematography, audio production, colour grading, and distribution.",
+      "To ask a question, type it into the input field at the bottom of the page and hit SEND, or press Enter. Agent Grok responds within seconds with a detailed, production-focused answer. You can ask anything — which tool to use for a specific task, how to fix a problem you are experiencing, what settings to use for a particular genre, advice on your script, distribution strategy, or anything else related to your film.",
+      "Eight quick-question buttons are available at the bottom of the chat for the most common queries: Recommended production workflow, How do I generate a scene, Best audio mix for documentary, How to export in 4K, Subscription plans, How does the Voice Engine work, What genres can I render, and How do I use the Timeline. Click any button to send that question instantly.",
+      "The conversation history is stored for your session. Use the CLEAR button to start a fresh conversation. Agent Grok is available at all times — day or night — and never gets tired of your questions. If you are ever stuck or unsure what to do next, Agent Grok is always the fastest way to get back on track.",
+    ]},
+    {t:"PAGE 22 — CREATOR NETWORK",paras:[
+      "Page 22 is the Creator Network — a showcase of featured projects and a space to connect with other filmmakers using MandaStrong Studio.",
+      "Browse featured films from the community, see trending projects, and discover creators working in your genre. The network is updated regularly with new work from subscribers around the world.",
+    ]},
+    {t:"MUSIC VIDEO STUDIO — FULL GUIDE",paras:[
+      "The Music Video Studio is accessed from the button in the top-right corner of Page 6. It is a dedicated four-step production wizard for creating beat-synced, visually-driven music videos from scratch.",
+      "STEP 1 — SONG DETAILS: Enter your song title, artist name, genre (Pop, Hip-Hop, Electronic, Rock, Country, Classical, R&B, Metal, Jazz, Folk, or Custom), and the overall mood of the track (Energetic, Romantic, Melancholic, Aggressive, Uplifting, or Dark). These details inform the AI's visual choices throughout the rest of the process.",
+      "STEP 2 — VISUAL STYLE: Choose your visual style from the presets — Cinematic, Grunge, Neon, Vintage, Minimalist, Surreal, Abstract, Urban, Nature, or Fantasy. Then select your colour grade preset to define the palette. Set the video duration between 1 and 180 minutes depending on the length of your track.",
+      "STEP 3 — SCENE & AUDIO: Write a detailed description of the visual world you want for your music video. Include location, mood, lighting, characters, and any specific imagery. In the audio section, upload your MP3 or WAV audio file, or hit the red RECORD YOUR OWN SONG button to record live audio directly through your microphone. The recording feature supports vocals, instruments, or any live performance you want to capture.",
+      "STEP 4 — GENERATE: Review all your settings, then hit GENERATE MUSIC VIDEO. The platform processes your scene description, syncs the visual rhythm to your audio waveform, applies your chosen style and colour grade, and renders the complete music video. When done, hit DOWNLOAD to save the file or SAVE TO MEDIA LIBRARY to continue editing it in the main platform.",
+    ]},
+    {t:"RECOMMENDED PRODUCTION WORKFLOW — STEP BY STEP",paras:[
+      "This is the recommended step-by-step workflow for producing a complete film using MandaStrong Studio. Following this order ensures the smoothest experience and the highest quality result.",
+      "STEP 1 — PAGE 4: Sign in and confirm your subscription plan. Make sure you have the right plan for your output resolution and tool access.",
+      "STEP 2 — PAGE 5: Write your complete script. Use the Logline Generator to start, then expand to Synopsis, Treatment, and full Screenplay. Save your script to your Media Library.",
+      "STEP 3 — PAGE 6: Record your narration. Select your voice character, fine-tune the settings, paste your script into the Speak tab, and hit Prepare and Speak. Review the output and re-record any sections if needed.",
+      "STEP 4 — PAGE 8: Generate all your video scenes. Use the Documentary Recovery Panel to load each scene in order. Generate each clip and confirm it saves to IndexedDB before moving to the next scene.",
+      "STEP 5 — PAGE 11: Hit Reload Clips from Storage. Confirm all your generated scenes appear in the Media Library. Upload any additional footage, music, or sound effects you want to include.",
+      "STEP 6 — PAGE 12: Build your storyboard if desired. Arrange shots, add notes, and attach reference images. This step is optional but helpful for complex narratives.",
+      "STEP 7 — PAGE 13: Hit Sync All Tracks. Review the timeline sequence. Adjust the order of any clips by dragging. Set your final film duration.",
+      "STEP 8 — PAGE 14: Apply your colour grade LUT. Make any manual adjustments to exposure, contrast, and saturation.",
+      "STEP 9 — PAGE 15: Set your audio mix levels. Use the recommended settings for your project type as a starting point.",
+      "STEP 10 — PAGE 16: Start Render. Do not close the browser. Wait for the render to complete and download your film.",
+      "STEP 11 — PAGE 17: Preview your completed film. Verify quality, timing, and audio balance.",
+      "STEP 12 — PAGE 18: Download and distribute. Share to your chosen platforms.",
+    ]},
+    {t:"SAVING YOUR PROJECT & RECOVERING SESSIONS",paras:[
+      "MandaStrong Studio automatically saves your video clips to IndexedDB — a browser-based database that persists even when you close the tab or restart the browser. Your Media Library, Timeline, and User settings are saved to localStorage every time you hit the Save Project button in the footer.",
+      "To save your project, click the SAVE PROJECT button in the footer at the bottom of any page. A modal will appear asking for a project name and optional notes. Enter a descriptive name (e.g. AI For Humanity Documentary v2) and click Save. This creates a save entry in your project history.",
+      "To restore a previous session, click MY PROJECTS in the footer. A list of all your saved projects appears with dates and page numbers. Click RESUME on any project to reload your timeline, media library, and last working page. Your video clips are automatically re-linked from IndexedDB.",
+      "Important: If you clear your browser's cache or use private/incognito mode, your IndexedDB data may be lost. For permanent cloud storage, ensure you are signed in to your account so your project data is backed up to Supabase.",
+    ]},
+    {t:"SUBSCRIPTIONS, BILLING & SUPPORT",paras:[
+      "MandaStrong Studio subscriptions are processed securely through Stripe — one of the world's most trusted payment platforms. Your payment details are never stored on our servers. All transactions are encrypted and protected.",
+      "Plans auto-renew monthly until cancelled. You can cancel at any time from your account settings on Page 4. Cancellation takes effect at the end of your current billing period — you retain full access until then.",
+      "The Studio Plan includes a 7-Day Free Trial. No charge is made during the trial period. If you cancel before the trial ends, you will not be billed. After the trial, billing begins automatically at $50 per month.",
+      "Every subscription contributes to our social mission: anti-bullying programmes in schools, veterans mental health initiatives, and humanitarian aid organisations. All Etsy store proceeds are donated in full. When you subscribe to MandaStrong Studio, you are not just making a film — you are funding something that matters.",
+      "For support, questions, or feedback, use Agent Grok on Page 21 for immediate answers. For billing issues or account problems, contact us through the details on Page 4.",
+    ]},
   ];
   return(
     <div style={{textAlign:"left",marginBottom:24}}>
@@ -3284,14 +3440,16 @@ function HowToGuide() {
             const isOpen=sec===i;
             return(
               <div key={i} style={{marginBottom:4}}>
-                <button onClick={()=>setSec(isOpen?null:i)} style={{width:"100%",background:isOpen?`${GOLD}18`:"#050300",border:`1px solid ${isOpen?GOLD:GOLDDIM+"55"}`,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
+                <button onClick={()=>setSec(isOpen?null:i)} style={{width:"100%",background:isOpen?`${GOLD}18`:"#050300",border:`1px solid ${isOpen?GOLD:GOLDDIM+"55"}`,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",textAlign:"left"}}>
                   <span style={{color:isOpen?GOLD:WHITE,fontWeight:900,fontSize:13,letterSpacing:2}}>{s.t}</span>
                   <span style={{color:GOLD,fontSize:14,fontWeight:900,flexShrink:0,marginLeft:12}}>{isOpen?"▲":"▼"}</span>
                 </button>
                 {isOpen&&(
-                  <div style={{background:"#040200",border:`1px solid ${GOLD}`,borderTop:"none",padding:"16px 20px"}}>
-                    {s.c.split("\n").map((line,li)=>(
-                      <p key={li} style={{color:line.includes("·")||line.startsWith("Step")||line.startsWith("Page")?GOLD:WHITE,fontSize:13,lineHeight:1.95,margin:"0 0 6px",fontWeight:line.includes("·")||line.startsWith("Step")?700:400}}>{line||"\u00a0"}</p>
+                  <div style={{background:"#040200",border:`1px solid ${GOLD}`,borderTop:"none",padding:"20px 24px"}}>
+                    {s.paras.map((para,pi)=>(
+                      <p key={pi} style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 14px",fontFamily:"'Rajdhani',sans-serif"}}
+                        dangerouslySetInnerHTML={{__html:para.replace(/\n—/g,"<br/>—").replace(/STEP \d+ —/g,(m)=>`<strong style="color:${GOLD};letter-spacing:1px">${m}</strong>`).replace(/Creator Plan|Pro Plan|Studio Plan|CREATOR PLAN|PRO PLAN|STUDIO PLAN/g,(m)=>`<strong style="color:${GOLD}">${m}</strong>`)}}
+                      />
                     ))}
                   </div>
                 )}
@@ -3335,6 +3493,35 @@ function P23({ go }) {
             <source src="/ThatsAllFolks.mp4" type="video/mp4"/>
             <source src="ThatsAllFolks.mp4" type="video/mp4"/>
           </video>
+
+          {/* Thank You Letter */}
+          <div style={{background:"linear-gradient(135deg,#0a0800,#050300)",border:`2px solid ${GOLD}`,padding:"36px 40px",marginBottom:28,textAlign:"left"}}>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:13,letterSpacing:5,fontWeight:900,textAlign:"center",marginBottom:28}}>✦ A PERSONAL LETTER FROM THE FOUNDER ✦</div>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 20px",fontFamily:"'Rajdhani',sans-serif"}}>
+              To every person who has opened MandaStrong Studio —
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 20px",fontFamily:"'Rajdhani',sans-serif"}}>
+              Thank you. From the bottom of my heart, thank you. You did not just download an app. You trusted me with your story — and that is the greatest honour I could ever receive.
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 20px",fontFamily:"'Rajdhani',sans-serif"}}>
+              I built MandaStrong Studio because I believe every human being has a story worth telling. Not just the people with production budgets. Not just the people with film school degrees or industry connections. <span style={{color:GOLD,fontWeight:700}}>Everyone.</span> The single mother who wants to make a film about her family. The veteran who needs to speak his truth. The child in a classroom who has never seen anyone who looks like her on screen. This platform was built for all of them. It was built for you.
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 20px",fontFamily:"'Rajdhani',sans-serif"}}>
+              I am not a corporation. I am Amanda Woolley — author, creative producer, and a person who has spent her life believing that technology should serve humanity and that art should serve truth. Every line of code in this platform, every voice character, every AI tool, every rendered frame was created with that belief at its core.
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 20px",fontFamily:"'Rajdhani',sans-serif"}}>
+              When you subscribe to MandaStrong Studio, something extraordinary happens — your subscription becomes part of something bigger than a film. A portion of every plan goes directly to <span style={{color:GOLD,fontWeight:700}}>anti-bullying programmes in schools</span>, <span style={{color:GOLD,fontWeight:700}}>veterans mental health initiatives</span>, and <span style={{color:GOLD,fontWeight:700}}>humanitarian causes</span> that need our support right now. All proceeds from our Etsy store are donated in full. You are not just making your film — you are funding someone else's survival.
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 20px",fontFamily:"'Rajdhani',sans-serif"}}>
+              If this platform has helped you tell your story, please share it with someone who needs it. If it has frustrated you, please tell me — I want to make it better. If it has moved you, that is the only reward I ever wanted.
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 28px",fontFamily:"'Rajdhani',sans-serif"}}>
+              The world needs your voice. It always has. Now you have the tools.
+            </p>
+            <p style={{color:WHITE,fontSize:15,lineHeight:2.1,margin:"0 0 4px",fontFamily:"'Rajdhani',sans-serif",fontStyle:"italic"}}>With deep gratitude and belief in your story,</p>
+            <p style={{color:GOLD,fontFamily:"'Cinzel',serif",fontSize:16,fontWeight:900,letterSpacing:3,margin:"0 0 4px",textShadow:`0 0 16px ${GOLD}66`}}>Amanda Woolley</p>
+            <p style={{color:GOLDDIM,fontSize:12,letterSpacing:2,margin:0,fontFamily:"'Rajdhani',sans-serif"}}>Founder · MandaStrong Studio · 2026</p>
+          </div>
 
           <div style={{height:1,background:`linear-gradient(90deg,transparent,${GOLD},transparent)`,marginBottom:28}}/>
 
