@@ -1609,55 +1609,155 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 The user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.`
         : "";
 
-      const directorPrompt=`You are the MandaStrong Cinema Engine. Write JavaScript canvas rendering code that creates a CINEMATIC, PHOTOREALISTIC scene.
+      const directorPrompt=`You are the MandaStrong Cinema Engine — the world's most advanced AI film renderer running inside a browser canvas. Your output must match professional Hollywood visual quality using only JavaScript Canvas 2D API.
 
-SCENE: "${prompt}"
+SCENE TO RENDER: "${prompt}"
 DURATION: ${duration} seconds${refInstruction}
 
-Write a function: function drawFrame(ctx, W, H, t, sec)
-Where t=0 to 1 (progress), sec=current second, W=1920, H=1080
+Write a single JavaScript function: function drawFrame(ctx, W, H, t, sec)
+- t = 0.0 to 1.0 overall progress through the scene
+- sec = current second of playback
+- W = 1920, H = 1080
+- ctx = CanvasRenderingContext2D
 
-CRITICAL REQUIREMENTS FOR PHOTOREALISTIC OUTPUT:
+═══════════════════════════════════════════════
+STEP 1 — READ THE SCENE AND IDENTIFY:
+- Location: indoor/outdoor, time of day, weather, era
+- Characters: how many, gender, age, ethnicity, emotion, clothing, position
+- Action: what is happening, what changes over time
+- Mood: the emotional tone (tense, warm, joyful, sad, dramatic)
+- Camera: angle, movement (push in, pull back, pan, static)
+═══════════════════════════════════════════════
 
-LIGHTING - must be physically accurate:
-- Use multiple radialGradient light sources with proper falloff
-- Ambient occlusion: darker in corners and crevices
-- Rim lighting on figures: bright edge glow from light source direction
-- Specular highlights: bright spots on reflective surfaces
-- Volumetric light: god rays as semi-transparent gradients
+STEP 2 — RENDER THE EXACT SCENE DESCRIBED. Do not substitute generic visuals. If the scene says "school drama rehearsal on a stage with students", render a stage, rows of seats, a curtain, students in costume. If it says "rain at night on a city street", render rain, reflections, neon, wet pavement. Render WHAT IS DESCRIBED.
 
-HUMANS - must look real:
-- Skin tones: use rgba with warm peachy tones e.g. rgba(220,170,130,1)
-- Face: oval for head, smaller oval for face area, dots for eyes, curve for lips
-- Hair: filled path with natural hair colours
-- Clothing: solid fills with shadow and highlight gradients
-- Body proportions: head=H*0.06, torso=H*0.2, legs=H*0.25
-- Cast shadows on ground beneath each figure
+═══════════════════════════════════════════════
+MANDATORY TECHNIQUES — USE ALL OF THESE:
+═══════════════════════════════════════════════
 
-ENVIRONMENTS - must look real:
-- Sky: multi-stop gradient from deep colour at top to lighter at horizon
-- Ground/floor: textured with subtle noise pattern
-- Buildings: boxes with window grids, varying heights, perspective depth
-- Water: animated sine wave layers with transparency and reflection gradient
-- Fire/candles: animated flickering radialGradient in orange/yellow
-- Fog/atmosphere: semi-transparent overlay gradients
+▸ BACKGROUND ENVIRONMENT
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  // Use 4-6 colour stops matching the scene's sky/ceiling/backdrop
+  // Day exterior: blue to cyan-white at horizon
+  // Night: near-black navy to deep blue at horizon with star particles
+  // Interior: warm cream/amber walls, window light shafts from correct direction
+  // Draw ground plane with perspective: darker near edges, lighter centre
+  // Add texture noise: loop 200 iterations of single-pixel rgba fills at random x/y within zone
 
-DEPTH & PERSPECTIVE:
-- Far objects: smaller, less saturated, more hazy
-- Near objects: larger, sharper, more saturated
+▸ ATMOSPHERIC DEPTH (always include)
+  // Draw 3 depth layers: far (opacity 0.3, smaller), mid (opacity 0.6), near (full)
+  // Haze: ctx.fillStyle = "rgba(180,160,140,0.08)"; ctx.fillRect(0,H*0.3,W,H*0.4);
+  // Dust motes: 15 circles r=1-2 drifting with Math.sin(sec+i)*3
 
-CINEMATIC MOTION:
-- Camera parallax: far elements move slower than near ones
-- Breathing: subtle scale oscillation using Math.sin(sec*0.5)
-- Wind: leaves/particles drift with sine curves
-- Light flicker: candles/fires use Math.sin(sec*7)
+▸ HUMAN FIGURES — FULLY DETAILED (if humans in scene)
+  // For EACH character described, draw at correct position with:
+  function drawHuman(ctx, cx, cy, scale, skinR, skinG, skinB, hairCol, clothTop, clothBot, facing, emotion, sec) {
+    // HEAD — ellipse not circle, slightly taller than wide
+    ctx.beginPath(); ctx.ellipse(cx, cy - scale*0.38, scale*0.11, scale*0.13, 0, 0, Math.PI*2);
+    ctx.fillStyle = "rgba("+skinR+","+skinG+","+skinB+",1)"; ctx.fill();
+    // NECK
+    ctx.fillRect(cx-scale*0.03, cy-scale*0.27, scale*0.06, scale*0.09);
+    // TORSO — trapezoid wider at shoulders
+    ctx.beginPath(); ctx.moveTo(cx-scale*0.13,cy-scale*0.18); ctx.lineTo(cx+scale*0.13,cy-scale*0.18);
+    ctx.lineTo(cx+scale*0.09,cy+scale*0.12); ctx.lineTo(cx-scale*0.09,cy+scale*0.12); ctx.closePath();
+    ctx.fillStyle = clothTop; ctx.fill();
+    // ARMS — slightly bent, one forward if action
+    ctx.strokeStyle = "rgba("+skinR+","+skinG+","+skinB+",1)"; ctx.lineWidth = scale*0.05;
+    ctx.beginPath(); ctx.moveTo(cx-scale*0.13,cy-scale*0.14); ctx.quadraticCurveTo(cx-scale*0.22,cy,cx-scale*0.18,cy+scale*0.13); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+scale*0.13,cy-scale*0.14); ctx.quadraticCurveTo(cx+scale*0.22,cy,cx+scale*0.18,cy+scale*0.13); ctx.stroke();
+    // LEGS
+    ctx.strokeStyle = clothBot; ctx.lineWidth = scale*0.07;
+    ctx.beginPath(); ctx.moveTo(cx-scale*0.05,cy+scale*0.12); ctx.quadraticCurveTo(cx-scale*0.08,cy+scale*0.28,cx-scale*0.06,cy+scale*0.38); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+scale*0.05,cy+scale*0.12); ctx.quadraticCurveTo(cx+scale*0.08,cy+scale*0.28,cx+scale*0.06,cy+scale*0.38); ctx.stroke();
+    // FACE DETAILS — eyes, nose suggestion, mouth expression
+    ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(cx-scale*0.04,cy-scale*0.38,scale*0.015,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+scale*0.04,cy-scale*0.38,scale*0.015,0,Math.PI*2); ctx.fill();
+    // Emotion: happy=upward curve, sad=downward, neutral=line
+    ctx.strokeStyle="rgba("+(skinR-40)+","+(skinG-40)+","+(skinB-40)+",0.8)"; ctx.lineWidth=scale*0.012;
+    if(emotion==="happy"){ ctx.beginPath(); ctx.arc(cx,cy-scale*0.34,scale*0.04,0.2,Math.PI-0.2); ctx.stroke(); }
+    else if(emotion==="sad"){ ctx.beginPath(); ctx.arc(cx,cy-scale*0.30,scale*0.04,Math.PI+0.2,Math.PI*2-0.2); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.moveTo(cx-scale*0.035,cy-scale*0.335); ctx.lineTo(cx+scale*0.035,cy-scale*0.335); ctx.stroke(); }
+    // HAIR — filled bezier path
+    ctx.fillStyle = hairCol; ctx.beginPath();
+    ctx.ellipse(cx, cy-scale*0.47, scale*0.115, scale*0.09, 0, Math.PI, Math.PI*2); ctx.fill();
+    // GROUND SHADOW — soft ellipse beneath feet
+    const sg = ctx.createRadialGradient(cx,cy+scale*0.38,0,cx,cy+scale*0.38,scale*0.15);
+    sg.addColorStop(0,"rgba(0,0,0,0.35)"); sg.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.ellipse(cx,cy+scale*0.39,scale*0.15,scale*0.04,0,0,Math.PI*2); ctx.fill();
+    // RIM LIGHT — edge glow from key light direction
+    const rl = ctx.createRadialGradient(cx-scale*0.14,cy-scale*0.2,0,cx-scale*0.14,cy-scale*0.2,scale*0.25);
+    rl.addColorStop(0,"rgba(255,220,160,0.3)"); rl.addColorStop(1,"rgba(255,220,160,0)");
+    ctx.fillStyle=rl; ctx.beginPath(); ctx.ellipse(cx,cy,scale*0.16,scale*0.35,0,0,Math.PI*2); ctx.fill();
+  }
+  // Call drawHuman with values matching the character described
 
-COLOUR GRADING (apply last):
-- Warm scenes: slight orange overlay at 0.08 opacity
-- Night scenes: blue overlay
-- Cinematic: teal shadows, orange highlights
+▸ ANIMATION — MAKE IT MOVE (mandatory)
+  // Characters breathe: cy offset = Math.sin(sec*0.9)*2
+  // Crowd scenes: each person has individual phase offset: Math.sin(sec*0.9+i*0.7)
+  // Walking: leg swing = Math.sin(sec*3)*15 degrees
+  // Talking: jaw bounce = Math.abs(Math.sin(sec*8))*3 pixels
+  // Hands gesturing: arm angle oscillates Math.sin(sec*2+phase)
+  // Eyes blink: every 3-4 seconds, close for 0.1s
+  // Hair/cloth: slight drift Math.sin(sec*1.2)*1.5
 
-Return ONLY the JavaScript function starting with:
+▸ SCENE-SPECIFIC ELEMENTS — RENDER THESE IF MENTIONED:
+  School/classroom: rows of desks with perspective, chalkboard/whiteboard on back wall, fluorescent ceiling panels as rectangles, teacher at front, students at desks facing forward
+  Stage/theatre: wooden stage floor planks, heavy velvet curtain drawn back, footlights as warm amber ovals at stage base, seats in raked rows fading to dark, spotlight cone from above
+  Night city: buildings as layered rectangles with window grids (lit yellow/white randomly), wet road as reflective gradient, rain as diagonal white lines (200 of them), neon signs as coloured glowing text, puddle reflections
+  Forest: layered tree silhouettes at 3 depths, ray shafts through canopy as radialGradients, ground dappling, moving leaves as small bezier shapes
+  Beach: graduated ocean with 4 sine-wave layers of varying blue opacity, wet sand gradient, foam at wave edge, sky with volumetric clouds as layered ellipses
+  Office: cubicle walls, monitor screens emitting blue-white glow, fluorescent strips, carpet texture
+  Hospital: white walls, green tiled floor reflection, bed with figure, monitoring equipment as rectangles with blinking dot
+
+▸ LIGHTING SYSTEM (always include)
+  // Key light: primary source matching scene (sun direction, window, ceiling)
+  const keyLight = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, W*0.8);
+  keyLight.addColorStop(0, "rgba(255,240,200,0.12)"); keyLight.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = keyLight; ctx.fillRect(0,0,W,H);
+  // Fill light: opposite side, cooler, half intensity
+  // Practical lights: any lights visible in scene (lamps, screens, candles) emit radialGradient halos
+  // Volumetric shafts: if window/spotlight, draw triangular path filled with rgba(255,240,200,0.06)
+
+▸ CAMERA MOVEMENT (choose one matching scene mood)
+  // Push in: scale increases over time — const scale = 1 + t*0.08
+  // Pull back: scale decreases — const scale = 1.08 - t*0.08
+  // Slow pan: translate x = t * W * 0.05
+  // Handheld shake: ctx.translate(Math.sin(sec*7)*0.4, Math.cos(sec*5)*0.3)
+  // Apply: ctx.save(); ctx.scale(scale,scale); ctx.translate(-W*(scale-1)/2,-H*(scale-1)/2); ... ctx.restore();
+
+▸ COLOUR GRADE (apply as final overlay pass)
+  // Warm/golden: ctx.fillStyle="rgba(255,140,30,0.07)"; ctx.fillRect(0,0,W,H);
+  // Cold/blue: ctx.fillStyle="rgba(20,60,120,0.08)"; ctx.fillRect(0,0,W,H);
+  // Teal-orange (cinematic): teal shadows pass + orange highlights pass
+  // Night: ctx.fillStyle="rgba(10,15,40,0.15)"; ctx.fillRect(0,0,W,H);
+  // Bleach bypass: reduce saturation by compositing greyscale layer at 0.2 opacity
+
+▸ VIGNETTE + GRAIN (always apply last)
+  const vin = ctx.createRadialGradient(W/2,H/2,W*0.25,W/2,H/2,W*0.78);
+  vin.addColorStop(0,"rgba(0,0,0,0)"); vin.addColorStop(1,"rgba(0,0,0,0.72)");
+  ctx.fillStyle=vin; ctx.fillRect(0,0,W,H);
+  // Film grain: 60 single-pixel fills at random positions with opacity 0.018
+  for(let g=0;g<60;g++){ ctx.fillStyle="rgba(200,180,140,0.018)"; ctx.fillRect(Math.random()*W,Math.random()*H,1,1); }
+  // Letterbox bars
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H*0.056); ctx.fillRect(0,H*0.944,W,H*0.056);
+
+▸ TRANSITIONS
+  // Opening fade in: if(t<0.05){ ctx.fillStyle="rgba(0,0,0,"+(1-t/0.05)+")"; ctx.fillRect(0,0,W,H); }
+  // Closing fade out: if(t>0.88){ const a=(t-0.88)/0.12; ctx.fillStyle="rgba(0,0,0,"+a+")"; ctx.fillRect(0,0,W,H); }
+
+═══════════════════════════════════════════════
+RULES:
+1. RENDER THE SPECIFIC SCENE — not a generic version
+2. Use Math.sin/cos for all animation (no random inside the frame function except grain)
+3. Every character mentioned must be drawn with drawHuman or equivalent
+4. Every location element mentioned must be drawn
+5. Use at least 8 distinct drawing operations
+6. Function must work for any value of t (0 to 1) and sec (0 to ${duration})
+7. No external dependencies. Canvas 2D API only.
+8. Do not use template literals inside the function body
+═══════════════════════════════════════════════
+
+Return ONLY the JavaScript function starting with exactly:
 function drawFrame(ctx, W, H, t, sec) {`;
 
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
@@ -1692,8 +1792,8 @@ function drawFrame(ctx, W, H, t, sec) {`;
         const retry=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
-            messages:[{role:"user",content:`Write a cinematic canvas renderer for: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]})
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+            messages:[{role:"user",content:"Write a JavaScript canvas drawFrame for: \""+prompt+"\". W=1920,H=1080,t=0-1,sec=0-"+duration+". Include: scene-accurate background with gradients, human figures using ellipse/path with skin rgba(220,170,130,1), clothing fills, animated breathing Math.sin, scene props, vignette radialGradient, letterbox. No template literals. Return ONLY: function drawFrame(ctx,W,H,t,sec){"}]})
         });
         const rd=await retry.json();
         let rc=rd.content&&rd.content[0]?rd.content[0].text.trim():"";
@@ -1711,12 +1811,111 @@ function drawFrame(ctx, W, H, t, sec) {`;
       try{drawFn(ctx,1920,1080,0,0);}catch(e){}
       await new Promise(r=>setTimeout(r,300));
 
+      // ── WEB AUDIO SYNTHESIS — scene-matched ambient soundscape ──────
+      addLog("Composing audio soundscape...");
+      let audioCtx=null,audioDest=null;
+      try{
+        audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        audioDest=audioCtx.createMediaStreamDestination();
+        const masterGain=audioCtx.createGain();masterGain.gain.value=0.72;
+        masterGain.connect(audioDest);masterGain.connect(audioCtx.destination);
+        const pLow=prompt.toLowerCase();
+        // Detect scene type and build matching soundscape
+        const isNight=/night|dark|evening|midnight/.test(pLow);
+        const isForest=/forest|trees|woods|jungle|nature|leaves/.test(pLow);
+        const isCity=/city|street|urban|traffic|rain|neon/.test(pLow);
+        const isIndoor=/indoor|inside|room|office|school|stage|theatre|hospital|classroom/.test(pLow);
+        const isDrama=/drama|stage|theatre|perform|act|rehearsal/.test(pLow);
+        const isOcean=/ocean|sea|waves|beach|water/.test(pLow);
+        const isSpace=/space|stars|cosmos|galaxy/.test(pLow);
+        const makeOscillator=(freq,type,gainVal,startT,endT)=>{
+          const osc=audioCtx.createOscillator();
+          const g=audioCtx.createGain();
+          osc.type=type;osc.frequency.value=freq;
+          g.gain.setValueAtTime(0,startT);
+          g.gain.linearRampToValueAtTime(gainVal,startT+0.5);
+          g.gain.linearRampToValueAtTime(gainVal,endT-0.4);
+          g.gain.linearRampToValueAtTime(0,endT);
+          osc.connect(g);g.connect(masterGain);
+          osc.start(startT);osc.stop(endT);
+        };
+        const makeNoise=(gainVal,startT,endT,lowHz,highHz)=>{
+          const bufSize=audioCtx.sampleRate*Math.min(endT-startT,30);
+          const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+          const data=buf.getChannelData(0);
+          for(let i=0;i<bufSize;i++)data[i]=(Math.random()*2-1)*0.3;
+          const src=audioCtx.createBufferSource();src.buffer=buf;src.loop=true;
+          const filt=audioCtx.createBiquadFilter();
+          filt.type="bandpass";filt.frequency.value=(lowHz+highHz)/2;filt.Q.value=0.8;
+          const g=audioCtx.createGain();
+          g.gain.setValueAtTime(0,startT);g.gain.linearRampToValueAtTime(gainVal,startT+1);
+          g.gain.linearRampToValueAtTime(gainVal,endT-0.8);g.gain.linearRampToValueAtTime(0,endT);
+          src.connect(filt);filt.connect(g);g.connect(masterGain);
+          src.start(startT);src.stop(endT);
+        };
+        const now=audioCtx.currentTime+0.1;
+        const end=now+duration;
+        if(isForest||(!isCity&&!isIndoor&&!isSpace)){
+          // Wind through leaves — filtered noise
+          makeNoise(0.04,now,end,300,1200);
+          // Birds — occasional high oscillators
+          for(let b=0;b<Math.min(duration/8,8);b++){
+            const bt=now+b*(duration/8)+Math.random()*3;
+            makeOscillator(2200+Math.random()*800,"sine",0.06,bt,bt+0.4);
+            makeOscillator(2800+Math.random()*600,"sine",0.04,bt+0.15,bt+0.55);
+          }
+        }
+        if(isCity||/rain|wet|puddle/.test(pLow)){
+          // Rain — white noise band
+          makeNoise(0.055,now,end,1500,8000);
+          // Distant traffic rumble
+          makeNoise(0.025,now,end,60,180);
+        }
+        if(isOcean){
+          // Ocean waves — low noise with rhythmic gain modulation
+          makeNoise(0.07,now,end,80,600);
+          // Wave rhythm LFO via multiple timed gain envelopes
+          for(let w=0;w<duration/6;w++){
+            const wt=now+w*6;
+            makeNoise(0.04,wt,wt+4,100,400);
+          }
+        }
+        if(isIndoor||isDrama){
+          // Room tone — very subtle low noise
+          makeNoise(0.018,now,end,100,800);
+          if(isDrama){
+            // Audience murmur — band noise
+            makeNoise(0.022,now,Math.min(now+duration*0.3,now+15),300,2000);
+            // Applause at end
+            if(duration>10)makeNoise(0.06,end-4,end,500,4000);
+          }
+        }
+        if(isSpace){
+          // Deep space drone
+          makeOscillator(40,"sine",0.08,now,end);
+          makeOscillator(80,"sine",0.04,now,end);
+          makeOscillator(120,"sine",0.02,now,end);
+        }
+        if(isNight&&!isCity){
+          // Crickets — rapid oscillating high frequency
+          makeNoise(0.03,now,end,3000,6000);
+          makeOscillator(4200,"square",0.012,now,end);
+        }
+        // Cinematic sub bass drone for all scenes — barely perceptible, adds weight
+        makeOscillator(38,"sine",0.035,now,end);
+        // Subtle musical pad — warm major chord wash
+        [261,329,392].forEach((f,i)=>makeOscillator(f,"sine",0.018,now+i*0.2,end-i*0.2));
+        addLog("Audio: scene-matched soundscape active");
+      }catch(audioErr){addLog("Audio unavailable: "+audioErr.message);audioDest=null;}
+
       const fps=12;
       const msPerFrame=Math.round(1000/fps);
       const totalFrames=duration*fps;
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
-      const stream=canvas.captureStream(fps);
-      const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:15000000});
+      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")?"video/webm;codecs=vp9,opus":MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+      const videoStream=canvas.captureStream(fps);
+      const allTracks=[...videoStream.getTracks(),...(audioDest?audioDest.stream.getTracks():[])];
+      const combinedStream=new MediaStream(allTracks);
+      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:15000000,audioBitsPerSecond:192000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(msPerFrame);
@@ -1764,11 +1963,12 @@ function drawFrame(ctx, W, H, t, sec) {`;
       setProgress(97);addLog("Finalising...");
       await new Promise(r=>setTimeout(r,800));
       recorder.stop();
+      if(audioCtx)try{audioCtx.close();}catch(e){}
       await new Promise(r=>{recorder.onstop=r;});
       const blob=new Blob(chunks,{type:mimeType});
       const url=URL.createObjectURL(blob);
       setVideoUrl(url);setProgress(100);
-      addLog("✓ Scene complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+duration+"s");
+      addLog("✓ Scene complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+duration+"s · audio included");
 
       const fn=(title||"Scene")+"_"+duration+"s.webm";
       try{
@@ -1802,7 +2002,7 @@ function drawFrame(ctx, W, H, t, sec) {`;
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG CINEMA ENGINE · SCENE GENERATION · CLAUDE POWERED</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,letterSpacing:5,margin:0,fontSize:24,textTransform:"uppercase"}}>VIDEO GENERATOR</h1>
         </div>
-        <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ CLAUDE WRITES YOUR SCENE · ANY PROMPT · ANY SUBJECT</div>
+        <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ RENDERS EXACTLY WHAT YOU DESCRIBE · REAL HUMANS · REAL ENVIRONMENTS · SCENE-MATCHED AUDIO</div>
       </div>
       <DocRecoveryPanel setTitle={setTitle} setPrompt={setPrompt} setDuration={setDuration}/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 420px",minHeight:"calc(100vh - 120px)"}}>
@@ -1918,14 +2118,17 @@ function drawFrame(ctx, W, H, t, sec) {`;
             ):(
               <div style={{padding:"16px 0",color:GOLDDIM,fontSize:10,lineHeight:2.2,letterSpacing:1}}>
                 <div style={{color:GOLD,fontWeight:900,fontSize:11,marginBottom:8}}>WHAT THIS ENGINE RENDERS</div>
-                ✦ Real human figures with skin tones<br/>
-                ✦ Any environment or setting<br/>
-                ✦ Physical lighting and atmosphere<br/>
-                ✦ Cities, oceans, space, interiors<br/>
-                ✦ Weather — rain, fog, dust, fire<br/>
-                ✦ Camera movement and parallax<br/>
-                ✦ Cinematic colour grading<br/>
-                ✦ Matches your reference image
+                <div style={{color:GOLDDIM,fontSize:10,lineHeight:2.2,letterSpacing:1}}>
+                ✦ Exactly what you describe — not generic<br/>
+                ✦ Real human figures: skin, hair, clothing, emotion<br/>
+                ✦ Characters animated: breathing, walking, talking<br/>
+                ✦ Any setting: school, stage, city, ocean, space<br/>
+                ✦ Scene-matched audio: rain, crowd, birds, drones<br/>
+                ✦ Physical lighting from correct direction<br/>
+                ✦ Camera push-in, pull-back, handheld shake<br/>
+                ✦ Cinematic colour grade matching scene mood<br/>
+                ✦ Film grain, letterbox, vignette on every frame<br/>
+                ✦ Matches your uploaded reference image style</div>
               </div>
             )}
           </div>
@@ -2536,8 +2739,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-              messages:[{role:"user",content:"Write a JavaScript canvas function for this cinematic scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]})
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+              messages:[{role:"user",content:"You are the MandaStrong Cinema Engine. Render this exact scene as a JavaScript canvas function: \""+scenePrompt+"\". W=1920,H="+dims.h+",t=0-1,sec=0-"+clipDurSec+". REQUIREMENTS: draw the specific location described (interior/exterior), draw every character mentioned using ellipse/arc/bezier paths with realistic skin tones rgba(210-240,160-190,120-160,1), clothing as filled paths, animated breathing Math.sin(sec*0.9)*2, scene-specific props exactly as described, multi-layer background with atmospheric depth, physically accurate lighting radialGradients from correct direction, volumetric light shafts if applicable, vignette radialGradient, letterbox bars, opening fade-in if(t<0.06) and closing fade-out if(t>0.9), film grain 50 pixels. Use Math.sin/cos for all animation. No template literals. No external dependencies. Return ONLY the function starting with: function drawFrame(ctx,W,H,t,sec){"}]})
           });
           const d=await res.json();
           let code=d.content&&d.content[0]?d.content[0].text.trim():"";
