@@ -1482,6 +1482,14 @@ The user has uploaded a reference image. Match its visual style, colour palette,
         : "";
 
       const directorPrompt="You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer. You produce PHOTOGRAPHIC QUALITY output. ZERO cartoons. ZERO outlines. ZERO flat colours. ZERO geometric shapes.\n\nSCENE TO RENDER: "+JSON.stringify(prompt)+"\nEXACT DURATION: "+duration+" seconds"+refInstruction+"\n\nFUNCTION SIGNATURE: function drawFrame(ctx, W, H, t, sec)\nt = 0.0 to 1.0 (progress through clip), sec = elapsed seconds, W=1920, H=1080\n\nYOU MUST USE THESE EXACT TECHNIQUES:\n\nSKY: ctx.createLinearGradient(0,0,0,H*0.6) with minimum 4 colour stops. Night: rgba(1,2,12,1) > rgba(3,6,25,1) > rgba(8,18,55,1) > rgba(12,28,70,1). Dawn: rgba(10,5,30,1) > rgba(80,20,10,1) > rgba(200,100,20,1) > rgba(255,200,100,1).\n\nOCEAN WAVES: Draw 10 separate wave layers. Each layer: ctx.beginPath(), moveTo(0, baseY), series of bezierCurveTo calls across full width using Math.sin(x*0.006+sec*(0.12+i*0.04)+i*1.1)*22 for vertical offset. Fill each with ctx.createLinearGradient — deep navy rgba(2,8,40,1) at top to near-black rgba(1,3,18,1) at bottom.\n\nHUMAN FIGURES — CRITICAL: Build every person from layered shapes with skin-tone gradients ONLY. Head: ctx.arc filled with ctx.createRadialGradient — centre rgba(220,170,120,1) to edge rgba(160,110,70,1). Body: ctx.fillRect with ctx.createLinearGradient skin tones. Hair: ctx.arc or bezier path filled dark brown/black. Eyes: two small ctx.arc shapes filled dark. Lips: small bezier path filled rgba(180,90,80,1). BREATHING: multiply torso height by (1+Math.sin(sec*0.85)*0.007). EYE BLINK: if(Math.sin(sec*0.37+hash)>0.94) draw thin ellipse over eye. ABSOLUTELY NO STICK FIGURES. ABSOLUTELY NO OUTLINES.\n\nLIGHTING — ALL radialGradient: Candle: ctx.createRadialGradient(cx,cy,0,cx,cy,130) rgba(255,230,100,0.9)>rgba(255,160,20,0.5)>rgba(0,0,0,0). Moon: ctx.createRadialGradient(mx,my,0,mx,my,220) rgba(230,240,255,0.85)>rgba(180,200,240,0.3)>rgba(0,0,0,0). Fire: 5 overlapping radialGradients with Math.sin(sec*7+i)*8 flicker.\n\nPARALLAX DEPTH: ctx.save(); ctx.translate(-t*W*0.012,0); [draw distant mountains/sky]; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.032,0); [draw mid elements]; ctx.restore(); ctx.save(); ctx.translate(-t*W*0.068,0); [draw foreground]; ctx.restore();\n\nATMOSPHERE: 60 dust particles. Each: small ctx.arc rgba(255,255,240,0.04) at position (px+Math.sin(sec*0.3+i)*2, py-sec*0.4%H).\n\nPOST-PROCESSING — DRAW THESE LAST IN THIS ORDER:\n1. Vignette: ctx.createRadialGradient(W/2,H/2,W*0.28,W/2,H/2,W*0.88) rgba(0,0,0,0)>rgba(0,0,0,0.82). fillRect(0,0,W,H).\n2. Letterbox: ctx.fillStyle=rgba(0,0,0,1). fillRect(0,0,W,H*0.074). fillRect(0,H*0.926,W,H*0.074).\n3. Film grain: for i<50: ctx.fillStyle=rgba(rand>0.5?200:10,rand>0.5?200:10,rand>0.5?200:10,0.009). fillRect(rand*W,rand*H,1,1).\n4. Colour grade: ctx.globalAlpha=0.055. fillStyle rgba(255,140,40,1) for warm scenes OR rgba(20,40,90,1) for cool/night. fillRect. ctx.globalAlpha=1.\n5. Fade in: if(t<0.04) ctx.fillStyle=rgba(0,0,0,"+(1-t*25)+") fillRect(0,0,W,H).\n6. Fade out: if(t>0.93) ctx.fillStyle=rgba(0,0,0,"+((t-0.93)*14.3)+") fillRect(0,0,W,H).\n\nReturn ONLY the complete JavaScript function. Zero markdown. Zero explanation. Start with EXACTLY: function drawFrame(ctx, W, H, t, sec) {";
+      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+          messages:[{role:"user",content:directorPrompt}]})
+      });
+      const data = await res.json();
+      let fnCode = data.content&&data.content[0]?data.content[0].text.trim():"";
       fnCode=fnCode.replace(/```javascript|```js|```/g,"").trim();
       const fnStart=fnCode.indexOf("function drawFrame");
       if(fnStart>0)fnCode=fnCode.slice(fnStart);
@@ -2877,7 +2885,7 @@ function P20() {
       <div style={{maxWidth:860,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>LEGAL</div>
         <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,letterSpacing:4,marginBottom:4}}>TERMS & DISCLAIMER</h1>
-        <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 · MANDASTRONG STUDIO LLC</div>
+        <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 · MANDASTRONG STUDIO</div>
 
         {/* Tab selector */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",marginBottom:28,border:`1px solid ${GOLDDIM}`}}>
@@ -2892,23 +2900,23 @@ function P20() {
         {tab==="tos"&&(
           <div>
             <div style={{background:"#050500",border:`2px solid ${GOLD}`,padding:"14px 20px",marginBottom:20,textAlign:"center"}}>
-              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO LLC · PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
+              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO · PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
               <div style={{color:WHITE,fontSize:12,marginTop:4}}>By using this platform you agree to be legally bound by these Terms.</div>
             </div>
 
             {sec("1. ACCEPTANCE OF TERMS",<>{p("By accessing or using MandaStrong Studio you agree to be legally bound by these Terms of Service. If you do not agree, do not use this platform. These terms apply to all users including free, trial, and paid subscribers.")}</>)}
             {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Creator ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
-            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio LLC. You may not reproduce, distribute, or resell the platform itself.")}</>)}
+            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
             {sec("4. AI-GENERATED CONTENT",<>{p("Content generated by MandaStrong Studio's AI tools is produced algorithmically. You are solely responsible for reviewing, editing, and verifying all AI-generated outputs before use. MandaStrong Studio makes no guarantees regarding the accuracy, appropriateness, or fitness for purpose of AI-generated content.")}{p("You agree not to use AI-generated content to produce material that is defamatory, illegal, harmful, or in violation of third-party rights.")}</>)}
             {sec("5. ACCEPTABLE USE",<>{p("You agree to use MandaStrong Studio only for lawful purposes. The following are strictly prohibited:")}{li(["Producing content that is defamatory, obscene, or harasses individuals","Infringing on third-party intellectual property rights","Attempting to reverse-engineer, copy, or redistribute the platform","Using the platform to generate spam, malware, or fraudulent content","Sharing your account credentials with third parties"])}</>)}
             {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. Full details available at MandaStrong1.Etsy.com.")}</>)}
-            {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio LLC shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
+            {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
-            {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio LLC is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
+            {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
             {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Grok on Page 21 of the platform.")}</>)}
 
             <div style={{background:"#050500",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO LLC · AMANDA WOOLLEY, FOUNDER · MARCH 2026</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO · AMANDA WOOLLEY, FOUNDER · MARCH 2026</p>
             </div>
           </div>
         )}
@@ -2930,7 +2938,7 @@ function P20() {
             {sec("CHANGES TO THIS DISCLAIMER",<>{p("MandaStrong Studio reserves the right to update this disclaimer at any time. Continued use of the platform following any update constitutes your acceptance of the revised terms.")}</>)}
 
             <div style={{background:"#050500",border:`1px solid ${GOLDDIM}`,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO LLC · MARCH 2026 · mandastrongstudio.bolt.host</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO · MARCH 2026 · mandastrongstudio.bolt.host</p>
             </div>
           </div>
         )}
@@ -3000,7 +3008,7 @@ function P21() {
             <div style={{flex:1,maxWidth:"85%"}}>
               <div style={{color:m.role==="user"?GOLDDIM:GOLD,fontSize:8,fontWeight:900,letterSpacing:2,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
               <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${m.role==="user"?GOLDDIM+"44":GOLD+"22"}`,padding:"10px 12px"}}>
-                <div style={{color:WHITE,fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                <div style={{color:WHITE,fontSize:15,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{m.content}</div>
               </div>
             </div>
           </div>
@@ -3058,7 +3066,7 @@ function P23({ go }) {
   const [guideOpen,setGuideOpen]=useState(false);
   return(
     <div style={{...Sp,padding:0}}>
-      <div style={{width:"100%",aspectRatio:"16/6",background:"#000",overflow:"hidden"}}>
+      <div style={{width:"100%",aspectRatio:"16/9",maxHeight:460,background:"#000",overflow:"hidden"}}>
         <video autoPlay loop playsInline muted preload="auto" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none";}}>
           <source src="/background.mp4" type="video/mp4"/>
           <source src="background.mp4" type="video/mp4"/>
@@ -3069,10 +3077,12 @@ function P23({ go }) {
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:10,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3vw,32px)",fontWeight:900,letterSpacing:5,marginBottom:16}}>THAT'S ALL FOLKS</h1>
           <video autoPlay loop playsInline muted preload="auto"
-            style={{width:"100%",maxWidth:640,display:"block",margin:"0 auto 20px",border:`1px solid ${GOLD}`,background:"#000"}}
+            style={{width:"100%",maxWidth:900,aspectRatio:"16/9",display:"block",margin:"0 auto 20px",border:`1px solid ${GOLD}`,background:"#000"}}
             onError={e=>{e.currentTarget.style.display="none";}}>
             <source src="/ThatsAllFolks.mp4" type="video/mp4"/>
             <source src="ThatsAllFolks.mp4" type="video/mp4"/>
+            <source src="/background.mp4" type="video/mp4"/>
+            <source src="background.mp4" type="video/mp4"/>
           </video>
           <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#050500",border:`2px solid ${GOLD}`}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ A LETTER TO THE CREATORS ✦</div>
