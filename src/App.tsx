@@ -2304,10 +2304,10 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>EDITING WORKSPACE</div>
           <h1 style={{...H1,fontSize:24,margin:0}}>TIMELINE EDITOR</h1>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-            <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>FILM: {filmDuration||60} MIN</span>
-            <input type="range" min={0} max={180} step={30} value={filmDuration||60} onChange={e=>setFilmDuration(+e.target.value)} style={{width:160,accentColor:GOLD}}/>
+            <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>FILM: {Math.max(1,filmDuration||60)} MIN</span>
+            <input type="range" min={1} max={180} step={1} value={Math.max(1,filmDuration||60)} onChange={e=>setFilmDuration(Math.max(1,+e.target.value))} style={{width:160,accentColor:GOLD}}/>
             <div style={{display:"flex",gap:4}}>
-              {[60,90,180].map(m=><button key={m} onClick={()=>setFilmDuration(m)} style={{background:filmDuration===m?GOLD:"#111",border:`1px solid ${filmDuration===m?"#000":GOLDDIM}`,color:filmDuration===m?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>{m}m</button>)}
+              {[30,60,90,120,180].map(m=><button key={m} onClick={()=>setFilmDuration(m)} style={{background:filmDuration===m?GOLD:"#111",border:`1px solid ${filmDuration===m?"#000":GOLDDIM}`,color:filmDuration===m?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>{m}m</button>)}
             </div>
           </div>
         </div>
@@ -2711,10 +2711,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700}}>PRODUCTION ENGINE — STAGE 6</div>
           <h1 style={{...H1,fontSize:22,margin:0}}>RENDER FILM</h1>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-            <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>FILM: {filmDuration||60} MIN</span>
-            <input type="range" min={0} max={180} step={30} value={filmDuration||60} onChange={e=>setFilmDuration(+e.target.value)} style={{width:160,accentColor:GOLD}}/>
+            <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>FILM: {Math.max(1,filmDuration||60)} MIN</span>
+            <input type="range" min={1} max={180} step={1} value={Math.max(1,filmDuration||60)} onChange={e=>setFilmDuration(Math.max(1,+e.target.value))} style={{width:160,accentColor:GOLD}}/>
             <div style={{display:"flex",gap:4}}>
-              {[60,90,180].map(m=><button key={m} onClick={()=>setFilmDuration(m)} style={{background:filmDuration===m?GOLD:"#111",border:`1px solid ${filmDuration===m?"#000":GOLDDIM}`,color:filmDuration===m?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>{m}m</button>)}
+              {[30,60,90,120,180].map(m=><button key={m} onClick={()=>setFilmDuration(m)} style={{background:filmDuration===m?GOLD:"#111",border:`1px solid ${filmDuration===m?"#000":GOLDDIM}`,color:filmDuration===m?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>{m}m</button>)}
             </div>
           </div>
         </div>
