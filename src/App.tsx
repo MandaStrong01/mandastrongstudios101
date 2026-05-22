@@ -772,13 +772,20 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
           ctx.save();
           ctx.translate(-drift*0.3,0);
 
-          try{ renderFn(ctx,W,H,t,sec,totalDur,beatNow); }
+          try{
+            // MANDASTRONG PHOTOREALISTIC BASE — always first
+            const skyB=ctx.createLinearGradient(0,0,0,H*0.6);
+            skyB.addColorStop(0,"rgb(1,2,12)");skyB.addColorStop(0.35,"rgb(4,8,35)");
+            skyB.addColorStop(0.75,"rgb(8,18,55)");skyB.addColorStop(1,"rgb(12,28,75)");
+            ctx.fillStyle=skyB;ctx.fillRect(0,0,W,H);
+            for(let si=0;si<180;si++){const sx=(si*137.5)%W,sy=(si*97.3)%(H*0.55);const sb=0.3+Math.sin(sec*0.7+si*0.4)*0.25;ctx.fillStyle="rgba(240,245,255,"+sb+")";ctx.fillRect(sx,sy,si%5===0?1.2:0.7,si%5===0?1.2:0.7);}
+            for(let wi=0;wi<10;wi++){const wbase=H*0.55+wi*((H-H*0.55)/10);const wgb=ctx.createLinearGradient(0,wbase,0,H);wgb.addColorStop(0,"rgba("+(3+wi*2)+","+(10+wi*5)+","+(42+wi*6)+",0.85)");wgb.addColorStop(1,"rgba(1,3,12,0.98)");ctx.fillStyle=wgb;ctx.beginPath();ctx.moveTo(-10,H);for(let wx=0;wx<=W+10;wx+=4){ctx.lineTo(wx,wbase+Math.sin(wx*0.007+sec*(0.22+wi*0.055)+wi*1.3)*18+wi*6);}ctx.lineTo(W+10,H);ctx.closePath();ctx.fill();}
+            renderFn(ctx,W,H,t,sec,totalDur,beatNow);
+          }
           catch(e){
-            // Graceful fallback — keep rendering
             const bg=ctx.createLinearGradient(0,0,0,H);
-            bg.addColorStop(0,"rgb(2,5,18)");
-            bg.addColorStop(1,"rgb(4,8,28)");
-            ctx.fillStyle=bg; ctx.fillRect(-W,0,W*3,H);
+            bg.addColorStop(0,"rgb(2,5,18)");bg.addColorStop(1,"rgb(4,8,28)");
+            ctx.fillStyle=bg;ctx.fillRect(-W,0,W*3,H);
           }
 
           ctx.restore();
@@ -1635,6 +1642,18 @@ Return ONLY the JavaScript function. No markdown. No backticks. No explanation. 
           const sec=frame/fps;
           try{
             ctx.clearRect(0,0,1920,1080);
+            // MANDASTRONG PHOTOREALISTIC BASE — always runs first
+            const W2=1920,H2=1080;
+            const isNight=true;
+            const sky=ctx.createLinearGradient(0,0,0,H2*0.6);
+            sky.addColorStop(0,"rgb(1,2,12)");sky.addColorStop(0.4,"rgb(4,8,35)");
+            sky.addColorStop(0.8,"rgb(8,18,55)");sky.addColorStop(1,"rgb(12,28,75)");
+            ctx.fillStyle=sky;ctx.fillRect(0,0,W2,H2);
+            // Stars
+            for(let si=0;si<180;si++){const sx=(si*137.5)%W2,sy=(si*97.3)%(H2*0.55);const sb=0.3+Math.sin(sec*0.7+si*0.4)*0.25;ctx.fillStyle="rgba(240,245,255,"+sb+")";ctx.fillRect(sx,sy,si%5===0?1.4:0.8,si%5===0?1.4:0.8);}
+            // Ocean base
+            for(let wi=0;wi<10;wi++){const wbase=H2*0.55+wi*((H2-H2*0.55)/10);const wg=ctx.createLinearGradient(0,wbase,0,H2);wg.addColorStop(0,"rgba("+(3+wi*2)+","+(10+wi*5)+","+(42+wi*6)+",0.85)");wg.addColorStop(1,"rgba(1,3,12,0.98)");ctx.fillStyle=wg;ctx.beginPath();ctx.moveTo(-10,H2);for(let wx=0;wx<=W2+10;wx+=4){ctx.lineTo(wx,wbase+Math.sin(wx*0.007+sec*(0.22+wi*0.055)+wi*1.3)*18+wi*8);}ctx.lineTo(W2+10,H2);ctx.closePath();ctx.fill();}
+            // Now run Claude's renderer on top
             drawFn(ctx,1920,1080,t,sec);
             const vig=ctx.createRadialGradient(960,540,200,960,540,1100);
             vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.85)");
