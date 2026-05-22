@@ -633,172 +633,517 @@ function MusicVideoStudio({ onClose, onSave }) {
       }
       setRenderProgress(10);
 
-      // ── CLAUDE WRITES THE ENTIRE FILM AS ONE RENDERER ─────────────
-      // One function. All scenes. Seamless transitions. Beat responsive.
+      // ── CLAUDE PROVIDES SCENE JSON — WE RENDER IT ────────────────
       addLog("Claude is writing your film renderer...");
 
-      const filmPrompt =
-        "You are the MandaStrong Cinema Engine. Write a single JavaScript canvas function that renders a photorealistic cinematic music video.\n\n"
+      // Ask Claude for scene parameters as JSON — we draw everything ourselves
+      const jsonPrompt =
+        "You are a cinematographer. Analyse this music video scene and return ONLY a JSON object (no markdown, no explanation).\n\n"
+        +"SCENE: "+sceneDesc+"\n"
         +"SONG: \""+config.title+"\" by "+config.artist+"\n"
-        +"GENRE: "+config.genre+"\n"
-        +"MOOD: "+config.mood+"\n"
-        +"COLOUR GRADE: "+config.colorGrade+"\n"
-        +"TOTAL DURATION: "+totalDur.toFixed(0)+" seconds\n\n"
-        +"SCENE TO RENDER (render this EXACTLY — every detail matters):\n"
-        +sceneDesc+"\n\n"
-        +"FUNCTION SIGNATURE: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)\n"
-        +"  t = 0.0 to 1.0 overall progress\n"
-        +"  sec = current second elapsed\n"
-        +"  beatNow = true on audio beat frames\n"
-        +"  W=1920, H=1080\n\n"
-        +"RENDERING REQUIREMENTS:\n\n"
-        +"BACKGROUND: Multi-stop linearGradient matching scene environment and time of day.\n"
-        +"  Night sky: stops rgb(1,2,12) to rgb(5,10,35) to rgb(8,18,55). Add 200 star dots.\n"
-        +"  Day sky: stops rgb(80,140,220) to rgb(160,200,240) to rgb(220,230,180).\n"
-        +"  Sunset: stops rgb(20,10,40) to rgb(180,50,10) to rgb(255,140,30) to rgb(255,210,80).\n"
-        +"  Interior: dark wall gradient rgb(12,8,5) to rgb(6,4,2). Floor rectangle below midpoint.\n"
-        +"  Never a flat colour. Always minimum 3 stops.\n\n"
-        +"HUMANS (draw every person mentioned):\n"
-        +"  Head: ctx.beginPath(); ctx.ellipse(cx,cy,W*0.025,W*0.030,0,0,Math.PI*2); ctx.fill();\n"
-        +"  Skin: radialGradient(cx-5,cy-5,0, cx,cy,W*0.03) rgba(238,190,140,1) to rgba(175,115,72,1)\n"
-        +"  Hair: filled bezier path in correct colour above head\n"
-        +"  Eyes: two ctx.arc r=W*0.004 dark + white specular dot\n"
-        +"  Torso: linearGradient clothing, lighter centre darker sides\n"
-        +"  Arms: quadraticCurve skin-tone paths\n"
-        +"  Legs: gradient-filled rectangle paths\n"
-        +"  Shadow: radialGradient ellipse at feet rgba(0,0,0,0.3) to transparent\n"
-        +"  Breathing: add Math.sin(sec*0.9+i*1.3)*1.8 to each character y position\n\n"
-        +"ENVIRONMENTS (draw exactly what is described):\n"
-        +"  Ocean/water: 10 filled sine-wave path layers, each a deep navy linearGradient\n"
-        +"  Forest: bezier tree silhouette layers, varied greens, parallax\n"
-        +"  City: rows of gradient-filled building rects, window grids (small lighter rects)\n"
-        +"  Fire/candle: radialGradient orange-yellow, flicker Math.sin(sec*9)*0.06\n"
-        +"  Rain: 200 diagonal lines rgba(200,220,255,0.4) refreshed by position\n"
-        +"  Space: black base + 300 star pixels + nebula radialGradient clouds\n\n"
-        +"PROPS: Draw every object mentioned literally:\n"
-        +"  Guitar: two connected ellipses body, thin rect neck, 6 line strings\n"
-        +"  Phone: dark rect, screen glow radialGradient\n"
-        +"  Candle: cylinder + flame radialGradient + room ambient glow\n\n"
-        +"GENRE TREATMENT ("+config.genre+"):\n"
-        +(config.genre.includes("Hip Hop")||config.genre.includes("Trap")||config.genre.includes("Drill")
-          ?"High contrast. Deep shadows. Urban night. Gold/chrome accents. Low angle implied.\n":"")
-        +(config.genre.includes("Electronic")||config.genre.includes("EDM")||config.genre.includes("House")||config.genre.includes("Techno")||config.genre.includes("Dubstep")
-          ?"Neon grid lines. Strobe on beat: if(beatNow){ctx.fillStyle='rgba(255,255,255,0.07)';ctx.fillRect(0,0,W,H);} Futuristic geometry.\n":"")
-        +(config.genre.includes("Rock")||config.genre.includes("Metal")||config.genre.includes("Punk")
-          ?"High contrast. Red+black. Dramatic backlighting. Deep shadows. Intense atmosphere.\n":"")
-        +(config.genre.includes("Jazz")||config.genre.includes("Blues")
-          ?"Warm amber smoky tones. Club spotlight. Brick walls. Intimate late-night.\n":"")
-        +(config.genre.includes("Pop")
-          ?"Bright, clean, colourful. Energetic beat response. Bold palette.\n":"")
-        +(config.genre.includes("Classical")||config.genre.includes("Orchestral")||config.genre.includes("Cinematic")
-          ?"Grand, epic scale. Deep contrast. Formal warm lighting.\n":"")
-        +(config.genre.includes("R&B")||config.genre.includes("Soul")
-          ?"Warm gold-purple. Candlelit. Intimate bokeh lights as radialGradient dots.\n":"")
-        +"\nCOLOUR GRADE ("+config.colorGrade+"):\n"
-        +(config.colorGrade.includes("Teal")?"ctx.fillStyle='rgba(0,70,90,0.06)';ctx.fillRect(0,0,W,H); ctx.fillStyle='rgba(255,90,20,0.05)';ctx.fillRect(0,0,W,H);\n":"")
-        +(config.colorGrade.includes("Golden")||config.colorGrade.includes("Warm")?"ctx.fillStyle='rgba(255,150,30,0.09)';ctx.fillRect(0,0,W,H);\n":"")
-        +(config.colorGrade.includes("Cool")||config.colorGrade.includes("Blue")?"ctx.fillStyle='rgba(20,40,140,0.08)';ctx.fillRect(0,0,W,H);\n":"")
-        +(config.colorGrade.includes("Black & White")||config.colorGrade.includes("Noir")?"Draw all objects in greyscale only. No colour values.\n":"")
-        +(config.colorGrade.includes("Neon")||config.colorGrade.includes("Cyberpunk")?"ctx.fillStyle='rgba(120,0,200,0.06)';ctx.fillRect(0,0,W,H); Use ctx.shadowColor+shadowBlur for key elements.\n":"")
-        +(config.colorGrade.includes("Vintage")?"ctx.fillStyle='rgba(255,180,80,0.07)';ctx.fillRect(0,0,W,H);\n":"")
-        +"\nCAMERA: Gentle push-in: apply ctx.save(); const sc2=1+t*0.04; ctx.translate(W*(1-sc2)*0.5,H*(1-sc2)*0.5); ctx.scale(sc2,sc2); at top, ctx.restore() before post-processing.\n\n"
-        +"CINEMATIC ACTS:\n"
-        +"  t 0.00-0.08: Fade in. Full scene established.\n"
-        +"  t 0.08-0.35: Wide shot. All characters and environment.\n"
-        +"  t 0.35-0.60: Closer. Character emotion. Detail.\n"
-        +"  t 0.60-0.82: Peak. Full atmosphere.\n"
-        +"  t 0.82-1.00: Pull back. Fade to black.\n\n"
-        +"BEAT RESPONSE: if(beatNow){ctx.save();ctx.translate(W/2,H/2);ctx.scale(1.013,1.013);ctx.translate(-W/2,-H/2);} // scene draw // if(beatNow){ctx.restore();}\n\n"
-        +"TITLE CARD (show at t<0.09 and t>0.88):\n"
-        +"  const ta=t<0.09?t/0.09:1-(t-0.88)/0.12;\n"
-        +"  ctx.globalAlpha=ta*0.95; ctx.fillStyle='#e8c96d';\n"
-        +"  ctx.font='900 '+Math.round(H*0.068)+'px Arial Black,Arial';\n"
-        +"  ctx.textAlign='center'; ctx.shadowColor='#e8c96d'; ctx.shadowBlur=28;\n"
-        +"  ctx.fillText('"+config.title.replace(/'/g,"\\'").toUpperCase()+"',W/2,H*0.44);\n"
-        +"  ctx.shadowBlur=0; ctx.fillStyle='rgba(255,255,255,0.82)';\n"
-        +"  ctx.font='300 '+Math.round(H*0.032)+'px Arial';\n"
-        +"  ctx.fillText('"+config.artist.replace(/'/g,"\\'").toUpperCase()+"',W/2,H*0.56); ctx.globalAlpha=1;\n\n"
-        +"POST-PROCESSING (draw these LAST):\n"
-        +"  1. Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.1,W/2,H/2,W*0.82); vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.88)'); ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);\n"
-        +"  2. Letterbox: ctx.fillStyle='#000'; ctx.fillRect(0,0,W,Math.round(H*0.074)); ctx.fillRect(0,H-Math.round(H*0.074),W,Math.round(H*0.074));\n"
-        +"  3. Grain: for(let g=0;g<30;g++){ctx.fillStyle='rgba(200,200,200,0.007)';ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}\n"
-        +"  4. Fade in: if(t<0.05){ctx.fillStyle='rgba(0,0,0,'+(1-t/0.05)+')';ctx.fillRect(0,0,W,H);}\n"
-        +"  5. Fade out: if(t>0.92){ctx.fillStyle='rgba(0,0,0,'+((t-0.92)/0.08)+')';ctx.fillRect(0,0,W,H);}\n\n"
-        +"ABSOLUTE RULES:\n"
-        +"1. Render EXACTLY what the scene description says.\n"
-        +"2. ZERO cartoon outlines. ZERO flat colour fills. ALL surfaces use gradients.\n"
-        +"3. Draw every human fully — head through feet.\n"
-        +"4. NO template literals. NO backticks anywhere in your code. Use only regular strings with + concatenation.\n"
-        +"5. NO external libraries. Canvas 2D API only.\n"
-        +"6. Function must work for any t in [0,1] and sec in [0,"+totalDur.toFixed(0)+"].\n\n"
-        +"Return ONLY the function, no explanation, no markdown:\n"
-        +"function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {";
+        +"GENRE: "+config.genre+"\nMOOD: "+config.mood+"\nGRADE: "+config.colorGrade+"\n\n"
+        +"Return this exact JSON structure with your values:\n"
+        +"{\n"
+        +"  \"environment\": \"indoor_night|indoor_day|outdoor_night|outdoor_day|outdoor_sunset|space|underwater\",\n"
+        +"  \"hasOcean\": true,\n"
+        +"  \"hasForest\": false,\n"
+        +"  \"hasCity\": false,\n"
+        +"  \"hasRain\": false,\n"
+        +"  \"hasFire\": true,\n"
+        +"  \"hasCandle\": true,\n"
+        +"  \"hasMoon\": true,\n"
+        +"  \"hasStars\": true,\n"
+        +"  \"skyTop\": \"2,4,15\",\n"
+        +"  \"skyMid\": \"5,10,35\",\n"
+        +"  \"skyBot\": \"8,18,55\",\n"
+        +"  \"ambientR\": 8, \"ambientG\": 18, \"ambientB\": 55,\n"
+        +"  \"gradeR\": 0, \"gradeG\": 30, \"gradeB\": 60, \"gradeA\": 0.07,\n"
+        +"  \"warmR\": 255, \"warmG\": 140, \"warmB\": 30, \"warmA\": 0.0,\n"
+        +"  \"characters\": [\n"
+        +"    {\"x\":0.25,\"y\":0.62,\"facing\":\"back\",\"seated\":true,\"clothingTop\":\"20,20,20\",\"clothingBot\":\"15,15,15\",\"hairColor\":\"10,8,6\",\"skinLight\":\"220,170,120\",\"skinDark\":\"160,110,72\"}\n"
+        +"  ],\n"
+        +"  \"props\": [\"guitar\",\"candle\",\"couch\",\"window\"],\n"
+        +"  \"moonX\": 0.72, \"moonY\": 0.12,\n"
+        +"  \"windowX\": 0.1, \"windowY\": 0.08, \"windowW\": 0.42, \"windowH\": 0.78,\n"
+        +"  \"candleX\": 0.68, \"candleY\": 0.58,\n"
+        +"  \"horizonY\": 0.55,\n"
+        +"  \"indoorWallColor\": \"10,6,3\",\n"
+        +"  \"indoorFloorColor\": \"18,12,7\"\n"
+        +"}";
 
-      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+      const jres = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:8000,messages:[{role:"user",content:filmPrompt}]})
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1200,messages:[{role:"user",content:jsonPrompt}]})
       });
-      const d = await res.json();
-      if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
-
-      const cleanCode=(raw)=>{
-        // Remove markdown fences
-        let c=raw.replace(/```[a-z]*\n?/gi,"").replace(/```/g,"").trim();
-        // Locate function start
-        const idx=c.indexOf("function renderFilm");
-        if(idx>0)c=c.slice(idx);
-        // Replace ALL template literals (including multiline) with equivalent string concat
-        // so new Function() constructor doesn't choke on backticks
-        c=c.replace(/`([\s\S]*?)`/g,(_,inner)=>JSON.stringify(inner));
-        // Remove any stray markdown inside code
-        c=c.replace(/^#+\s.*$/gm,"").replace(/^\*+\s.*$/gm,"");
-        return c;
-      };
-      const extractBody=(c)=>{
-        const start=c.indexOf("{");
-        const end=c.lastIndexOf("}");
-        return start>=0&&end>start?c.slice(start+1,end):"";
-      };
-
-      let code = d.content&&d.content[0]?d.content[0].text.trim():"";
-      code=cleanCode(code);
-      let renderFn = null;
+      const jd = await jres.json();
+      if(jd.error){addLog("Error: "+jd.error.message);setGenerating(false);return;}
+      let scene:any = {};
       try{
-        const body=extractBody(code);
-        if(!body)throw new Error("empty body");
-        renderFn = new Function("ctx","W","H","t","sec","totalSec","beatNow",body);
-        addLog("Film renderer compiled — "+Math.round(body.length/1000)+"kb of cinema code");
-      }catch(e){
-        addLog("Compile error: "+e.message+" — retrying with focused prompt...");
-        const simple = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:6000,
-            messages:[{role:"user",content:
-              "Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) for this scene: \""+sceneDesc+"\". "
-              +"Song: \""+config.title+"\" by "+config.artist+". Mood: "+config.mood+". "
-              +"W=1920,H=1080. t=0-1 progress. sec=current second. "
-              +"RULES: ALL surfaces use gradients (createLinearGradient/createRadialGradient). "
-              +"ZERO flat fills except pure black. ZERO cartoon outlines. "
-              +"Draw the exact scene described — every human, every object, every environment detail. "
-              +"Humans: radialGradient skin rgba(230,185,140), hair bezier, eyes/nose/mouth arcs, torso linearGradient clothing, arms, legs. "
-              +"Post-process: vignette radialGradient, letterbox bars top+bottom 7.4%, 30 grain pixels. "
-              +"Fade in t<0.06, fade out t>0.92. "
-              +"NO template literals. NO backticks anywhere. Use only regular strings. "
-              +"Return ONLY the function starting with: function renderFilm(ctx,W,H,t,sec,totalSec,beatNow){"
-            }]})
-        });
-        const sd = await simple.json();
-        let sc = sd.content&&sd.content[0]?sd.content[0].text.trim():"";
-        sc=cleanCode(sc);
-        try{
-          const sb=extractBody(sc);
-          if(!sb)throw new Error("empty retry body");
-          renderFn = new Function("ctx","W","H","t","sec","totalSec","beatNow",sb);
-          addLog("Retry compiled — "+Math.round(sb.length/1000)+"kb");
-        }catch(e2){ addLog("Fatal compile: "+e2.message); setGenerating(false); return; }
-      }
+        let jtext = jd.content&&jd.content[0]?jd.content[0].text.trim():"{}";
+        jtext = jtext.replace(/```[a-z]*/gi,"").replace(/```/g,"").trim();
+        const ji=jtext.indexOf("{"), jk=jtext.lastIndexOf("}");
+        if(ji>=0&&jk>ji) jtext=jtext.slice(ji,jk+1);
+        scene = JSON.parse(jtext);
+        addLog("Scene parameters loaded — building cinematic renderer...");
+      }catch(e){ addLog("Scene parse error — using defaults"); }
+
+      // ── PHOTOREALISTIC BUILT-IN RENDERER ─────────────────────────
+      // Every surface is a gradient. Zero flat fills. Zero outlines.
+      const renderFn = (ctx, W, H, t, sec, _totalSec, beatNow) => {
+        const PI2=Math.PI*2;
+        const rr=(s)=>{ const p=s.split(","); return [parseInt(p[0]||"0"),parseInt(p[1]||"0"),parseInt(p[2]||"0")]; };
+        const rgb=(r,g,b,a=1)=>`rgba(${r},${g},${b},${a})`;
+        const env = scene.environment||"outdoor_night";
+        const isNight = env.includes("night")||env.includes("indoor");
+        const isIndoor = env.includes("indoor");
+        const isOutdoor = env.includes("outdoor")||env.includes("space")||env.includes("under");
+        const horizonY = H*(scene.horizonY||0.55);
+
+        // ── CAMERA PUSH ──────────────────────────────────────────
+        if(beatNow){ctx.save();ctx.translate(W/2,H/2);ctx.scale(1.012,1.012);ctx.translate(-W/2,-H/2);}
+        const camScale = 1+t*0.035;
+        ctx.save();
+        ctx.translate(W*(1-camScale)*0.5,H*(1-camScale)*0.5);
+        ctx.scale(camScale,camScale);
+
+        // ── SKY / BACKGROUND ─────────────────────────────────────
+        const [st0,st1,st2] = [rr(scene.skyTop||"2,4,15"),rr(scene.skyMid||"5,10,35"),rr(scene.skyBot||"8,18,55")];
+        if(!isIndoor){
+          const sky=ctx.createLinearGradient(0,0,0,horizonY);
+          sky.addColorStop(0,rgb(st0[0],st0[1],st0[2]));
+          sky.addColorStop(0.55,rgb(st1[0],st1[1],st1[2]));
+          sky.addColorStop(1,rgb(st2[0],st2[1],st2[2]));
+          ctx.fillStyle=sky; ctx.fillRect(0,0,W,horizonY+4);
+          // STARS
+          if(scene.hasStars!==false&&isNight){
+            for(let s=0;s<220;s++){
+              const sx=(s*137.508)%W, sy=(s*97.3)%(horizonY*0.92);
+              const br=0.35+Math.sin(sec*0.8+s*0.4)*0.28;
+              const sr=s%4===0?1.4:s%3===0?1.0:0.7;
+              const sg=ctx.createRadialGradient(sx,sy,0,sx,sy,sr*2);
+              sg.addColorStop(0,rgb(240,245,255,br));
+              sg.addColorStop(1,rgb(200,210,255,0));
+              ctx.fillStyle=sg; ctx.fillRect(sx-sr*2,sy-sr*2,sr*4,sr*4);
+            }
+          }
+          // MOON
+          if(scene.hasMoon!==false&&isNight){
+            const mx=W*(scene.moonX||0.72), my=H*(scene.moonY||0.12);
+            const mr=H*0.055;
+            // Moon glow halo
+            const mg2=ctx.createRadialGradient(mx,my,0,mx,my,mr*4.5);
+            mg2.addColorStop(0,rgb(240,245,200,0.18));
+            mg2.addColorStop(1,rgb(180,200,255,0));
+            ctx.fillStyle=mg2; ctx.fillRect(mx-mr*5,my-mr*5,mr*10,mr*10);
+            // Moon disc
+            const mg=ctx.createRadialGradient(mx-mr*0.18,my-mr*0.18,0,mx,my,mr);
+            mg.addColorStop(0,rgb(255,255,248,0.98));
+            mg.addColorStop(0.4,rgb(240,242,220,0.9));
+            mg.addColorStop(0.75,rgb(210,220,200,0.7));
+            mg.addColorStop(1,rgb(180,195,170,0));
+            ctx.fillStyle=mg;
+            ctx.beginPath(); ctx.arc(mx,my,mr,0,PI2); ctx.fill();
+            // Moon shimmer on water
+            if(scene.hasOcean!==false){
+              const shimW=mr*1.1+Math.sin(sec*0.4)*8;
+              const sh=ctx.createLinearGradient(mx,horizonY,mx,H);
+              sh.addColorStop(0,rgb(255,252,210,0.22));
+              sh.addColorStop(0.3,rgb(240,240,190,0.12));
+              sh.addColorStop(1,rgb(200,220,180,0));
+              ctx.fillStyle=sh;
+              ctx.beginPath();
+              ctx.moveTo(mx-shimW,horizonY);
+              for(let sx2=0;sx2<=W;sx2+=6){
+                const wv=Math.sin(sx2*0.05+sec*0.9)*9*Math.max(0,1-(Math.abs(sx2-mx)/(shimW*18)));
+                ctx.lineTo(mx-shimW+sx2*(shimW*2/W),horizonY+wv);
+              }
+              ctx.lineTo(mx+shimW*3,H); ctx.lineTo(mx-shimW*3,H); ctx.closePath(); ctx.fill();
+            }
+          }
+          // HORIZON GLOW
+          const hg=ctx.createLinearGradient(0,horizonY-H*0.08,0,horizonY+H*0.06);
+          hg.addColorStop(0,rgb(scene.ambientR||8,scene.ambientG||18,scene.ambientB||55,0));
+          hg.addColorStop(0.5,rgb((scene.ambientR||8)+15,(scene.ambientG||18)+10,(scene.ambientB||55)+20,0.18));
+          hg.addColorStop(1,rgb(scene.ambientR||8,scene.ambientG||18,scene.ambientB||55,0));
+          ctx.fillStyle=hg; ctx.fillRect(0,horizonY-H*0.08,W,H*0.14);
+        }
+
+        // ── OCEAN ────────────────────────────────────────────────
+        if(scene.hasOcean!==false&&!isIndoor){
+          for(let w=0;w<10;w++){
+            const wBase=horizonY+w*((H-horizonY)/10);
+            const wg=ctx.createLinearGradient(0,wBase,0,H);
+            const wr=(scene.ambientR||2)+w*2, wg2=(scene.ambientG||8)+w*4, wb=(scene.ambientB||38)+w*5;
+            wg.addColorStop(0,rgb(wr,wg2,wb,0.72+w*0.025));
+            wg.addColorStop(1,rgb(1,3,12,0.98));
+            ctx.fillStyle=wg;
+            ctx.beginPath(); ctx.moveTo(-20,H);
+            for(let x=0;x<=W+20;x+=3){
+              const y=wBase+Math.sin(x*0.007+sec*(0.28+w*0.055)+w*1.3)*16
+                      +Math.sin(x*0.019+sec*(0.45+w*0.04)+w*0.7)*6
+                      +Math.sin(x*0.041+sec*0.7+w*0.4)*3;
+              ctx.lineTo(x,y);
+            }
+            ctx.lineTo(W+20,H); ctx.closePath(); ctx.fill();
+          }
+          // Ocean surface specular gleam
+          const osg=ctx.createLinearGradient(0,horizonY,0,horizonY+H*0.08);
+          osg.addColorStop(0,rgb(180,210,255,0.14));
+          osg.addColorStop(1,rgb(80,120,200,0));
+          ctx.fillStyle=osg; ctx.fillRect(0,horizonY,W,H*0.08);
+        }
+
+        // ── CITY / BUILDINGS ─────────────────────────────────────
+        if(scene.hasCity){
+          for(let b=0;b<28;b++){
+            const bx=(b*97.5)%W, bh=H*0.18+((b*47)%1)*(H*0.28);
+            const by=horizonY-bh, bw=W*0.035+((b*31)%1)*W*0.04;
+            const bg=ctx.createLinearGradient(bx,by,bx+bw,by);
+            bg.addColorStop(0,rgb(12+(b%5)*4,14+(b%4)*3,20+(b%6)*4,0.95));
+            bg.addColorStop(0.5,rgb(20+(b%6)*3,22+(b%5)*2,32+(b%4)*3,0.92));
+            bg.addColorStop(1,rgb(8+(b%3)*4,10+(b%4)*3,18+(b%5)*4,0.95));
+            ctx.fillStyle=bg; ctx.fillRect(bx,by,bw,bh);
+            for(let wy2=0;wy2<bh;wy2+=H*0.04){
+              for(let wx2=0;wx2<bw;wx2+=W*0.012){
+                if(Math.sin(b*7.3+wy2*0.1+wx2*0.3)>0.1){
+                  const wa=0.4+Math.sin(sec*0.3+b*2.1+wy2*0.2)*0.15;
+                  ctx.fillStyle=rgb(255,240,180,wa);
+                  ctx.fillRect(bx+wx2+1,by+wy2+2,W*0.007,H*0.025);
+                }
+              }
+            }
+          }
+        }
+
+        // ── FOREST ───────────────────────────────────────────────
+        if(scene.hasForest){
+          for(let layer=0;layer<4;layer++){
+            const lp=layer/3;
+            ctx.save(); ctx.translate(-t*W*(0.015+lp*0.025),0);
+            for(let tr=0;tr<8+layer*4;tr++){
+              const tx=(tr*(W/(7+layer*3))+(layer*W*0.06))%W;
+              const th=H*(0.28+lp*0.12+Math.sin(tr*7.1+layer)*0.06);
+              const ty=horizonY-th*0.85;
+              const tw=W*(0.028+lp*0.018);
+              const tg=ctx.createLinearGradient(tx,ty,tx+tw,ty+th);
+              const gr=8+(layer*4)+(tr%3)*3, gg=28+(layer*8)+(tr%4)*6, gb2=12+(layer*3);
+              tg.addColorStop(0,rgb(gr+10,gg+15,gb2+5,0.92));
+              tg.addColorStop(0.4,rgb(gr,gg,gb2,0.88));
+              tg.addColorStop(1,rgb(gr-4,gg-8,gb2-4,0.85));
+              ctx.fillStyle=tg;
+              ctx.beginPath();
+              ctx.moveTo(tx+tw/2,ty);
+              ctx.bezierCurveTo(tx+tw*0.8,ty+th*0.35,tx+tw,ty+th*0.7,tx+tw*1.1,ty+th);
+              ctx.lineTo(tx-tw*0.1,ty+th);
+              ctx.bezierCurveTo(tx,ty+th*0.7,tx+tw*0.2,ty+th*0.35,tx+tw/2,ty);
+              ctx.closePath(); ctx.fill();
+            }
+            ctx.restore();
+          }
+        }
+
+        // ── INDOOR ROOM ──────────────────────────────────────────
+        if(isIndoor){
+          const [wr1,wg1,wb1]=rr(scene.indoorWallColor||"10,6,3");
+          const wallG=ctx.createLinearGradient(0,0,0,H);
+          wallG.addColorStop(0,rgb(wr1,wg1,wb1,1));
+          wallG.addColorStop(0.55,rgb(wr1+4,wg1+3,wb1+2,1));
+          wallG.addColorStop(1,rgb(wr1-2,wg1-1,wb1-1,1));
+          ctx.fillStyle=wallG; ctx.fillRect(0,0,W,H);
+          // Floor
+          const [fr,fg2,fb]=rr(scene.indoorFloorColor||"18,12,7");
+          const floorG=ctx.createLinearGradient(0,H*0.72,0,H);
+          floorG.addColorStop(0,rgb(fr,fg2,fb,1));
+          floorG.addColorStop(1,rgb(fr-4,fg2-3,fb-2,1));
+          ctx.fillStyle=floorG; ctx.fillRect(0,H*0.72,W,H*0.28);
+          // Floor-wall shadow line
+          const fl2=ctx.createLinearGradient(0,H*0.70,0,H*0.76);
+          fl2.addColorStop(0,rgb(0,0,0,0.55));
+          fl2.addColorStop(1,rgb(0,0,0,0));
+          ctx.fillStyle=fl2; ctx.fillRect(0,H*0.70,W,H*0.06);
+        }
+
+        // ── WINDOW ───────────────────────────────────────────────
+        if(isIndoor){
+          const wx2=W*(scene.windowX||0.08), wy2=H*(scene.windowY||0.06);
+          const ww2=W*(scene.windowW||0.44), wh2=H*(scene.windowH||0.80);
+          // Window sky glow behind glass
+          const wsg=ctx.createLinearGradient(wx2,wy2,wx2+ww2,wy2+wh2);
+          if(isNight){
+            wsg.addColorStop(0,rgb(st0[0]+2,st0[1]+4,st0[2]+12,0.95));
+            wsg.addColorStop(1,rgb(st1[0],st1[1],st1[2]+8,0.98));
+          } else {
+            wsg.addColorStop(0,rgb(140,190,240,0.9));
+            wsg.addColorStop(1,rgb(200,230,255,0.95));
+          }
+          ctx.fillStyle=wsg; ctx.fillRect(wx2,wy2,ww2,wh2);
+          // Ocean/sky visible through window (miniature)
+          if(scene.hasOcean!==false&&isNight){
+            const wHorizon=wy2+wh2*0.52;
+            for(let w2=0;w2<5;w2++){
+              const wBase2=wHorizon+w2*((wy2+wh2-wHorizon)/5);
+              const wg3=ctx.createLinearGradient(0,wBase2,0,wy2+wh2);
+              wg3.addColorStop(0,rgb(2+w2*2,8+w2*4,38+w2*5,0.82));
+              wg3.addColorStop(1,rgb(1,3,12,0.97));
+              ctx.fillStyle=wg3;
+              ctx.beginPath(); ctx.moveTo(wx2,wy2+wh2);
+              for(let x=wx2;x<=wx2+ww2;x+=2){
+                const y=wBase2+Math.sin(x*0.012+sec*(0.3+w2*0.06)+w2)*8+Math.sin(x*0.03+sec*0.5)*3;
+                ctx.lineTo(x,y);
+              }
+              ctx.lineTo(wx2+ww2,wy2+wh2); ctx.closePath(); ctx.fill();
+            }
+            // Moon in window
+            const wmx=wx2+ww2*0.7, wmy=wy2+wh2*0.2, wmr=wh2*0.06;
+            ctx.save(); ctx.beginPath(); ctx.rect(wx2,wy2,ww2,wh2); ctx.clip();
+            const wmg=ctx.createRadialGradient(wmx,wmy,0,wmx,wmy,wmr*3);
+            wmg.addColorStop(0,rgb(255,255,245,0.95));
+            wmg.addColorStop(0.35,rgb(235,238,215,0.7));
+            wmg.addColorStop(1,rgb(180,195,175,0));
+            ctx.fillStyle=wmg; ctx.fillRect(wmx-wmr*3,wmy-wmr*3,wmr*6,wmr*6);
+            ctx.beginPath(); ctx.arc(wmx,wmy,wmr,0,PI2);
+            const wmDisc=ctx.createRadialGradient(wmx-wmr*0.15,wmy-wmr*0.15,0,wmx,wmy,wmr);
+            wmDisc.addColorStop(0,rgb(255,255,248,0.97));
+            wmDisc.addColorStop(0.6,rgb(240,240,220,0.88));
+            wmDisc.addColorStop(1,rgb(200,210,190,0));
+            ctx.fillStyle=wmDisc; ctx.fill();
+            ctx.restore();
+          }
+          // Window frame — wooden, gradient
+          const wfg=ctx.createLinearGradient(wx2,wy2,wx2+12,wy2);
+          wfg.addColorStop(0,rgb(45,28,14,1)); wfg.addColorStop(0.5,rgb(62,40,20,1)); wfg.addColorStop(1,rgb(38,22,10,1));
+          ctx.fillStyle=wfg;
+          ctx.fillRect(wx2-6,wy2-6,12,wh2+12); ctx.fillRect(wx2+ww2-6,wy2-6,12,wh2+12);
+          ctx.fillRect(wx2-6,wy2-6,ww2+12,12); ctx.fillRect(wx2-6,wy2+wh2-6,ww2+12,12);
+          // Cross bars
+          ctx.fillRect(wx2,wy2+wh2*0.47,ww2,8);
+          ctx.fillRect(wx2+ww2*0.48,wy2,8,wh2);
+          // Window glass reflection sheen
+          const wref=ctx.createLinearGradient(wx2,wy2,wx2+ww2*0.4,wy2+wh2*0.3);
+          wref.addColorStop(0,rgb(255,255,255,0.045));
+          wref.addColorStop(1,rgb(255,255,255,0));
+          ctx.fillStyle=wref; ctx.fillRect(wx2,wy2,ww2,wh2);
+          // Ambient window light spill into room
+          const wl=ctx.createRadialGradient(wx2+ww2*0.5,wy2+wh2*0.5,0,wx2+ww2*0.5,wy2+wh2*0.5,ww2*1.1);
+          wl.addColorStop(0,rgb(st1[0]+5,st1[1]+8,st1[2]+20,0.12));
+          wl.addColorStop(1,rgb(st1[0],st1[1],st1[2],0));
+          ctx.fillStyle=wl; ctx.fillRect(0,0,W,H);
+          // Curtains
+          const curtainAlpha=0.55+Math.sin(sec*0.18)*0.04;
+          for(let ci=0;ci<2;ci++){
+            const cx3=ci===0?wx2-6:wx2+ww2-34;
+            const cw3=40;
+            const cg=ctx.createLinearGradient(cx3,wy2,cx3+cw3,wy2);
+            cg.addColorStop(0,rgb(120,95,70,curtainAlpha)); cg.addColorStop(0.5,rgb(100,78,55,curtainAlpha+0.06)); cg.addColorStop(1,rgb(88,65,44,curtainAlpha));
+            ctx.fillStyle=cg;
+            ctx.beginPath(); ctx.moveTo(cx3,wy2-10);
+            const sw=Math.sin(sec*0.22+ci)*14;
+            ctx.bezierCurveTo(cx3+sw,wy2+wh2*0.28,cx3+sw*0.7,wy2+wh2*0.58,cx3+sw*1.3,wy2+wh2+10);
+            ctx.lineTo(cx3+cw3+sw*1.3,wy2+wh2+10);
+            ctx.bezierCurveTo(cx3+cw3+sw*0.7,wy2+wh2*0.58,cx3+cw3+sw,wy2+wh2*0.28,cx3+cw3,wy2-10);
+            ctx.closePath(); ctx.fill();
+          }
+        }
+
+        // ── CANDLE ───────────────────────────────────────────────
+        if((scene.hasCandle||scene.hasFire)&&(scene.candleX||0.68)>0){
+          const cx4=W*(scene.candleX||0.68), cy4=H*(scene.candleY||0.58);
+          const flk=0.88+Math.sin(sec*8.1)*0.07+Math.sin(sec*14.3)*0.04+Math.sin(sec*3.7)*0.025;
+          // Candle body
+          const cbg=ctx.createLinearGradient(cx4-6,cy4,cx4+6,cy4);
+          cbg.addColorStop(0,rgb(210,195,165,0.9)); cbg.addColorStop(0.5,rgb(235,220,185,0.95)); cbg.addColorStop(1,rgb(200,180,148,0.9));
+          ctx.fillStyle=cbg; ctx.fillRect(cx4-5,cy4,10,H*0.06);
+          // Wax drip
+          ctx.fillStyle=rgb(225,210,175,0.6); ctx.fillRect(cx4-3,cy4,4,3);
+          // Flame
+          const flameh=H*0.04*flk;
+          const fg2b=ctx.createRadialGradient(cx4,cy4-flameh*0.3,0,cx4,cy4,flameh);
+          fg2b.addColorStop(0,rgb(255,255,220,0.98));
+          fg2b.addColorStop(0.25,rgb(255,200,60,0.88));
+          fg2b.addColorStop(0.6,rgb(255,110,10,0.55));
+          fg2b.addColorStop(1,rgb(255,60,0,0));
+          ctx.fillStyle=fg2b;
+          ctx.beginPath();
+          ctx.moveTo(cx4,cy4-flameh*1.6);
+          ctx.bezierCurveTo(cx4+flameh*0.35,cy4-flameh*0.9,cx4+flameh*0.22,cy4-flameh*0.1,cx4,cy4);
+          ctx.bezierCurveTo(cx4-flameh*0.22,cy4-flameh*0.1,cx4-flameh*0.35,cy4-flameh*0.9,cx4,cy4-flameh*1.6);
+          ctx.fill();
+          // Candle ambient room glow
+          const cag=ctx.createRadialGradient(cx4,cy4,0,cx4,cy4,W*0.38);
+          cag.addColorStop(0,rgb(255,145,28,0.13));
+          cag.addColorStop(0.4,rgb(255,120,18,0.06));
+          cag.addColorStop(1,rgb(200,80,0,0));
+          ctx.fillStyle=cag; ctx.fillRect(0,0,W,H);
+        }
+
+        // ── CHARACTERS ───────────────────────────────────────────
+        const chars = scene.characters||[{x:0.25,y:0.62,facing:"back",seated:true,clothingTop:"20,20,20",clothingBot:"15,15,15",hairColor:"10,8,6",skinLight:"220,170,120",skinDark:"160,110,72"}];
+        for(let ci=0;ci<chars.length;ci++){
+          const ch=chars[ci];
+          const bx=W*ch.x, by=H*ch.y;
+          const breath=Math.sin(sec*0.88+ci*1.4)*2.2;
+          const scale=H*0.0012;
+          const isFacingBack = (ch.facing||"back")==="back";
+          const [sl0,sl1,sl2]=rr(ch.skinLight||"220,170,120");
+          const [sd0,sd1,sd2]=rr(ch.skinDark||"160,110,72");
+          const [ct0,ct1,ct2]=rr(ch.clothingTop||"20,20,20");
+          const [cb0,cb1,cb2]=rr(ch.clothingBot||"15,15,15");
+          const [hr0,hr1,hr2]=rr(ch.hairColor||"10,8,6");
+          // Shadow on floor
+          const shG=ctx.createRadialGradient(bx,by+H*0.04,0,bx,by+H*0.04,W*0.055);
+          shG.addColorStop(0,rgb(0,0,0,0.32)); shG.addColorStop(1,rgb(0,0,0,0));
+          ctx.fillStyle=shG; ctx.fillRect(bx-W*0.06,by,W*0.12,H*0.06);
+          // Legs
+          const legG=ctx.createLinearGradient(bx-scale*22,by+breath,bx+scale*22,by+breath);
+          legG.addColorStop(0,rgb(cb0-5,cb1-4,cb2-4,0.95)); legG.addColorStop(0.5,rgb(cb0+8,cb1+6,cb2+5,0.98)); legG.addColorStop(1,rgb(cb0-5,cb1-4,cb2-4,0.95));
+          ctx.fillStyle=legG;
+          if(!ch.seated){
+            ctx.fillRect(bx-scale*12,by+scale*56+breath,scale*11,scale*62);
+            ctx.fillRect(bx+scale*2,by+scale*56+breath,scale*11,scale*62);
+          } else {
+            ctx.fillRect(bx-scale*25,by+scale*56+breath,scale*52,scale*18);
+          }
+          // Torso
+          const torsoH=scale*62*(1+Math.sin(sec*0.88+ci)*0.006);
+          const torsoG=ctx.createLinearGradient(bx-scale*22,by+breath,bx+scale*22,by+breath);
+          torsoG.addColorStop(0,rgb(ct0-8,ct1-6,ct2-5,0.97)); torsoG.addColorStop(0.4,rgb(ct0+12,ct1+9,ct2+7,0.99)); torsoG.addColorStop(1,rgb(ct0-6,ct1-5,ct2-4,0.97));
+          ctx.fillStyle=torsoG; ctx.fillRect(bx-scale*20,by-scale*4+breath,scale*40,torsoH);
+          // Shoulders
+          const shoulderG=ctx.createLinearGradient(bx-scale*28,by+breath,bx+scale*28,by+breath);
+          shoulderG.addColorStop(0,rgb(ct0-10,ct1-8,ct2-6,0.9)); shoulderG.addColorStop(0.5,rgb(ct0+8,ct1+6,ct2+4,0.95)); shoulderG.addColorStop(1,rgb(ct0-10,ct1-8,ct2-6,0.9));
+          ctx.fillStyle=shoulderG; ctx.fillRect(bx-scale*28,by-scale*6+breath,scale*56,scale*16);
+          // Arms
+          const armSkin=ctx.createLinearGradient(bx-scale*32,by+breath,bx+scale*32,by+breath);
+          armSkin.addColorStop(0,rgb(sl0,sl1,sl2,0.88)); armSkin.addColorStop(0.5,rgb(sl0+12,sl1+8,sl2+5,0.92)); armSkin.addColorStop(1,rgb(sd0,sd1,sd2,0.88));
+          ctx.fillStyle=armSkin;
+          // Left arm (reaches to guitar if prop present)
+          ctx.beginPath();
+          const armAngle=Math.sin(sec*0.3+ci*0.8)*0.04;
+          ctx.moveTo(bx-scale*20,by+scale*4+breath);
+          ctx.quadraticCurveTo(bx-scale*35+Math.cos(armAngle)*scale*8,by+scale*28+breath+Math.sin(armAngle)*scale*4,bx-scale*28+Math.cos(armAngle)*scale*12,by+scale*52+breath);
+          ctx.quadraticCurveTo(bx-scale*24,by+scale*48+breath,bx-scale*14,by+scale*4+breath);
+          ctx.closePath(); ctx.fill();
+          // Right arm
+          ctx.beginPath();
+          ctx.moveTo(bx+scale*20,by+scale*4+breath);
+          ctx.quadraticCurveTo(bx+scale*38+Math.cos(armAngle)*scale*6,by+scale*32+breath+Math.sin(armAngle)*scale*6,bx+scale*44+Math.cos(armAngle)*scale*10,by+scale*48+breath);
+          ctx.quadraticCurveTo(bx+scale*40,by+scale*44+breath,bx+scale*14,by+scale*4+breath);
+          ctx.closePath(); ctx.fill();
+          // Neck
+          const neckG=ctx.createLinearGradient(bx-scale*7,by-scale*14,bx+scale*7,by);
+          neckG.addColorStop(0,rgb(sl0+5,sl1+3,sl2+2,0.92)); neckG.addColorStop(1,rgb(sd0+5,sd1+3,sd2+2,0.88));
+          ctx.fillStyle=neckG; ctx.fillRect(bx-scale*7,by-scale*14+breath,scale*14,scale*16);
+          // Head
+          const headTilt=Math.sin(sec*0.15+ci*2.1)*0.06;
+          ctx.save(); ctx.translate(bx,by-scale*22+breath); ctx.rotate(headTilt);
+          const headG=ctx.createRadialGradient(-scale*6,-scale*8,0,0,0,scale*22);
+          headG.addColorStop(0,rgb(sl0+18,sl1+12,sl2+8,1));
+          headG.addColorStop(0.45,rgb(sl0,sl1,sl2,1));
+          headG.addColorStop(0.75,rgb(sd0+5,sd1+3,sd2+2,1));
+          headG.addColorStop(1,rgb(sd0-8,sd1-5,sd2-4,1));
+          ctx.fillStyle=headG;
+          ctx.beginPath(); ctx.ellipse(0,0,scale*19,scale*22,0,0,PI2); ctx.fill();
+          // Ear (only if not facing back)
+          if(!isFacingBack){
+            const earG=ctx.createRadialGradient(scale*17,0,0,scale*17,0,scale*6);
+            earG.addColorStop(0,rgb(sl0-10,sl1-7,sl2-5,0.9)); earG.addColorStop(1,rgb(sd0,sd1,sd2,0));
+            ctx.fillStyle=earG; ctx.beginPath(); ctx.ellipse(scale*17,scale*3,scale*6,scale*8,0.2,0,PI2); ctx.fill();
+          }
+          // Hair
+          ctx.fillStyle=rgb(hr0,hr1,hr2,1);
+          ctx.beginPath();
+          if(isFacingBack){
+            ctx.ellipse(0,-scale*4,scale*21,scale*24,0,Math.PI,PI2); ctx.fill();
+          } else {
+            ctx.moveTo(-scale*20,-scale*8);
+            ctx.bezierCurveTo(-scale*22,-scale*22,-scale*10,-scale*28,0,-scale*26);
+            ctx.bezierCurveTo(scale*10,-scale*28,scale*20,-scale*20,scale*18,-scale*8);
+            ctx.bezierCurveTo(scale*22,-scale*12,scale*20,-scale*2,scale*16,scale*4);
+            ctx.lineTo(-scale*16,scale*4);
+            ctx.bezierCurveTo(-scale*20,-scale*2,-scale*22,-scale*12,-scale*20,-scale*8);
+            ctx.closePath(); ctx.fill();
+          }
+          // Eyes (if facing front/side)
+          if(!isFacingBack){
+            for(let ei=0;ei<2;ei++){
+              const ex=(ei===0?-1:1)*scale*7, ey=-scale*4;
+              const eyeG=ctx.createRadialGradient(ex,ey,0,ex,ey,scale*5);
+              eyeG.addColorStop(0,rgb(20,15,10,1)); eyeG.addColorStop(0.4,rgb(50,38,25,1)); eyeG.addColorStop(0.7,rgb(35,25,15,1)); eyeG.addColorStop(1,rgb(sl0,sl1,sl2,0));
+              ctx.fillStyle=eyeG; ctx.beginPath(); ctx.ellipse(ex,ey,scale*4.5,scale*3.5,0,0,PI2); ctx.fill();
+              ctx.fillStyle=rgb(255,255,255,0.55); ctx.beginPath(); ctx.arc(ex-scale*1.2,ey-scale*1.2,scale*1.2,0,PI2); ctx.fill();
+            }
+          }
+          ctx.restore();
+        }
+
+        // ── GUITAR ───────────────────────────────────────────────
+        if((scene.props||[]).includes("guitar")){
+          const ch0=chars[0]||{x:0.25,y:0.62};
+          const gx=W*ch0.x+H*0.07, gy=H*ch0.y+H*0.015;
+          const gs=H*0.001;
+          const gbg=ctx.createRadialGradient(gx,gy,0,gx,gy,H*0.09);
+          gbg.addColorStop(0,rgb(110,65,22,0.97)); gbg.addColorStop(0.5,rgb(80,44,14,0.95)); gbg.addColorStop(1,rgb(55,30,8,0.92));
+          ctx.fillStyle=gbg;
+          // Lower bout
+          ctx.beginPath(); ctx.ellipse(gx,gy+gs*22,gs*38,gs*48,0.22,0,PI2); ctx.fill();
+          // Upper bout
+          ctx.beginPath(); ctx.ellipse(gx,gy-gs*18,gs*30,gs*38,0.22,0,PI2); ctx.fill();
+          // Waist shading
+          const wst=ctx.createLinearGradient(gx-gs*38,gy,gx+gs*38,gy);
+          wst.addColorStop(0,rgb(0,0,0,0.28)); wst.addColorStop(0.5,rgb(0,0,0,0)); wst.addColorStop(1,rgb(0,0,0,0.22));
+          ctx.fillStyle=wst; ctx.fillRect(gx-gs*38,gy-gs*10,gs*76,gs*20);
+          // Sound hole
+          const sholeG=ctx.createRadialGradient(gx,gy+gs*10,0,gx,gy+gs*10,gs*12);
+          sholeG.addColorStop(0,rgb(10,5,2,1)); sholeG.addColorStop(1,rgb(55,30,8,0.4));
+          ctx.fillStyle=sholeG; ctx.beginPath(); ctx.arc(gx,gy+gs*10,gs*12,0,PI2); ctx.fill();
+          // Neck
+          const nkG=ctx.createLinearGradient(gx-gs*8,gy-gs*18,gx+gs*8,gy-gs*18);
+          nkG.addColorStop(0,rgb(65,38,12,0.95)); nkG.addColorStop(0.5,rgb(85,52,18,0.98)); nkG.addColorStop(1,rgb(58,32,8,0.95));
+          ctx.fillStyle=nkG; ctx.fillRect(gx-gs*7,gy-gs*18-gs*65,gs*14,gs*70);
+          // Strings
+          for(let str=0;str<6;str++){
+            const sx=gx-gs*5+str*gs*2, salpha=0.35+str*0.06;
+            ctx.strokeStyle=rgb(210+str*8,205+str*5,175+str*4,salpha);
+            ctx.lineWidth=0.5+str*0.2;
+            ctx.beginPath(); ctx.moveTo(sx,gy-gs*80); ctx.lineTo(sx,gy+gs*45); ctx.stroke();
+          }
+          // Guitar highlight
+          const ghl=ctx.createLinearGradient(gx-gs*38,gy-gs*48,gx-gs*10,gy-gs*20);
+          ghl.addColorStop(0,rgb(255,220,160,0.12)); ghl.addColorStop(1,rgb(255,200,120,0));
+          ctx.fillStyle=ghl; ctx.beginPath(); ctx.ellipse(gx,gy-gs*18,gs*30,gs*38,0.22,0,PI2); ctx.fill();
+        }
+
+        // ── RAIN ─────────────────────────────────────────────────
+        if(scene.hasRain){
+          ctx.strokeStyle=rgb(200,220,255,0.28); ctx.lineWidth=0.8;
+          for(let r=0;r<180;r++){
+            const rx=((r*97.3+sec*120)%W), ry=((r*137.5+sec*280)%H);
+            ctx.beginPath(); ctx.moveTo(rx,ry); ctx.lineTo(rx-4,ry+18); ctx.stroke();
+          }
+        }
+
+        // ── COLOUR GRADE OVERLAY ─────────────────────────────────
+        const grade = config.colorGrade||"";
+        if(grade.includes("Teal")||grade.includes("Orange")){
+          ctx.fillStyle=rgb(0,65,82,0.065); ctx.fillRect(0,0,W,H);
+          ctx.fillStyle=rgb(255,85,15,0.048); ctx.fillRect(0,0,W,H);
+        } else if(grade.includes("Golden")||grade.includes("Warm")){
+          ctx.fillStyle=rgb(255,148,28,0.08); ctx.fillRect(0,0,W,H);
+        } else if(grade.includes("Cool")||grade.includes("Blue")||grade.includes("Moody")){
+          ctx.fillStyle=rgb(18,38,135,0.075); ctx.fillRect(0,0,W,H);
+        } else if(grade.includes("Vintage")){
+          ctx.fillStyle=rgb(255,178,72,0.065); ctx.fillRect(0,0,W,H);
+          ctx.fillStyle=rgb(180,140,80,0.03); ctx.fillRect(0,0,W,H);
+        }
+        if(scene.gradeA>0){
+          ctx.fillStyle=rgb(scene.gradeR||0,scene.gradeG||30,scene.gradeB||60,scene.gradeA||0);
+          ctx.fillRect(0,0,W,H);
+        }
+
+        ctx.restore(); // camera scale
+        if(beatNow) ctx.restore(); // beat scale
+      };
 
       setRenderProgress(30);
       addLog("Rendering "+totalDur.toFixed(0)+"s film at 12fps...");
