@@ -772,20 +772,12 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
           ctx.save();
           ctx.translate(-drift*0.3,0);
 
-          try{
-            // MANDASTRONG PHOTOREALISTIC BASE — always first
-            const skyB=ctx.createLinearGradient(0,0,0,H*0.6);
-            skyB.addColorStop(0,"rgb(1,2,12)");skyB.addColorStop(0.35,"rgb(4,8,35)");
-            skyB.addColorStop(0.75,"rgb(8,18,55)");skyB.addColorStop(1,"rgb(12,28,75)");
-            ctx.fillStyle=skyB;ctx.fillRect(0,0,W,H);
-            for(let si=0;si<180;si++){const sx=(si*137.5)%W,sy=(si*97.3)%(H*0.55);const sb=0.3+Math.sin(sec*0.7+si*0.4)*0.25;ctx.fillStyle="rgba(240,245,255,"+sb+")";ctx.fillRect(sx,sy,si%5===0?1.2:0.7,si%5===0?1.2:0.7);}
-            for(let wi=0;wi<10;wi++){const wbase=H*0.55+wi*((H-H*0.55)/10);const wgb=ctx.createLinearGradient(0,wbase,0,H);wgb.addColorStop(0,"rgba("+(3+wi*2)+","+(10+wi*5)+","+(42+wi*6)+",0.85)");wgb.addColorStop(1,"rgba(1,3,12,0.98)");ctx.fillStyle=wgb;ctx.beginPath();ctx.moveTo(-10,H);for(let wx=0;wx<=W+10;wx+=4){ctx.lineTo(wx,wbase+Math.sin(wx*0.007+sec*(0.22+wi*0.055)+wi*1.3)*18+wi*6);}ctx.lineTo(W+10,H);ctx.closePath();ctx.fill();}
-            renderFn(ctx,W,H,t,sec,totalDur,beatNow);
-          }
+          try{ renderFn(ctx,W,H,t,sec,totalDur,beatNow); }
           catch(e){
             const bg=ctx.createLinearGradient(0,0,0,H);
-            bg.addColorStop(0,"rgb(2,5,18)");bg.addColorStop(1,"rgb(4,8,28)");
-            ctx.fillStyle=bg;ctx.fillRect(-W,0,W*3,H);
+            bg.addColorStop(0,"rgb(2,5,18)");
+            bg.addColorStop(1,"rgb(4,8,28)");
+            ctx.fillStyle=bg; ctx.fillRect(-W,0,W*3,H);
           }
 
           ctx.restore();
@@ -1542,78 +1534,46 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     addLog("Director reading your scene...");
     setProgress(8);
     try{
-      const refInstruction=refDataUrl
-        ? `
+      const refInstruction=refDataUrl?"\n\nThe user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.":"";
 
-The user has uploaded a reference image. Match its visual style, colour palette, lighting mood, and composition as closely as possible.`
-        : "";
-
-      const directorPrompt=`You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
-
-ABSOLUTE PHOTOREALISM RULES — NEVER BREAK:
-- ZERO cartoon outlines. ZERO thick strokes. ZERO flat colour fills anywhere.
-- EVERY surface: ctx.createLinearGradient or ctx.createRadialGradient ONLY.
-- SKY: 4-stop minimum linearGradient. Night: rgb(1,2,12) to rgb(4,8,35) to rgb(8,18,55) to rgb(12,28,75). Never a solid fill.
-- STARS: 150+ dots, radius 0.3-1.2, opacity=Math.sin(sec*0.7+i)*0.4+0.8 flicker.
-- HUMANS: head=ctx.arc filled radialGradient rgba(220,170,120,1) to rgba(150,100,65,1). Torso=fillRect linearGradient. BREATHING=torso*(1+Math.sin(sec*0.85)*0.007). ZERO outlines on any body part.
-- WATER: 10 wave paths using Math.sin(x*0.007+sec*(0.2+w*0.06)+w)*18 offsets. Each filled deep navy linearGradient.
-- ALL LIGHTS: radialGradient only. Moon: rgba(255,255,248,0.9) fading to transparent. Candle: flicker with Math.sin(sec*8.3)*0.06.
-- PARALLAX: 3 layers at ctx.translate speeds -t*W*0.012, -t*W*0.032, -t*W*0.068.
-- POST-PROCESSING last: (1)vignette radialGradient to rgba(0,0,0,0.92), (2)letterbox H*0.074, (3)25 grain dots, (4)colour grade rgba overlay globalAlpha 0.055, (5)fade in t<0.05, (6)fade out t>0.92.
-
-Write a SINGLE self-contained JavaScript function:
-function drawFrame(ctx, W, H, t, sec) { ... }
-
-Where: ctx=2D context, W=1920, H=1080, t=progress 0-1, sec=elapsed seconds.
-
-SCENE TO RENDER (apply ALL photorealism rules):
-${title||"Cinematic scene"}: ${prompt}
-
-Return ONLY the JavaScript function. No markdown. No backticks. No explanation. Start with: function drawFrame(ctx,W,H,t,sec){`
-
-      const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
-          messages:[{role:"user",content:directorPrompt}]})
-      });
-      const d=await res.json();
-      if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
-
-      let fnCode=d.content&&d.content[0]?d.content[0].text.trim():"";
-      fnCode=fnCode.replace(/```javascript|```js|```/g,"").trim();
-      const fnStart=fnCode.indexOf("function drawFrame");
-      if(fnStart>0)fnCode=fnCode.slice(fnStart);
+      const directorPrompt="You are the MandaStrong Cinema Engine. Write a photorealistic JavaScript canvas function for this EXACT scene.\n\nSCENE: "+JSON.stringify(prompt)+"\n\nFUNCTION: function drawFrame(ctx, W, H, t, sec) where W=1920 H=1080 t=0-1 sec=elapsed.\n\nREAD THE SCENE. Render EXACTLY what it describes. Do NOT default to night/ocean if the scene is daytime, savanna, interior, or anything else.\n\nMANDATORY PHOTOREALISM RULES:\n1. ZERO flat colour fills. ALL backgrounds must be gradients.\n2. SKY: match the scene. Golden savanna: rgb(200,130,30) to rgb(255,180,60). Night: rgb(1,2,12) to rgb(8,18,55). Day: rgb(80,140,220) to rgb(160,200,240).\n3. STARS: only if night. 150+ dots with Math.sin flicker.\n4. HUMANS: radialGradient skin, linearGradient clothing, BREATHING Math.sin(sec*0.85)*3, ZERO outlines.\n5. SPLIT FRAME: ctx.save();ctx.beginPath();ctx.rect(0,0,W/2,H);ctx.clip(); left side; ctx.restore(); then right side.\n6. TEXT OVERLAYS: ctx.font bold Arial Black, ctx.fillStyle #e8c96d, ctx.fillText at bottom.\n7. PARALLAX: 3 layers at different translate speeds.\n8. POST-PROCESSING LAST: vignette, letterbox H*0.074, grain 30 dots, warm grade, fade in/out.\n\nReturn ONLY the function. No markdown. Start: function drawFrame(ctx, W, H, t, sec) {";
 
       addLog("Scene designed. Rendering frames...");setProgress(22);
 
-      // Strip any markdown or preamble
-      fnCode=fnCode.replace(/```[a-z]*/g,"").replace(/```/g,"").trim();
-      if(fnCode.indexOf("function drawFrame")>0)fnCode=fnCode.slice(fnCode.indexOf("function drawFrame"));
-      // Remove template literals that break Function constructor
-      fnCode=fnCode.replace(/`[^`]*`/g,s=>JSON.stringify(s.slice(1,-1)));
+      let fnCode="";
+      try{
+        const res2=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:directorPrompt+refInstruction}]})
+        });
+        const d2=await res2.json();
+        if(d2.error){addLog("Error: "+d2.error.message);setGenerating(false);return;}
+        fnCode=d2.content&&d2.content[0]?d2.content[0].text.trim():"";
+      }catch(e2){addLog("API error: "+e2.message);setGenerating(false);return;}
+
+      fnCode=fnCode.replace(/```javascript|```js|```/g,"").trim();
+      const fnStart=fnCode.indexOf("function drawFrame");
+      if(fnStart>0)fnCode=fnCode.slice(fnStart);
       let drawFn;
       try{
-        const bOpen=fnCode.indexOf("{");
-        const bClose=fnCode.lastIndexOf("}");
-        const body=bOpen>0&&bClose>bOpen?fnCode.slice(bOpen+1,bClose):"";
+        const bO=fnCode.indexOf("{");const bC=fnCode.lastIndexOf("}");
+        const body=bO>0&&bC>bO?fnCode.slice(bO+1,bC):"";
         drawFn=new Function("ctx","W","H","t","sec",body);
-      }catch(e){
-        addLog("Retrying with simplified renderer...");
-        const retry=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
-            messages:[{role:"user",content:`Write a PHOTOREALISTIC cinematic canvas renderer. ZERO cartoon outlines. ALL gradients. Photorealistic humans and environments. For: "${prompt}". Function: function drawFrame(ctx,W,H,t,sec). Use photorealistic gradients, proper human figures with skin tones, depth, lighting. Return only the function.`}]})
-        });
-        const rd=await retry.json();
-        let rc=rd.content&&rd.content[0]?rd.content[0].text.trim():"";
-        rc=rc.replace(/```javascript|```js|```/g,"").trim();
-        const ri=rc.indexOf("function drawFrame");if(ri>0)rc=rc.slice(ri);
-        const rb=rc.indexOf("{");const rbc=rc.lastIndexOf("}");
-        const rbody=rb>0&&rbc>rb?rc.slice(rb+1,rbc):"";
-        try{drawFn=new Function("ctx","W","H","t","sec",rbody);}
-        catch(e2){addLog("Render failed: "+e2.message);setGenerating(false);return;}
+      }catch(e3){
+        addLog("Retrying...");
+        try{
+          const r2=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:"Write a PHOTOREALISTIC canvas renderer. ZERO cartoon outlines. ALL gradients. For: "+JSON.stringify(prompt)+". Function: function drawFrame(ctx,W,H,t,sec). Return only the function."}]})
+          });
+          const rd=await r2.json();
+          let rc=rd.content&&rd.content[0]?rd.content[0].text.trim():"";
+          rc=rc.replace(/```javascript|```js|```/g,"").trim();
+          const ri=rc.indexOf("function drawFrame");if(ri>0)rc=rc.slice(ri);
+          const rb=rc.indexOf("{");const rbc=rc.lastIndexOf("}");
+          const rbody=rb>0&&rbc>rb?rc.slice(rb+1,rbc):"";
+          drawFn=new Function("ctx","W","H","t","sec",rbody);
+        }catch(e4){addLog("Render failed: "+e4.message);setGenerating(false);return;}
       }
 
       const canvas=canvasRef.current;
@@ -1642,25 +1602,13 @@ Return ONLY the JavaScript function. No markdown. No backticks. No explanation. 
           const sec=frame/fps;
           try{
             ctx.clearRect(0,0,1920,1080);
-            // MANDASTRONG PHOTOREALISTIC BASE — always runs first
-            const W2=1920,H2=1080;
-            const isNight=true;
-            const sky=ctx.createLinearGradient(0,0,0,H2*0.6);
-            sky.addColorStop(0,"rgb(1,2,12)");sky.addColorStop(0.4,"rgb(4,8,35)");
-            sky.addColorStop(0.8,"rgb(8,18,55)");sky.addColorStop(1,"rgb(12,28,75)");
-            ctx.fillStyle=sky;ctx.fillRect(0,0,W2,H2);
-            // Stars
-            for(let si=0;si<180;si++){const sx=(si*137.5)%W2,sy=(si*97.3)%(H2*0.55);const sb=0.3+Math.sin(sec*0.7+si*0.4)*0.25;ctx.fillStyle="rgba(240,245,255,"+sb+")";ctx.fillRect(sx,sy,si%5===0?1.4:0.8,si%5===0?1.4:0.8);}
-            // Ocean base
-            for(let wi=0;wi<10;wi++){const wbase=H2*0.55+wi*((H2-H2*0.55)/10);const wg=ctx.createLinearGradient(0,wbase,0,H2);wg.addColorStop(0,"rgba("+(3+wi*2)+","+(10+wi*5)+","+(42+wi*6)+",0.85)");wg.addColorStop(1,"rgba(1,3,12,0.98)");ctx.fillStyle=wg;ctx.beginPath();ctx.moveTo(-10,H2);for(let wx=0;wx<=W2+10;wx+=4){ctx.lineTo(wx,wbase+Math.sin(wx*0.007+sec*(0.22+wi*0.055)+wi*1.3)*18+wi*8);}ctx.lineTo(W2+10,H2);ctx.closePath();ctx.fill();}
-            // Now run Claude's renderer on top
             drawFn(ctx,1920,1080,t,sec);
             const vig=ctx.createRadialGradient(960,540,200,960,540,1100);
             vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.85)");
             ctx.fillStyle=vig;ctx.fillRect(0,0,1920,1080);
             ctx.fillStyle="#000";ctx.fillRect(0,0,1920,78);ctx.fillRect(0,1002,1920,78);
-            for(let g=0;g<80;g++){
-              ctx.fillStyle=`rgba(${Math.random()>0.5?180:20},${Math.random()>0.5?180:20},${Math.random()>0.5?180:20},0.012)`;
+            for(let g=0;g<30;g++){
+              ctx.fillStyle="rgba(200,200,200,0.007)";
               ctx.fillRect(Math.random()*1920,Math.random()*1080,1,1);
             }
             if(t>0.9){
