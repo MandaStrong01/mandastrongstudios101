@@ -634,7 +634,7 @@ interface PageProps {
 export default function Page6({ onNavigate, onSave }: PageProps) {
   const [text, setText] = useState("");
   const [processed, setProcessed] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showMVS, setShowMVS] = useState(false);
@@ -694,6 +694,47 @@ export default function Page6({ onNavigate, onSave }: PageProps) {
     return isMale ? (premiumMaleUS || us[0] || allEn[0]) : (premiumFemaleUS || us[0] || allEn[0]);
   };
 
+  // Per-character speech personality — defines how each voice BEHAVES, not just pitch/rate
+  const getCharacterProfile = (vc) => {
+    const s = vc.style.toLowerCase();
+    const id = vc.id;
+    // Rate variation array: how much the voice changes speed between chunks (deadpan = flat, excited = wild)
+    const isDeadpan = s.includes("deadpan") || s.includes("sardonic") || s.includes("dry") || s.includes("neutral") || s.includes("precise");
+    const isExcited = s.includes("excited") || s.includes("joyful") || s.includes("upbeat") || s.includes("energetic") || s.includes("explosive") || s.includes("celebratory");
+    const isWhisper = s.includes("whisper") || s.includes("asmr") || s.includes("intimate") || id === "luna";
+    const isTheatrical = s.includes("theatrical") || s.includes("grand") || s.includes("epic") || s.includes("ancient") || s.includes("booming") || s.includes("cinematic");
+    const isAngry = s.includes("angry") || s.includes("fierce") || s.includes("intense") || s.includes("defiant");
+    const isGentle = s.includes("gentle") || s.includes("tender") || s.includes("loving") || s.includes("warm") || s.includes("peaceful") || s.includes("mindful");
+    const isChild = vc.age === "Child";
+    const isTeen = vc.age === "Teen";
+    const isElderly = vc.age === "Elderly";
+    // Rate variation per chunk (smaller = more robotic/deadpan, bigger = more expressive)
+    const rVar = isDeadpan  ? [0, 0.005, -0.005, 0.003, 0.001, -0.003, 0.002, -0.001]
+               : isExcited  ? [0, 0.10, -0.05, 0.12, -0.08, 0.09, -0.06, 0.11]
+               : isWhisper  ? [0, -0.03, -0.05, -0.02, -0.04, -0.03, -0.02, -0.04]
+               : isTheatrical ? [0, 0.06, -0.08, 0.10, -0.06, 0.09, -0.07, 0.05]
+               : isAngry    ? [0, 0.08, -0.04, 0.10, -0.03, 0.07, 0.06, -0.05]
+               : isChild    ? [0, 0.08, 0.04, 0.10, 0.06, 0.09, 0.05, 0.07]
+               : isGentle   ? [0, 0.02, -0.015, 0.018, -0.01, 0.015, -0.012, 0.01]
+               : isElderly  ? [0, -0.02, 0.01, -0.015, 0.008, -0.01, 0.012, -0.008]
+               :               [0, 0.03, -0.03, 0.02, -0.015, 0.025, -0.02, 0.01];
+    // Pitch variation per chunk
+    const pVar = isDeadpan  ? [0, 0.003, -0.003, 0.002, -0.001, 0.002, -0.002, 0.001]
+               : isExcited  ? [0, 0.12, 0.08, 0.15, -0.05, 0.10, 0.13, -0.04]
+               : isWhisper  ? [0, 0.02, 0.03, 0.015, 0.025, 0.018, 0.022, 0.012]
+               : isTheatrical ? [0, 0.08, -0.06, 0.12, -0.08, 0.10, -0.07, 0.09]
+               : isAngry    ? [0, -0.04, 0.06, -0.06, 0.08, -0.05, 0.07, -0.03]
+               : isChild    ? [0, 0.10, 0.06, 0.12, 0.08, 0.09, 0.07, 0.11]
+               : isGentle   ? [0, 0.03, -0.02, 0.025, -0.015, 0.020, -0.018, 0.015]
+               : isElderly  ? [0, -0.01, 0.008, -0.012, 0.006, -0.009, 0.007, -0.005]
+               :               [0, 0.025, -0.02, 0.04, -0.025, 0.015, -0.03, 0.02];
+    // Pause multiplier — deadpan takes long deliberate pauses; excited rushes through
+    const pauseMult = isDeadpan ? 1.8 : isExcited ? 0.45 : isWhisper ? 2.2 : isTheatrical ? 2.0 : isAngry ? 0.6 : isChild ? 0.7 : isElderly ? 1.6 : isGentle ? 1.3 : 1.0;
+    const emphRate = isDeadpan ? -0.01 : isExcited ? -0.12 : isTheatrical ? -0.10 : isAngry ? 0.04 : -0.05;
+    const emphPitch = isDeadpan ? 0.01 : isExcited ? 0.15 : isTheatrical ? 0.12 : isAngry ? -0.08 : 0.06;
+    return { rVar, pVar, pauseMult, emphRate, emphPitch };
+  };
+
   const speakNow = (txt: string) => {
     window.speechSynthesis.cancel();
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -702,6 +743,7 @@ export default function Page6({ onNavigate, onSave }: PageProps) {
     const baseRate = speed * (selected.rate || 0.9);
     const basePitch = pitchV * (selected.pitch || 1.0);
     const totalChunks = chunks.length;
+    const profile = getCharacterProfile(selected);
     const next = () => {
       const idx = idxRef.current;
       if (idx >= chunksRef.current.length) { setSpeaking(false); return; }
@@ -712,13 +754,13 @@ export default function Page6({ onNavigate, onSave }: PageProps) {
       const utt = new SpeechSynthesisUtterance(chunk.text);
       if (liveV) utt.voice = liveV;
       utt.volume = volume;
-      const rVar = [0, 0.03, -0.03, 0.02, -0.015, 0.025, -0.02, 0.01];
-      const pVar = [0, 0.025, -0.02, 0.04, -0.025, 0.015, -0.03, 0.02];
+      const { rVar, pVar, pauseMult, emphRate, emphPitch } = profile;
       const pitchMod = chunk.type === "question" ? 0.12 : chunk.type === "exclaim" ? 0.08 : (chunk.type === "sentence" && idx === totalChunks - 1) ? -0.06 : 0;
       const hasEmphasis = /\b[A-Z]{2,}\b/.test(chunk.text);
-      utt.rate = Math.max(0.1, Math.min(2.0, baseRate + rVar[idx % rVar.length] + (hasEmphasis ? -0.05 : 0)));
-      utt.pitch = Math.max(0.1, Math.min(2.0, basePitch + pVar[idx % pVar.length] + pitchMod + (hasEmphasis ? 0.06 : 0)));
-      const afterPause = chunk.type === "question" ? Math.round(pauseLen * 1.1) : chunk.type === "sentence" ? pauseLen : chunk.type === "clause" ? Math.round(pauseLen * 0.4) : Math.round(pauseLen * 0.15);
+      utt.rate = Math.max(0.1, Math.min(2.0, baseRate + rVar[idx % rVar.length] + (hasEmphasis ? emphRate : 0)));
+      utt.pitch = Math.max(0.1, Math.min(2.0, basePitch + pVar[idx % pVar.length] + pitchMod + (hasEmphasis ? emphPitch : 0)));
+      const basePause = Math.round(pauseLen * pauseMult);
+      const afterPause = chunk.type === "question" ? Math.round(basePause * 1.1) : chunk.type === "sentence" ? basePause : chunk.type === "clause" ? Math.round(basePause * 0.4) : Math.round(basePause * 0.15);
       utt.onend = () => { idxRef.current = idx + 1; timerRef.current = setTimeout(next, afterPause); };
       utt.onerror = () => { idxRef.current = idx + 1; next(); };
       window.speechSynthesis.speak(utt);
@@ -728,20 +770,11 @@ export default function Page6({ onNavigate, onSave }: PageProps) {
     else { window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; setTimeout(() => next(), 50); }; }
   };
 
-  const processAndSpeak = async () => {
+  const processAndSpeak = () => {
     if (!text.trim()) return;
-    setLoading(true); setProcessed(""); setSaved(false);
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": "" + ["sk-ant-api03-", "rNj3uksGI3kmBJI9Mzjm2A2II2Ll6T05dea_dgB0aqqMjqbbIsembbeVVlT", "-lJ4LDSQzV8ertjcY1BodhaJcA-_mURVAAA"].join("") + "" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 2000, messages: [{ role: "user", content: `You are a speech coach preparing text for TTS. Speaker: ${selected.name} — ${selected.style}. Break into short sentences, add commas for natural pauses, spell out numbers. Output ONLY the reformatted text:\n\n${text}` }] })
-      });
-      const d = await res.json();
-      const out = d.content && d.content[0] ? d.content[0].text.trim() : text;
-      setProcessed(out); setActiveTab("result"); speakNow(out);
-    } catch (_) { setProcessed(text); speakNow(text); }
-    setLoading(false);
+    setProcessed(text);
+    setSaved(false);
+    speakNow(text);
   };
 
   const stop = () => { window.speechSynthesis.cancel(); if (timerRef.current) clearTimeout(timerRef.current); setSpeaking(false); };
@@ -831,9 +864,9 @@ export default function Page6({ onNavigate, onSave }: PageProps) {
                 <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Paste your narration script here... Tip: For documentary use James — pitch 0.86, rate 0.62, pause 1600ms."
                   style={{ width: "100%", background: "#000", border: `1px solid ${GOLDDIM}`, padding: "12px 14px", color: WHITE, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "'Rajdhani',sans-serif", lineHeight: 1.9, height: 220, resize: "vertical" }} />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
-                  <button onClick={processAndSpeak} disabled={loading || !text.trim()}
-                    style={{ background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`, border: "none", color: "#000", padding: "14px", fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: loading || !text.trim() ? "not-allowed" : "pointer", fontFamily: "'Rajdhani',sans-serif", opacity: loading || !text.trim() ? 0.5 : 1 }}>
-                    {loading ? "⟳ PREPARING..." : "✦ PREPARE & SPEAK"}
+                  <button onClick={processAndSpeak} disabled={!text.trim()}
+                    style={{ background: `linear-gradient(135deg,${GOLDDIM},${GOLD})`, border: "none", color: "#000", padding: "14px", fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: !text.trim() ? "not-allowed" : "pointer", fontFamily: "'Rajdhani',sans-serif", opacity: !text.trim() ? 0.5 : 1 }}>
+                    ✦ SPEAK WITH {selected.name.toUpperCase()}
                   </button>
                   <button onClick={() => { if (speaking) { stop(); } else { speakNow(text); } }} disabled={!text.trim()}
                     style={{ background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, padding: "14px", fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: !text.trim() ? "not-allowed" : "pointer", fontFamily: "'Rajdhani',sans-serif", opacity: !text.trim() ? 0.5 : 1 }}>
