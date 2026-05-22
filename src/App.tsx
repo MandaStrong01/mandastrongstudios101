@@ -65,7 +65,7 @@ function speakText(voiceId, txt, onStart, onEnd) {
     .replace(/—/g,", ")
     .replace(/[*\/]/g," ")
     .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
-    .slice(0,5000);
+    .trim();
   const doSpeak = () => {
     const allVoices = window.speechSynthesis.getVoices();
     const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
@@ -1215,6 +1215,38 @@ const VOICE_CHARACTERS = [
   {id:"atlas",name:"Atlas",emoji:"🌐",gender:"Male",age:"Adult",origin:"Neutral",region:"Epic",style:"Cinematic · Epic · Booming",pitch:0.68,rate:0.76,desc:"The voice of a thousand documentaries."},
   {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal · Dreamy · Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
+
+function buildChunks(txt) {
+  // Split text into sentence-level chunks safe for Web Speech API
+  // Each chunk max 200 chars to avoid browser cutoff
+  const clean = txt
+    .replace(/\.\.\.|\.{3}/g," ... ")
+    .replace(/—/g,", ")
+    .replace(/[*\/]/g," ")
+    .trim();
+  // Split on sentence boundaries
+  const sentences = clean.match(/[^.!?\n]+[.!?\n]?/g) || [clean];
+  const chunks = [];
+  for(const s of sentences) {
+    const trimmed = s.trim();
+    if(!trimmed) continue;
+    // If sentence is long, break on commas
+    if(trimmed.length > 200) {
+      const parts = trimmed.match(/[^,;]+[,;]?/g) || [trimmed];
+      for(const part of parts) {
+        const p = part.trim();
+        if(p) {
+          const type = p.endsWith('?') ? 'question' : p.endsWith('!') ? 'exclaim' : p.endsWith(',') || p.endsWith(';') ? 'pause' : 'sentence';
+          chunks.push({text: p, type});
+        }
+      }
+    } else {
+      const type = trimmed.endsWith('?') ? 'question' : trimmed.endsWith('!') ? 'exclaim' : 'sentence';
+      chunks.push({text: trimmed, type});
+    }
+  }
+  return chunks.length > 0 ? chunks : [{text: clean.slice(0,200), type:'sentence'}];
+}
 
 function P6Voice({ onSave, setMediaLib }) {
   const [text,setText]=useState(""); const [loading,setLoading]=useState(false);
