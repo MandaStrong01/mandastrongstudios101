@@ -653,7 +653,7 @@ ABSOLUTE PHOTOREALISM RULES — NEVER BREAK:
   1. VIGNETTE: const vg=ctx.createRadialGradient(W/2,H/2,H*0.25,W/2,H/2,H*0.85); vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,0.92)"); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
   2. LETTERBOX: ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);
   3. GRAIN: for(let g=0;g<25;g++){ctx.fillStyle="rgba(200,200,200,0.008)";ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
-  4. COLOUR GRADE: ctx.globalAlpha=0.055; ctx.fillStyle="rgba(${config.grade==="Cinematic Teal & Orange"?"0,40,60":"40,20,0"},1)"; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+  4. COLOUR GRADE: ctx.globalAlpha=0.055; ctx.fillStyle="rgba(${config.colorGrade==="Cinematic Teal & Orange"?"0,40,60":"40,20,0"},1)"; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
   5. FADE IN: if(t<0.05){ctx.fillStyle=\`rgba(0,0,0,\${1-t/0.05})\`;ctx.fillRect(0,0,W,H);}
   6. FADE OUT: if(t>0.92){ctx.fillStyle=\`rgba(0,0,0,\${(t-0.92)/0.08})\`;ctx.fillRect(0,0,W,H);}
 
@@ -669,15 +669,15 @@ Where:
 - beatNow = true on audio beat peaks
 
 SCENE TO RENDER (apply all photorealism rules above):
-${config.scene||"Cinematic night ocean vista. Full moon. Silver moonlight road on water."}
+${config.visualDesc||"Cinematic night ocean vista. Full moon. Silver moonlight road on water."}
 
 MUSIC CONTEXT:
 Title: ${config.title||"Untitled"}
 Artist: ${config.artist||"Unknown"}
 Genre: ${config.genre||"Cinematic"}
 Mood: ${config.mood||"Melancholic"}
-Style: ${config.style||"Cinematic Narrative"}
-Grade: ${config.grade||"Cinematic Teal & Orange"}
+Style: ${config.videoStyle||"Cinematic Narrative"}
+Grade: ${config.colorGrade||"Cinematic Teal & Orange"}
 
 IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. No explanation. Start with: function renderFilm(ctx,W,H,t,sec,totalSec,beatNow){`
 
@@ -1560,7 +1560,7 @@ function drawFrame(ctx, W, H, t, sec) { ... }
 Where: ctx=2D context, W=1920, H=1080, t=progress 0-1, sec=elapsed seconds.
 
 SCENE TO RENDER (apply ALL photorealism rules):
-${scene.title}: ${scene.prompt}
+${title||"Cinematic scene"}: ${prompt}
 
 Return ONLY the JavaScript function. No markdown. No backticks. No explanation. Start with: function drawFrame(ctx,W,H,t,sec){`
 
