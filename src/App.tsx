@@ -3422,61 +3422,21 @@ export default function App() {
     return()=>window.removeEventListener("ms_open_history",handler);
   },[]);
 
-  // Auto-populate timeline with 13 doc scenes + narration track if empty
+  // Auto-populate timeline with doc scenes if timeline is empty
   useEffect(()=>{
-    if(Object.keys(timeline).length===0){
-      const videoClips=DOC_SCENES.map((s,i)=>({
+    if(Object.keys(timeline).length===0&&mediaLib.length===0){
+      // Pre-load doc scene metadata into timeline so user can render immediately
+      const docAssets=DOC_SCENES.map((s,i)=>({
         id:"doc_scene_"+(i+1),
-        name:s.title.replace(/[^a-zA-Z0-9]/g,"_")+"_"+s.duration+"s.webm",
+        name:s.title+"_"+s.duration+"s.webm",
         type:"video/webm",
         url:"",
         duration:s.duration,
         title:s.title,
         prompt:s.prompt,
-        needsGeneration:true,
-        startTime:DOC_SCENES.slice(0,i).reduce((a,x)=>a+x.duration,0),
-        syncGroup:"master",
-        synced:true,
-        label:"SCENE "+String(i+1).padStart(2,"0")+" — "+s.title
+        needsGeneration:true
       }));
-      const narrationTrack=[{
-        id:"narration_james",
-        name:"AI For Humanity — James Narration.webm",
-        type:"audio/narration",
-        url:"",
-        label:"JAMES NARRATOR · Speed 0.62 · Pitch 0.86 · Pause 1600ms · Mood Sarcastic",
-        startTime:0,
-        syncGroup:"master",
-        synced:true,
-        voice:"James",
-        settings:{speed:0.62,pitch:0.86,pause:1600,mood:"Sarcastic"}
-      }];
-      const musicTrack=[{
-        id:"music_track_1",
-        name:"Background Score",
-        type:"audio/music",
-        url:"",
-        label:"BACKGROUND MUSIC — record or upload on Page 6",
-        startTime:0,
-        syncGroup:"master",
-        synced:true
-      }];
-      setTimeline({
-        0:videoClips,      // VIDEO TRACK — 13 scenes
-        1:narrationTrack,  // NARRATION TRACK — James
-        2:[{
-          id:"music_documentary_score",
-          name:"Soft Documentary Score",
-          type:"audio/music",
-          url:"",
-          label:"SOFT BACKGROUND SCORE — ambient, warm, human · Volume 35-40",
-          startTime:0,
-          syncGroup:"master",
-          synced:true,
-          suggested:"Soft ambient piano. Warm strings underneath. No drums. Emotional but restrained. Sits quietly behind James narrator. Never louder than 40% volume.",
-          mixLevel:38
-        }],
-      });
+      setTimeline({0:docAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}))});
     }
   },[]);
   const saveAsset=async(a)=>{
