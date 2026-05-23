@@ -1489,7 +1489,6 @@ function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
   );
 }
 
-
 function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const canvasRef=useRef(null);
   const videoRef=useRef(null);
@@ -1508,6 +1507,82 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [refDataUrl,setRefDataUrl]=useState(null);
   const [showTemplates,setShowTemplates]=useState(false);
   const addLog=(msg)=>setLog(p=>[...p,msg]);
+
+  const generateAllScenes_DISABLED=async()=>{
+    if(generatingAll)return;
+    setGeneratingAll(true);setGenProgress(0);
+    setLog([]);setVideoUrl("");
+    addLog("Starting AI For Humanity — generating all 13 scenes...");
+    const savedClips=[];
+    for(let i=0;i<DOC_SCENES.length;i++){
+      const scene=DOC_SCENES[i];
+      setGenProgress(i);
+      setTitle(scene.title);
+      setPrompt(scene.prompt);
+      setDuration(scene.duration);
+      addLog("Scene "+(i+1)+"/13: "+scene.title);
+      try{
+        const fullP=buildPrompt(scene.prompt,"");
+        const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:fullP}]})
+        });
+        const d=await res.json();
+        if(d.error){addLog("  Error: "+d.error.message);continue;}
+        let fnCode=d.content&&d.content[0]?d.content[0].text.trim():"";
+        fnCode=fnCode.replace(/```javascript|```js|```/g,"").trim();
+        const fnStart=fnCode.indexOf("function drawFrame");if(fnStart>0)fnCode=fnCode.slice(fnStart);
+        let drawFn;
+        try{const bO=fnCode.indexOf("{");const bC=fnCode.lastIndexOf("}");drawFn=new Function("ctx","W","H","t","sec",bO>=0&&bC>bO?fnCode.slice(bO+1,bC):"");}
+        catch(e){addLog("  Compile error — skipping");continue;}
+        const canvas=canvasRef.current;
+        canvas.width=1920;canvas.height=1080;
+        const ctx=canvas.getContext("2d");
+        const fps=12,dur=scene.duration,totalFrames=dur*fps,msPerFrame=Math.round(1000/fps);
+        const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+        const stream=canvas.captureStream(fps);
+        const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:12000000});
+        const chunks=[];
+        recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+        recorder.start(msPerFrame);
+        await new Promise(resolve=>{
+          let frame=0;const startTime=performance.now();
+          const tick=()=>{
+            if(frame>=totalFrames){resolve(null);return;}
+            const t=frame/totalFrames,sec=frame/fps;
+            try{ctx.clearRect(0,0,1920,1080);drawFn(ctx,1920,1080,t,sec);
+              const vg=ctx.createRadialGradient(960,540,220,960,540,1050);vg.addColorStop(0,"rgba(0,0,0,0)");vg.addColorStop(1,"rgba(0,0,0,0.88)");ctx.fillStyle=vg;ctx.fillRect(0,0,1920,1080);
+              ctx.fillStyle="#000";ctx.fillRect(0,0,1920,80);ctx.fillRect(0,1000,1920,80);
+              if(t<0.06){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.06)+")";ctx.fillRect(0,0,1920,1080);}
+              if(t>0.92){ctx.fillStyle="rgba(0,0,0,"+((t-0.92)/0.08)+")";ctx.fillRect(0,0,1920,1080);}
+            }catch(e){ctx.fillStyle="#020100";ctx.fillRect(0,0,1920,1080);}
+            frame++;setTimeout(tick,Math.max(4,startTime+(frame*msPerFrame)-performance.now()));
+          };tick();
+        });
+        await new Promise(r=>setTimeout(r,500));
+        recorder.stop();
+        await new Promise(r=>{recorder.onstop=r;});
+        const blob=new Blob(chunks,{type:mimeType});
+        const fn=scene.title.replace(/[^a-zA-Z0-9]/g,"_")+"_"+dur+"s.webm";
+        const clipId="doc_clip_"+(i+1)+"_"+Date.now();
+        await saveClipToDB(clipId,blob,fn,"video/webm");
+        const clip={id:clipId,name:fn,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],fn,{type:"video/webm"}),dbId:clipId};
+        savedClips.push(clip);
+        if(onSave)onSave(clip);
+        addLog("  ✓ Scene "+(i+1)+" saved — "+(blob.size/1024/1024).toFixed(1)+"MB");
+        setGenProgress(i+1);
+        if(i===DOC_SCENES.length-1){
+          const url=URL.createObjectURL(blob);
+          setVideoUrl(url);
+          setTimeout(()=>{if(videoRef.current){videoRef.current.src=url;videoRef.current.load();}},300);
+        }
+      }catch(e){addLog("  Error scene "+(i+1)+": "+e.message);}
+    }
+    setGenProgress(13);
+    addLog("✓ All 13 scenes generated and saved to media library");
+    addLog("Go to Page 11 → Reload Clips → Page 13 → Sync All Tracks → Page 16 → Render");
+    setGeneratingAll(false);
+  };
 
   const GENRES=[
     {id:"feature",label:"🎬 Feature Film",desc:"Full-length drama 90-120 mins"},
@@ -1878,16 +1953,23 @@ function P1({ go }) {
             const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
 
             if(window.deferredInstallPrompt){
-              // Chrome/Edge/Android — native install prompt
               window.deferredInstallPrompt.prompt();
               window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
             } else {
-              // Desktop — look for install icon in address bar
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
+              // Create a download link for the PWA manifest or direct app link
+              const a=document.createElement("a");
+              a.href="https://mandastrongstudio2026.bolt.host";
+              a.target="_blank";
+              a.rel="noopener noreferrer";
+              // Also try to trigger add-to-homescreen
+              const ua=navigator.userAgent.toLowerCase();
+              if(/iphone|ipad|ipod/.test(ua)){
+                alert("Install on iPhone/iPad:\n\n1. Tap Share ↑ at the bottom\n2. Tap \'Add to Home Screen\'\n3. Tap \'Add\'\n\nFull screen app on your device.");
+              } else if(/android/.test(ua)){
+                alert("Install on Android:\n\n1. Tap menu ⋮ in browser\n2. Tap \'Add to Home Screen\'\n3. Tap Install");
+              } else {
+                alert("Install MandaStrong Studio:\n\n1. Look for ⊕ in your browser address bar\n2. Click Install\n\nOr bookmark mandastrongstudio2026.bolt.host");
+              }
             }
           }} style={{background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
@@ -2432,8 +2514,11 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       setProgress(5);
       // Helper: render a scene directly to canvas using Claude
       const renderSceneToCanvas=async(sceneName,clipDurSec)=>{
-        const scenePrompt=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/\d+s$/,"").trim();
-        log("  Regenerating: "+scenePrompt.slice(0,40)+"...");
+        // Try to match clip name to DOC_SCENES for best prompt
+        const cleanName=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/\d+s$/,"").trim();
+        const docMatch=DOC_SCENES.find(s=>s.title===cleanName||sceneName.includes("doc_scene_")||cleanName.includes(s.title.slice(0,15)));
+        const scenePrompt=docMatch?docMatch.prompt:cleanName;
+        log("  Rendering: "+(docMatch?docMatch.title:cleanName).slice(0,40)+"...");
         try{
           const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
             method:"POST",
@@ -3045,86 +3130,70 @@ function P21() {
     setLoading(false);
   };
   return(
-    <div style={{minHeight:"100vh",background:"#000",display:"flex",flexDirection:"column",paddingBottom:160}}>
-      {/* HEADER */}
-      <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:`2px solid ${GOLD}`,padding:"16px 24px",flexShrink:0}}>
-        <div style={{maxWidth:960,margin:"0 auto",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+    <div style={{...Sp,padding:"20px 24px"}}>
+      <div style={{maxWidth:960,margin:"0 auto",height:"calc(100vh - 200px)",display:"flex",flexDirection:"column",gap:0,background:"#050300",border:`2px solid ${GOLD}`,overflow:"hidden"}}>
+        {/* HEADER BAR */}
+        <div style={{background:`linear-gradient(135deg,#1a0800,#0a0400)`,borderBottom:`2px solid ${GOLD}`,padding:"14px 20px",display:"flex",alignItems:"center",gap:14,flexShrink:0}}>
           <div style={{position:"relative",flexShrink:0}}>
-            <div style={{width:64,height:64,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 24px ${GOLD}77`}}>
-              <span style={{fontFamily:"'Cinzel',serif",fontSize:32,fontWeight:900,color:"#000"}}>G</span>
+            <div style={{width:52,height:52,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 20px ${GOLD}77`}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:26,fontWeight:900,color:"#000"}}>G</span>
             </div>
-            <div style={{position:"absolute",bottom:-2,right:-2,width:14,height:14,background:"#22c55e",border:"3px solid #000",borderRadius:"50%"}}/>
+            <div style={{position:"absolute",bottom:-2,right:-2,width:12,height:12,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
-          <div style={{flex:1,minWidth:160}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,3.5vw,38px)",fontWeight:900,letterSpacing:5,lineHeight:1,textShadow:`0 0 24px ${GOLD}88`}}>AGENT GROK</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:5,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/><span style={{color:"#22c55e",fontSize:12,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
-              <span style={{color:GOLD,fontSize:12,letterSpacing:2,fontWeight:700}}>YOUR AI PRODUCTION CONSULTANT</span>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(20px,3vw,32px)",fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/><span style={{color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
+              <span style={{color:GOLD,fontSize:11,letterSpacing:2,fontWeight:700}}>YOUR AI PRODUCTION CONSULTANT</span>
             </div>
           </div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
             {[["23","PAGES"],["600+","TOOLS"],["54","VOICES"],["4K","RENDER"]].map(([v,l])=>(
-              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLD}55`,padding:"7px 10px",textAlign:"center",minWidth:48}}>
-                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:14,fontWeight:900}}>{v}</div>
-                <div style={{color:"#22c55e",fontSize:9,letterSpacing:1,marginTop:2,fontWeight:700}}>{l}</div>
+              <div key={l} style={{background:"#0a0800",border:`1px solid ${GOLD}55`,padding:"6px 10px",textAlign:"center",minWidth:44}}>
+                <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:13,fontWeight:900}}>{v}</div>
+                <div style={{color:"#22c55e",fontSize:8,letterSpacing:1,marginTop:2,fontWeight:700}}>{l}</div>
               </div>
             ))}
           </div>
         </div>
-      </div>
-      {/* BODY */}
-      <div style={{flex:1,overflowY:"auto",padding:"16px 24px"}}>
-        <div style={{maxWidth:960,margin:"0 auto",display:"flex",flexDirection:"column",gap:12}}>
-          {/* CHAT */}
-          <div style={{background:"#030303",border:`1px solid ${GOLD}44`}}>
-            <div style={{background:"linear-gradient(135deg,#0a0500,#030300)",borderBottom:`1px solid ${GOLD}44`,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:GOLD,fontSize:12,fontWeight:900,letterSpacing:3}}>● LIVE PRODUCTION CONSULTATION</span>
-              <button onClick={()=>setMsgs([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}])}
-                style={{background:"none",border:`1px solid ${GOLD}44`,color:GOLD,padding:"3px 12px",cursor:"pointer",fontSize:10,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CLEAR</button>
-            </div>
-            <div style={{height:"min(55vh,480px)",overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              {msgs.map((m,i)=>(
-                <div key={i} style={{display:"flex",gap:12,flexDirection:m.role==="user"?"row-reverse":"row"}}>
-                  <div style={{width:38,height:38,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
-                  <div style={{flex:1,maxWidth:"82%"}}>
-                    <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:4,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
-                    <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${GOLD}33`,padding:"12px 16px"}}>
-                      <div style={{color:WHITE,fontSize:14,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{m.content}</div>
-                    </div>
-                  </div>
+        {/* CHAT AREA */}
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
+          {msgs.map((m,i)=>(
+            <div key={i} style={{display:"flex",gap:12,flexDirection:m.role==="user"?"row-reverse":"row"}}>
+              <div style={{width:36,height:36,flexShrink:0,background:m.role==="user"?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
+              <div style={{flex:1,maxWidth:"82%"}}>
+                <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:4,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
+                <div style={{background:m.role==="user"?"#100800":"#0a0900",border:`1px solid ${GOLD}33`,padding:"10px 14px"}}>
+                  <div style={{color:WHITE,fontSize:13,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{m.content}</div>
                 </div>
-              ))}
-              {loading&&(
-                <div style={{display:"flex",gap:12}}>
-                  <div style={{width:38,height:38,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div>
-                  <div style={{background:"#0a0900",border:`1px solid ${GOLD}33`,padding:"12px 16px"}}><span style={{color:GOLD,fontSize:13}}>Thinking...</span></div>
-                </div>
-              )}
-              <div ref={bot}/>
+              </div>
             </div>
-          </div>
-          {/* QUICK QUESTIONS */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
-            {QUICK.map(q=>(
-              <button key={q} onClick={()=>send(q)}
-                style={{background:"#0a0800",border:`1px solid ${GOLD}44`,color:GOLD,padding:"10px 14px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.5}}
-                onMouseEnter={e=>{e.currentTarget.style.background="#150a00";e.currentTarget.style.borderColor=GOLD;}}
-                onMouseLeave={e=>{e.currentTarget.style.background="#0a0800";e.currentTarget.style.borderColor=GOLD+"44";}}>
-                ✦ {q}
-              </button>
-            ))}
-          </div>
-          {/* INPUT */}
-          <div style={{background:"#030303",border:`1px solid ${GOLD}44`,padding:16}}>
-            <textarea value={inp2} onChange={e=>setInp2(e.target.value)}
-              onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-              placeholder="Ask anything about tools, workflow, pricing or production..."
-              style={{width:"100%",height:64,resize:"none",padding:"12px 14px",fontSize:14,background:"#0a0800",border:`1px solid ${GOLD}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",marginBottom:10}}/>
-            <button onClick={()=>send()} disabled={loading||!inp2.trim()}
-              style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLD+"33":GOLD}`,color:loading||!inp2.trim()?GOLD:"#000",padding:"12px 32px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-              {loading?"⟳ THINKING...":"SEND ▶"}
+          ))}
+          {loading&&<div style={{display:"flex",gap:12}}><div style={{width:36,height:36,flexShrink:0,background:`linear-gradient(135deg,${GOLDDIM},${GOLD})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#000",fontFamily:"'Cinzel',serif"}}>G</div><div style={{background:"#0a0900",border:`1px solid ${GOLD}33`,padding:"10px 14px"}}><span style={{color:GOLD,fontSize:12}}>Thinking...</span></div></div>}
+          <div ref={bot}/>
+        </div>
+        {/* QUICK QUESTIONS */}
+        <div style={{borderTop:`1px solid ${GOLD}22`,padding:"10px 20px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:5,flexShrink:0,background:"#040200"}}>
+          {QUICK.map(q=>(
+            <button key={q} onClick={()=>send(q)}
+              style={{background:"#0a0800",border:`1px solid ${GOLD}33`,color:GOLDDIM,padding:"7px 12px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",textAlign:"left",lineHeight:1.4}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.color=GOLD;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLD+"33";e.currentTarget.style.color=GOLDDIM;}}>
+              ✦ {q}
             </button>
-          </div>
+          ))}
+        </div>
+        {/* INPUT */}
+        <div style={{borderTop:`1px solid ${GOLD}`,padding:"12px 20px",display:"flex",gap:10,flexShrink:0,background:"#030200"}}>
+          <textarea value={inp2} onChange={e=>setInp2(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+            placeholder="Ask anything about tools, workflow, pricing or production..."
+            rows={2}
+            style={{flex:1,resize:"none",padding:"10px 14px",fontSize:13,background:"#0a0800",border:`1px solid ${GOLD}44`,color:WHITE,outline:"none",lineHeight:1.6,fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box"}}/>
+          <button onClick={()=>send()} disabled={loading||!inp2.trim()}
+            style={{background:loading||!inp2.trim()?"#1a0a00":`linear-gradient(135deg,${GOLDDIM},${GOLD})`,border:`1px solid ${loading||!inp2.trim()?GOLD+"22":GOLD}`,color:loading||!inp2.trim()?GOLDDIM:"#000",padding:"10px 24px",cursor:loading||!inp2.trim()?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",alignSelf:"stretch"}}>
+            {loading?"⟳":"SEND ▶"}
+          </button>
         </div>
       </div>
     </div>
@@ -3351,6 +3420,24 @@ export default function App() {
     const handler=()=>setShowHistory(true);
     window.addEventListener("ms_open_history",handler);
     return()=>window.removeEventListener("ms_open_history",handler);
+  },[]);
+
+  // Auto-populate timeline with doc scenes if timeline is empty
+  useEffect(()=>{
+    if(Object.keys(timeline).length===0&&mediaLib.length===0){
+      // Pre-load doc scene metadata into timeline so user can render immediately
+      const docAssets=DOC_SCENES.map((s,i)=>({
+        id:"doc_scene_"+(i+1),
+        name:s.title+"_"+s.duration+"s.webm",
+        type:"video/webm",
+        url:"",
+        duration:s.duration,
+        title:s.title,
+        prompt:s.prompt,
+        needsGeneration:true
+      }));
+      setTimeline({0:docAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}))});
+    }
   },[]);
   const saveAsset=async(a)=>{
     // Save to IndexedDB if it has a file blob
