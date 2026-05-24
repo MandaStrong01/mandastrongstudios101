@@ -1712,8 +1712,26 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       const fnStart=fnCode.indexOf("function drawFrame");
       if(fnStart>0)fnCode=fnCode.slice(fnStart);
 
-      addLog("Renderer compiled — "+Math.round(fnCode.length/1000)+"kb. Camera rolling...");
+      addLog("Renderer compiled — "+Math.round(fnCode.length/1000)+"kb.");
       setProgress(22);
+
+      // If renderer is too small, Claude wrote minimal code — retry with higher quality demand
+      if(fnCode.length<2000){
+        addLog("Quality too low — requesting detailed renderer...");
+        try{
+          const rq=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+              messages:[{role:"user",content:buildPrompt(prompt,refNote,RENDER_STYLES[renderStyle]?.rules)+" CRITICAL: You must write at least 4000 characters of JavaScript canvas code. Include detailed gradient sky, detailed human figures with skin-tone radialGradients, detailed environment, animated elements. Do not write minimal code."}]})
+          });
+          const rqd=await rq.json();
+          if(rqd.content&&rqd.content[0]){
+            let fc2=rqd.content[0].text.trim().replace(/```javascript|```js|```/g,"").trim();
+            const fi2=fc2.indexOf("function drawFrame");if(fi2>0)fc2=fc2.slice(fi2);
+            if(fc2.length>fnCode.length){fnCode=fc2;addLog("Enhanced — "+Math.round(fnCode.length/1000)+"kb.");}
+          }
+        }catch(e2){addLog("Enhancement failed — using original");}
+      }
 
       let drawFn;
       try{
@@ -1721,6 +1739,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
         const body=bO>=0&&bC>bO?fnCode.slice(bO+1,bC):"";
         drawFn=new Function("ctx","W","H","t","sec",body);
         drawFn(canvasRef.current.getContext("2d"),1920,1080,0,0);
+        addLog("Camera rolling...");
       }catch(e){
         addLog("Compile issue — retrying with simplified renderer...");
         const r2=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
