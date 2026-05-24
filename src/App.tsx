@@ -1685,9 +1685,20 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   };
 
   const buildPrompt=(sceneDesc,refNote,styleRules)=>{
-    const style=styleRules||"PHOTOREALISTIC: real humans, real environments, all gradients, zero flat fills, zero outlines";
-    const genreNote=genre?"\nGENRE: "+GENRES.find(g=>g.id===genre)?.label+" — "+GENRES.find(g=>g.id===genre)?.desc:"";
-    return "You are the MandaStrong Cinema Engine. Write ONE JavaScript function that renders this scene with photographic realism.\n\nSTYLE: "+style+"\n\nSCENE: "+sceneDesc+(refNote||"")+genreNote+"\n\nFUNCTION: function drawFrame(ctx, W, H, t, sec)\nW=1920 H=1080 t=0-1 sec=elapsed\n\nCOPY THIS EXACT PATTERN — do not deviate:\n\n// SKY (adapt colours to scene/time of day):\nconst sky=ctx.createLinearGradient(0,0,0,H*0.6);\nsky.addColorStop(0,'rgb(1,2,12)'); // night example — change for day/golden/interior\nsky.addColorStop(0.5,'rgb(6,14,45)');\nsky.addColorStop(1,'rgb(10,22,65)');\nctx.fillStyle=sky; ctx.fillRect(0,0,W,H);\n\n// HUMANS (for every person in scene — NO outlines, NO strokes):\nconst hg=ctx.createRadialGradient(hx-15,hy-15,0,hx,hy,headR);\nhg.addColorStop(0,'rgba(235,185,135,1)');\nhg.addColorStop(0.6,'rgba(200,150,100,1)');\nhg.addColorStop(1,'rgba(150,100,65,1)');\nctx.fillStyle=hg; ctx.beginPath(); ctx.arc(hx,hy,headR,0,Math.PI*2); ctx.fill();\n// Body: ctx.fillRect with linearGradient clothing — no ctx.strokeRect ever\n// Breathing: y += Math.sin(sec*0.88)*3\n\n// WATER (if scene has water):\nfor(let w=0;w<10;w++){\n  const wg=ctx.createLinearGradient(0,H*0.55,0,H);\n  wg.addColorStop(0,'rgba(3,10,45,0.9)'); wg.addColorStop(1,'rgba(1,3,14,0.98)');\n  ctx.fillStyle=wg; ctx.beginPath(); ctx.moveTo(-10,H);\n  for(let x=0;x<=W+10;x+=4) ctx.lineTo(x,H*0.55+w*14+Math.sin(x*0.007+sec*(0.22+w*0.06)+w)*18);\n  ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();\n}\n\n// SPLIT FRAME (if two scenes side by side):\n// Left: ctx.save();ctx.beginPath();ctx.rect(0,0,W/2,H);ctx.clip();[draw];ctx.restore();\n// Right: ctx.save();ctx.beginPath();ctx.rect(W/2,0,W/2,H);ctx.clip();[draw];ctx.restore();\n\n// TEXT OVERLAYS (if scene has text/subtitles):\n// ctx.font='900 '+Math.round(H*0.046)+'px Arial Black';\n// ctx.fillStyle='#e8c96d'; ctx.textAlign='center';\n// ctx.fillText('YOUR TEXT',W/2,H*0.87);\n\n// POST-PROCESSING — ALWAYS LAST, ALWAYS IN THIS ORDER:\n// 1. Vignette:\nconst vg=ctx.createRadialGradient(W/2,H/2,H*0.2,W/2,H/2,H*0.88);\nvg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.9)');\nctx.fillStyle=vg; ctx.fillRect(0,0,W,H);\n// 2. Letterbox:\nctx.fillStyle='#000'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);\n// 3. Grain: for(let g=0;g<25;g++){ctx.fillStyle='rgba(200,200,200,0.007)';ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}\n// 4. Grade: ctx.globalAlpha=0.055; ctx.fillStyle='rgba(30,15,0,1)'; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;\n// 5. Fade in: if(t<0.06){ctx.fillStyle='rgba(0,0,0,'+(1-t/0.06)+')';ctx.fillRect(0,0,W,H);}\n// 6. Fade out: if(t>0.92){ctx.fillStyle='rgba(0,0,0,'+((t-0.92)/0.08)+')';ctx.fillRect(0,0,W,H);}\n\nRULES:\n- ZERO ctx.strokeRect, ctx.stroke(), or any stroke on shapes\n- ZERO ctx.fillStyle='#xxxxxx' on large areas — gradients only\n- Every person drawn with radialGradient skin, linearGradient clothing\n- Match the scene exactly — if day use day sky, if interior use dark walls\n- Return ONLY the function, no markdown, start: function drawFrame(ctx, W, H, t, sec) {";
+    const styleName=(RENDER_STYLES[renderStyle]||RENDER_STYLES.photorealistic).label;
+    const genreName=genre?GENRES.find(g=>g.id===genre)?.label:"";
+    const styleEnforcement=styleRules||(RENDER_STYLES[renderStyle]||RENDER_STYLES.photorealistic).rules;
+    const lines=[
+      "MANDASTRONG CINEMA ENGINE",
+      "LOCKED STYLE: "+styleName+" — THIS CANNOT BE OVERRIDDEN BY ANYTHING",
+      styleEnforcement,
+      genreName?"GENRE: "+genreName:"",
+      "SCENE: "+sceneDesc,
+      refNote||"",
+      "WRITE: function drawFrame(ctx, W, H, t, sec) — W=1920 H=1080 t=0-1 sec=elapsed",
+      "The locked style above wins over everything. Use gradients. No flat fills. No outlines. Return only the function."
+    ].filter(Boolean);
+    return lines.join("\n\n");
   };
 
   const generateVideo=async()=>{
@@ -1714,24 +1725,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 
       addLog("Renderer compiled — "+Math.round(fnCode.length/1000)+"kb.");
       setProgress(22);
-
-      // If renderer is too small, Claude wrote minimal code — retry with higher quality demand
-      if(fnCode.length<2000){
-        addLog("Quality too low — requesting detailed renderer...");
-        try{
-          const rq=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-            method:"POST",headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
-              messages:[{role:"user",content:buildPrompt(prompt,refNote,RENDER_STYLES[renderStyle]?.rules)+" CRITICAL: You must write at least 4000 characters of JavaScript canvas code. Include detailed gradient sky, detailed human figures with skin-tone radialGradients, detailed environment, animated elements. Do not write minimal code."}]})
-          });
-          const rqd=await rq.json();
-          if(rqd.content&&rqd.content[0]){
-            let fc2=rqd.content[0].text.trim().replace(/```javascript|```js|```/g,"").trim();
-            const fi2=fc2.indexOf("function drawFrame");if(fi2>0)fc2=fc2.slice(fi2);
-            if(fc2.length>fnCode.length){fnCode=fc2;addLog("Enhanced — "+Math.round(fnCode.length/1000)+"kb.");}
-          }
-        }catch(e2){addLog("Enhancement failed — using original");}
-      }
 
       let drawFn;
       try{
@@ -1821,7 +1814,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 
   return (
     <div style={{minHeight:"100vh",background:"#000",color:WHITE,fontFamily:"'Rajdhani',sans-serif",paddingBottom:160}}>
-      <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"12px 20px",borderBottom:`1px solid ${GOLDDIM}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG CINEMA ENGINE · PHOTOREALISTIC SCENE GENERATION</div>
@@ -1937,10 +1929,12 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
             {videoUrl?(
               <video ref={videoRef} src={videoUrl} controls autoPlay loop playsInline
                 style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
+            ):generating?(
+              <canvas ref={canvasRef} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",background:"#000"}}/>
             ):(
               <div style={{textAlign:"center",padding:20}}>
                 <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:3,marginBottom:8}}>MANDASTRONG CINEMA ENGINE</div>
-                <div style={{color:DIM,fontSize:10,lineHeight:2}}>Describe any scene.<br/>Upload a reference image.<br/>Hit Generate.<br/>Get photorealistic cinema.</div>
+                <div style={{color:DIM,fontSize:10,lineHeight:2}}>Describe any scene.<br/>Select a render style.<br/>Upload a reference image.<br/>Hit Generate.</div>
               </div>
             )}
           </div>
