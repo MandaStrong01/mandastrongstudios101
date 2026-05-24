@@ -23,6 +23,13 @@ const STRIPE = {
   studio:"https://buy.stripe.com/fZubJ35BE3B53oHdiyafS02",
 };
 
+async function proxyFetch(body){
+  const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)
+  });
+  return res.json();
+}
+
 const G = (v, sm) => ({
   background: v==="gold" ? `linear-gradient(135deg,${GOLDDIM},${GOLD})` : "transparent",
   border: v==="gold" ? "none" : `1px solid ${GOLD}`,
@@ -3364,7 +3371,9 @@ function P23({ go }) {
     <div style={{...Sp,padding:0}}>
       <video key="bg-video" autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",aspectRatio:"16/9",objectFit:"cover",background:"#000"}}
-        onError={e=>{e.currentTarget.style.display="none";}}>
+        onLoadedData={e=>{e.currentTarget.play().catch(()=>{});}}
+        onError={e=>{e.currentTarget.style.display="none";}}
+        ref={el=>{if(el){el.defaultMuted=true;el.play().catch(()=>{});}}}>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
       </video>
@@ -3383,9 +3392,11 @@ function P23({ go }) {
 
           {/* THANK YOU LETTER */}
           <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#050500",border:`2px solid ${GOLD}`}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:14,textAlign:"center"}}>✦ THANK YOU ✦</div>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 10px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>Thank you for being part of this journey. Every film you create here is proof that technology can serve people — not the other way around. You belong here. Keep creating.</p>
+            <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:14,textAlign:"center"}}>✦ TO EVERY CREATOR WHO FOUND THIS PLACE ✦</div>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>You found MandaStrong Studio. That tells me something about you already.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>Whether this is your first film or your fiftieth — whether you have a professional kit or just a phone and a story burning inside you — this studio was built for you. Not for the already-famous. Not for the already-funded. For you, right now, exactly as you are.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>The world needs your story. Not a polished version of someone else's. <strong style={{color:GOLD}}>Yours.</strong> The one only you can tell.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>— <em style={{color:GOLD}}>Amanda Woolley, Founder · MandaStrong Studio</em></p>
           </div>
 
           {/* MISSION STATEMENT */}
