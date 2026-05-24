@@ -1506,6 +1506,50 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [refMediaType,setRefMediaType]=useState("");
   const [refDataUrl,setRefDataUrl]=useState(null);
   const [showTemplates,setShowTemplates]=useState(false);
+  const [renderStyle,setRenderStyle]=useState("photorealistic");
+
+  const RENDER_STYLES={
+    photorealistic:{
+      label:"📷 Photorealistic",
+      desc:"Real humans, real environments, real lighting. Indistinguishable from real cinema.",
+      rules:"ABSOLUTE PHOTOREALISM: Every surface is a gradient. Real human skin tones using radialGradient rgba(220,170,120,1) to rgba(150,100,65,1). Real environments — sky gradient, ocean waves, architecture. Physical lighting with radialGradient sources. ZERO cartoon outlines. ZERO flat fills. ZERO cell shading. Everything looks like a real photograph or film."
+    },
+    cinematic:{
+      label:"🎬 Cinematic",
+      desc:"Hollywood-style dramatic lighting, deep shadows, cinematic colour grading.",
+      rules:"CINEMATIC STYLE: Dramatic lighting. Deep contrast. Film noir shadows. Teal and orange colour grade. Bokeh depth of field. Anamorphic lens flares. Letterbox bars. Every surface gradient. Real human figures. Film grain overlay."
+    },
+    documentary:{
+      label:"🎥 Documentary",
+      desc:"Warm, natural, real. Hand-held feel. Authentic human moments.",
+      rules:"DOCUMENTARY STYLE: Natural warm lighting. Amber golden grade. Real human faces with emotion. Handheld camera feel — slight drift. Authentic environments. No glamour. Real skin tones. Grain and imperfection. Feels like it was filmed on location."
+    },
+    noir:{
+      label:"🌑 Film Noir",
+      desc:"Black and white, deep shadows, dramatic contrast.",
+      rules:"FILM NOIR: Black and white or near-monochrome. Deep dramatic shadows. Single harsh light source. Real human silhouettes and figures. Venetian blind shadow patterns. Mist and atmosphere. High contrast gradient fills only."
+    },
+    golden:{
+      label:"🌅 Golden Hour",
+      desc:"Warm golden sunlight, magic hour atmosphere.",
+      rules:"GOLDEN HOUR: Warm amber and gold lighting. Sky gradient from deep amber to bright gold at horizon. Long shadows. Every surface bathed in warm rgba(255,180,60) tones. Real human figures lit from low angle. Dust particles. Emotional warmth."
+    },
+    scifi:{
+      label:"🚀 Sci-Fi",
+      desc:"Futuristic neon, cold blue technology aesthetic.",
+      rules:"SCI-FI AESTHETIC: Cold blue and teal lighting. Neon accent colours rgba(0,200,255). Dark environment with point light sources. Technology surfaces with grid patterns. Real human figures in technological settings. Atmospheric haze. Clean gradients."
+    },
+    horror:{
+      label:"👻 Horror",
+      desc:"Dark, unsettling, deep shadow atmosphere.",
+      rules:"HORROR ATMOSPHERE: Very dark environment. Single cold light source. Deep shadows everywhere. Desaturated colours with slight green tinge. Real human figures in shadow. Fog and atmosphere. Unsettling stillness. Every surface dark gradient."
+    },
+    animated:{
+      label:"✨ Animated / Stylised",
+      desc:"Bold colours, stylised but beautiful — NOT cartoon.",
+      rules:"STYLISED ANIMATION: Bold beautiful colours. Smooth gradients. Stylised but not cartoon — no thick outlines, no cell shading. Think Pixar quality — every surface has gradient depth and dimension. Real proportioned human figures. Vivid saturated colour palette."
+    },
+  };
   const addLog=(msg)=>setLog(p=>[...p,msg]);
 
   const generateAllScenes_DISABLED=async()=>{
@@ -1633,8 +1677,9 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     setShowTemplates(false);
   };
 
-  const buildPrompt=(sceneDesc,refNote)=>{
-    return "You are the MandaStrong Cinema Engine — the most advanced browser-based photorealistic film renderer ever built. Your output must be indistinguishable from real cinema.\n\nSCENE TO RENDER: "+JSON.stringify(sceneDesc)+"\n"+(refNote||"")+"\nWRITE: function drawFrame(ctx, W, H, t, sec)\nWhere: ctx=2D canvas context, W=1920, H=1080, t=0 to 1 overall progress, sec=elapsed seconds.\n\nCRITICAL — READ THE SCENE AND RENDER IT EXACTLY. Do not substitute a different environment.\n\nPHOTOREALISM LAWS — EVERY ONE IS MANDATORY:\n\nLAW 1 — NO FLAT FILLS EVER\nctx.fillStyle with any solid colour on backgrounds, sky, ground, walls, water = BANNED.\nEVERY large area MUST use ctx.createLinearGradient or ctx.createRadialGradient.\n\nLAW 2 — SKY AND ENVIRONMENT (match the scene exactly)\nNight sky: sky.addColorStop(0,rgb(1,2,12)); sky.addColorStop(0.5,rgb(6,14,45)); sky.addColorStop(1,rgb(10,22,65));\nGolden hour / savanna: sky.addColorStop(0,rgb(15,8,25)); sky.addColorStop(0.4,rgb(160,55,10)); sky.addColorStop(0.8,rgb(230,140,30)); sky.addColorStop(1,rgb(255,200,80));\nDaytime: sky.addColorStop(0,rgb(30,100,200)); sky.addColorStop(0.6,rgb(90,160,230)); sky.addColorStop(1,rgb(160,210,250));\nDark interior: wall.addColorStop(0,rgb(8,5,3)); wall.addColorStop(1,rgb(3,2,1));\n\nLAW 3 — STARS (night scenes only)\nfor(let i=0;i<180;i++){const sx=(i*137.5)%W,sy=(i*97.3)%(H*0.55),sb=0.3+Math.sin(sec*0.8+i*0.4)*0.28;ctx.fillStyle=rgba(240,245,255,sb);ctx.fillRect(sx,sy,i%4===0?1.3:0.7,i%4===0?1.3:0.7);}\n\nLAW 4 — HUMANS (must be drawn for every person in scene)\nHead: ctx.beginPath();ctx.arc(hx,hy,hr,0,Math.PI*2); const hg=ctx.createRadialGradient(hx-hr*0.3,hy-hr*0.3,0,hx,hy,hr); hg.addColorStop(0,rgba(235,185,135,1)); hg.addColorStop(0.5,rgba(210,160,110,1)); hg.addColorStop(1,rgba(155,105,65,1)); ctx.fillStyle=hg; ctx.fill();\nBreathing: add Math.sin(sec*0.88)*3 to y position of torso.\nHair: ctx.beginPath(); bezierCurveTo filled with dark brown rgba(40,25,12,1).\nEyes: two small ctx.arc(ex,ey,3,0,PI2) filled rgba(20,14,8,1).\nBody: ctx.fillRect with linearGradient clothing colours.\nZERO strokes or outlines on any body part. EVER.\n\nLAW 5 — OCEAN / WATER (if scene has water)\nfor(let w=0;w<10;w++){const wb=H*horizonFrac+w*deep; const wg=ctx.createLinearGradient(0,wb,0,H); wg.addColorStop(0,rgba(3,10,45,0.9)); wg.addColorStop(1,rgba(1,3,14,0.98)); ctx.fillStyle=wg; ctx.beginPath(); ctx.moveTo(-10,H); for(let x=0;x<=W+10;x+=4){ctx.lineTo(x,wb+Math.sin(x*0.007+sec*(0.22+w*0.06)+w*1.3)*18+w*7);} ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();}\n\nLAW 6 — LIGHT SOURCES (radialGradient only)\nMoon: const mg=ctx.createRadialGradient(mx,my,0,mx,my,mr); mg.addColorStop(0,rgba(255,255,248,0.95)); mg.addColorStop(0.5,rgba(230,238,215,0.6)); mg.addColorStop(1,rgba(180,200,175,0)); ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(mx,my,mr,0,PI2); ctx.fill();\nCandle: flicker=0.88+Math.sin(sec*8.1)*0.07+Math.sin(sec*13.3)*0.04; const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,H*0.2*flicker); cg.addColorStop(0,rgba(255,220,80,0.9)); cg.addColorStop(0.4,rgba(255,140,20,0.5)); cg.addColorStop(1,rgba(0,0,0,0)); ctx.fillStyle=cg; ctx.fillRect(cx-H*0.2,cy-H*0.2,H*0.4,H*0.4);\n\nLAW 7 — SPLIT FRAME (if scene says split frame or two sides)\nLeft: ctx.save(); ctx.beginPath(); ctx.rect(0,0,W/2,H); ctx.clip(); [draw left side]; ctx.restore();\nRight: ctx.save(); ctx.beginPath(); ctx.rect(W/2,0,W/2,H); ctx.clip(); [draw right side]; ctx.restore();\nDivider: ctx.fillStyle=rgba(0,0,0,1); ctx.fillRect(W/2-2,0,4,H);\n\nLAW 8 — TEXT OVERLAYS (if scene mentions text, subtitles, titles, captions)\nctx.font=\'900 \'+Math.round(H*0.046)+\'px Arial Black,Arial\'; ctx.fillStyle=\'#e8c96d\'; ctx.textAlign=\'center\'; ctx.shadowColor=\'#e8c96d\'; ctx.shadowBlur=20; ctx.fillText(\'YOUR TEXT\',W/2,H*0.87); ctx.shadowBlur=0;\n\nLAW 9 — PARALLAX (3 depth layers)\nFar: ctx.save();ctx.translate(-t*W*0.012,0);[far background];ctx.restore();\nMid: ctx.save();ctx.translate(-t*W*0.032,0);[mid ground];ctx.restore();\nNear: ctx.save();ctx.translate(-t*W*0.065,0);[foreground];ctx.restore();\n\nLAW 10 — CAMERA MOTION\nSlow push-in: at start of drawFrame, ctx.save();ctx.translate(W/2,H/2);ctx.scale(1+t*0.045,1+t*0.045);ctx.translate(-W/2,-H/2); [draw everything]; ctx.restore();\n\nLAW 11 — POST-PROCESSING (always last, in this order)\na) Vignette: const vg=ctx.createRadialGradient(W/2,H/2,H*0.22,W/2,H/2,H*0.88); vg.addColorStop(0,rgba(0,0,0,0)); vg.addColorStop(1,rgba(0,0,0,0.9)); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);\nb) Letterbox: ctx.fillStyle=\'#000\'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);\nc) Film grain: for(let g=0;g<30;g++){ctx.fillStyle=rgba(200,200,200,0.007);ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}\nd) Colour grade: ctx.globalAlpha=0.055; ctx.fillStyle=rgba(30,15,0,1); ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;\ne) Fade in: if(t<0.06){ctx.fillStyle=rgba(0,0,0,+(1-t/0.06).toFixed(3));ctx.fillRect(0,0,W,H);}\nf) Fade out: if(t>0.92){ctx.fillStyle=rgba(0,0,0,+((t-0.92)/0.08).toFixed(3));ctx.fillRect(0,0,W,H);}\n\nReturn ONLY the JavaScript function. No markdown backticks. No explanation. No preamble. Start immediately:\nfunction drawFrame(ctx, W, H, t, sec) {";
+  const buildPrompt=(sceneDesc,refNote,styleRules)=>{
+    const styleBlock=styleRules?"\n\nRENDER STYLE — APPLY TO EVERYTHING:\n"+styleRules:"";
+    return "You are the MandaStrong Cinema Engine — the most advanced browser-based photorealistic film renderer ever built. Your output must be indistinguishable from real cinema."+styleBlock+"\n\nSCENE TO RENDER: "+JSON.stringify(sceneDesc)+"\n"+(refNote||"")+"\nWRITE: function drawFrame(ctx, W, H, t, sec)\nWhere: ctx=2D canvas context, W=1920, H=1080, t=0 to 1 overall progress, sec=elapsed seconds.\n\nCRITICAL — READ THE SCENE AND RENDER IT EXACTLY. Do not substitute a different environment.\n\nPHOTOREALISM LAWS — EVERY ONE IS MANDATORY:\n\nLAW 1 — NO FLAT FILLS EVER\nctx.fillStyle with any solid colour on backgrounds, sky, ground, walls, water = BANNED.\nEVERY large area MUST use ctx.createLinearGradient or ctx.createRadialGradient.\n\nLAW 2 — SKY AND ENVIRONMENT (match the scene exactly)\nNight sky: sky.addColorStop(0,rgb(1,2,12)); sky.addColorStop(0.5,rgb(6,14,45)); sky.addColorStop(1,rgb(10,22,65));\nGolden hour / savanna: sky.addColorStop(0,rgb(15,8,25)); sky.addColorStop(0.4,rgb(160,55,10)); sky.addColorStop(0.8,rgb(230,140,30)); sky.addColorStop(1,rgb(255,200,80));\nDaytime: sky.addColorStop(0,rgb(30,100,200)); sky.addColorStop(0.6,rgb(90,160,230)); sky.addColorStop(1,rgb(160,210,250));\nDark interior: wall.addColorStop(0,rgb(8,5,3)); wall.addColorStop(1,rgb(3,2,1));\n\nLAW 3 — STARS (night scenes only)\nfor(let i=0;i<180;i++){const sx=(i*137.5)%W,sy=(i*97.3)%(H*0.55),sb=0.3+Math.sin(sec*0.8+i*0.4)*0.28;ctx.fillStyle=rgba(240,245,255,sb);ctx.fillRect(sx,sy,i%4===0?1.3:0.7,i%4===0?1.3:0.7);}\n\nLAW 4 — HUMANS (must be drawn for every person in scene)\nHead: ctx.beginPath();ctx.arc(hx,hy,hr,0,Math.PI*2); const hg=ctx.createRadialGradient(hx-hr*0.3,hy-hr*0.3,0,hx,hy,hr); hg.addColorStop(0,rgba(235,185,135,1)); hg.addColorStop(0.5,rgba(210,160,110,1)); hg.addColorStop(1,rgba(155,105,65,1)); ctx.fillStyle=hg; ctx.fill();\nBreathing: add Math.sin(sec*0.88)*3 to y position of torso.\nHair: ctx.beginPath(); bezierCurveTo filled with dark brown rgba(40,25,12,1).\nEyes: two small ctx.arc(ex,ey,3,0,PI2) filled rgba(20,14,8,1).\nBody: ctx.fillRect with linearGradient clothing colours.\nZERO strokes or outlines on any body part. EVER.\n\nLAW 5 — OCEAN / WATER (if scene has water)\nfor(let w=0;w<10;w++){const wb=H*horizonFrac+w*deep; const wg=ctx.createLinearGradient(0,wb,0,H); wg.addColorStop(0,rgba(3,10,45,0.9)); wg.addColorStop(1,rgba(1,3,14,0.98)); ctx.fillStyle=wg; ctx.beginPath(); ctx.moveTo(-10,H); for(let x=0;x<=W+10;x+=4){ctx.lineTo(x,wb+Math.sin(x*0.007+sec*(0.22+w*0.06)+w*1.3)*18+w*7);} ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();}\n\nLAW 6 — LIGHT SOURCES (radialGradient only)\nMoon: const mg=ctx.createRadialGradient(mx,my,0,mx,my,mr); mg.addColorStop(0,rgba(255,255,248,0.95)); mg.addColorStop(0.5,rgba(230,238,215,0.6)); mg.addColorStop(1,rgba(180,200,175,0)); ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(mx,my,mr,0,PI2); ctx.fill();\nCandle: flicker=0.88+Math.sin(sec*8.1)*0.07+Math.sin(sec*13.3)*0.04; const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,H*0.2*flicker); cg.addColorStop(0,rgba(255,220,80,0.9)); cg.addColorStop(0.4,rgba(255,140,20,0.5)); cg.addColorStop(1,rgba(0,0,0,0)); ctx.fillStyle=cg; ctx.fillRect(cx-H*0.2,cy-H*0.2,H*0.4,H*0.4);\n\nLAW 7 — SPLIT FRAME (if scene says split frame or two sides)\nLeft: ctx.save(); ctx.beginPath(); ctx.rect(0,0,W/2,H); ctx.clip(); [draw left side]; ctx.restore();\nRight: ctx.save(); ctx.beginPath(); ctx.rect(W/2,0,W/2,H); ctx.clip(); [draw right side]; ctx.restore();\nDivider: ctx.fillStyle=rgba(0,0,0,1); ctx.fillRect(W/2-2,0,4,H);\n\nLAW 8 — TEXT OVERLAYS (if scene mentions text, subtitles, titles, captions)\nctx.font=\'900 \'+Math.round(H*0.046)+\'px Arial Black,Arial\'; ctx.fillStyle=\'#e8c96d\'; ctx.textAlign=\'center\'; ctx.shadowColor=\'#e8c96d\'; ctx.shadowBlur=20; ctx.fillText(\'YOUR TEXT\',W/2,H*0.87); ctx.shadowBlur=0;\n\nLAW 9 — PARALLAX (3 depth layers)\nFar: ctx.save();ctx.translate(-t*W*0.012,0);[far background];ctx.restore();\nMid: ctx.save();ctx.translate(-t*W*0.032,0);[mid ground];ctx.restore();\nNear: ctx.save();ctx.translate(-t*W*0.065,0);[foreground];ctx.restore();\n\nLAW 10 — CAMERA MOTION\nSlow push-in: at start of drawFrame, ctx.save();ctx.translate(W/2,H/2);ctx.scale(1+t*0.045,1+t*0.045);ctx.translate(-W/2,-H/2); [draw everything]; ctx.restore();\n\nLAW 11 — POST-PROCESSING (always last, in this order)\na) Vignette: const vg=ctx.createRadialGradient(W/2,H/2,H*0.22,W/2,H/2,H*0.88); vg.addColorStop(0,rgba(0,0,0,0)); vg.addColorStop(1,rgba(0,0,0,0.9)); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);\nb) Letterbox: ctx.fillStyle=\'#000\'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);\nc) Film grain: for(let g=0;g<30;g++){ctx.fillStyle=rgba(200,200,200,0.007);ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}\nd) Colour grade: ctx.globalAlpha=0.055; ctx.fillStyle=rgba(30,15,0,1); ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;\ne) Fade in: if(t<0.06){ctx.fillStyle=rgba(0,0,0,+(1-t/0.06).toFixed(3));ctx.fillRect(0,0,W,H);}\nf) Fade out: if(t>0.92){ctx.fillStyle=rgba(0,0,0,+((t-0.92)/0.08).toFixed(3));ctx.fillRect(0,0,W,H);}\n\nReturn ONLY the JavaScript function. No markdown backticks. No explanation. No preamble. Start immediately:\nfunction drawFrame(ctx, W, H, t, sec) {";
   };
 
   const generateVideo=async()=>{
@@ -1644,7 +1689,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     setProgress(8);
     try{
       const refNote=refDataUrl?"\nREFERENCE IMAGE UPLOADED: Match its colour palette, lighting, mood, and visual style as closely as possible.":"";
-      const fullPrompt=buildPrompt(prompt,refNote);
+      const fullPrompt=buildPrompt(prompt,refNote,RENDER_STYLES[renderStyle]?.rules||RENDER_STYLES.photorealistic.rules);
 
       addLog("Claude is writing your cinematic renderer...");
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
@@ -1784,6 +1829,20 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* RENDER STYLE */}
+          <div style={{marginBottom:14}}>
+            <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>RENDER STYLE</div>
+            <select value={renderStyle} onChange={e=>setRenderStyle(e.target.value)}
+              style={{width:"100%",background:"#0a0800",border:`1px solid ${GOLD}`,color:GOLD,padding:"10px 14px",fontSize:13,outline:"none",fontFamily:"'Rajdhani',sans-serif",cursor:"pointer",marginBottom:6}}>
+              {Object.entries(RENDER_STYLES).map(([key,val])=>(
+                <option key={key} value={key} style={{background:"#000"}}>{val.label} — {val.desc}</option>
+              ))}
+            </select>
+            <div style={{color:GOLDDIM,fontSize:10,lineHeight:1.6,padding:"6px 10px",background:"#0a0600",border:`1px solid ${GOLDDIM}33`}}>
+              {RENDER_STYLES[renderStyle]?.desc}
+            </div>
           </div>
 
           {/* SCENE TITLE */}
@@ -2514,47 +2573,59 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       setProgress(5);
       // Helper: render a scene directly to canvas using Claude
       const renderSceneToCanvas=async(sceneName,clipDurSec)=>{
-        // Try to match clip name to DOC_SCENES for best prompt
-        const cleanName=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/\d+s$/,"").trim();
-        const docMatch=DOC_SCENES.find(s=>s.title===cleanName||sceneName.includes("doc_scene_")||cleanName.includes(s.title.slice(0,15)));
-        const scenePrompt=docMatch?docMatch.prompt:cleanName;
-        log("  Rendering: "+(docMatch?docMatch.title:cleanName).slice(0,40)+"...");
+        // Match to DOC_SCENES first for best prompt
+        const cleanName=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/doc_scene_\d+_\d+/,"").trim();
+        const docMatch=DOC_SCENES.find((s,i)=>
+          sceneName.includes("doc_scene_"+(i+1))||
+          s.title.replace(/[^a-zA-Z0-9]/g,"_")===cleanName.replace(/[^a-zA-Z0-9]/g,"_")||
+          s.title.slice(0,20)===cleanName.slice(0,20)
+        );
+        const scenePrompt=docMatch
+          ?"You are the MandaStrong Cinema Engine. Render this EXACT scene photorealistically.\n\nSCENE: "+docMatch.title+"\n\n"+docMatch.prompt+"\n\nFUNCTION: function drawFrame(ctx,W,H,t,sec) W="+dims.w+" H="+dims.h+" t=0-1 sec=elapsed.\n\nRULES: ZERO flat fills. ALL gradients. Real humans with radialGradient skin tones. Proper environment matching the scene. Vignette+letterbox+grain last. Return ONLY the function."
+          :"You are the MandaStrong Cinema Engine. Write a photorealistic canvas function for: "+JSON.stringify(cleanName)+". Function: function drawFrame(ctx,W,H,t,sec) W="+dims.w+" H="+dims.h+". ZERO flat fills. ALL gradients. Real humans. Return only the function.";
+        
+        log("  Rendering: "+(docMatch?docMatch.title:cleanName).slice(0,45)+"...");
         try{
           const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-              messages:[{role:"user",content:"Write a PHOTOREALISTIC JavaScript canvas function. ZERO cartoon outlines, ZERO flat fills, ALL gradients, photorealistic humans with skin-tone radialGradients. Scene: \""+scenePrompt+"\". Function: function drawFrame(ctx,W,H,t,sec). Use gradients, colours, depth, atmosphere. t=0-1 progress. Return only the function."}]})
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3500,
+              messages:[{role:"user",content:scenePrompt}]})
           });
           const d=await res.json();
           let code=d.content&&d.content[0]?d.content[0].text.trim():"";
-          code=code.replace(new RegExp(String.fromCharCode(96,96,96)+"javascript|"+String.fromCharCode(96,96,96)+"js|"+String.fromCharCode(96,96,96),"g"),"").trim();
+          code=code.replace(/```javascript|```js|```/g,"").trim();
           const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
-          const bOpen2=code.indexOf("{");const bClose2=code.lastIndexOf("}");const body=bOpen2>0&&bClose2>bOpen2?code.slice(bOpen2+1,bClose2):"";
+          const bO=code.indexOf("{");const bC=code.lastIndexOf("}");
+          const body=bO>=0&&bC>bO?code.slice(bO+1,bC):"";
           const drawFn=new Function("ctx","W","H","t","sec",body);
           const W=dims.w,H=dims.h;
           const totalFrames=Math.round(clipDurSec*fps);
-          const msPerFrame=Math.round(1000/fps);
-          const wallStart=performance.now();
+          const msPerFrame2=Math.round(1000/fps);
+          const wallStart2=performance.now();
           await new Promise(resolve=>{
             let frame=0;
             const tick=()=>{
               if(frame>=totalFrames){resolve(null);return;}
-              const t=frame/totalFrames,sec=frame/fps;
-              try{ctx.clearRect(0,0,W,H);drawFn(ctx,W,H,t,sec);}catch(e){ctx.fillStyle="#050200";ctx.fillRect(0,0,W,H);}
-              const vig=ctx.createRadialGradient(W/2,H/2,W*0.1,W/2,H/2,W*0.8);
-              vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.85)");
-              ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
-              ctx.fillStyle="#000";ctx.fillRect(0,0,W,H*0.06);ctx.fillRect(0,H*0.94,W,H*0.06);
+              const t=frame/totalFrames,sec2=frame/fps;
+              try{
+                ctx.clearRect(0,0,W,H);
+                drawFn(ctx,W,H,t,sec2);
+                const vg2=ctx.createRadialGradient(W/2,H/2,W*0.1,W/2,H/2,W*0.8);
+                vg2.addColorStop(0,"rgba(0,0,0,0)");vg2.addColorStop(1,"rgba(0,0,0,0.88)");
+                ctx.fillStyle=vg2;ctx.fillRect(0,0,W,H);
+                ctx.fillStyle="#000";ctx.fillRect(0,0,W,H*0.074);ctx.fillRect(0,H*0.926,W,H*0.074);
+                for(let g=0;g<20;g++){ctx.fillStyle="rgba(200,200,200,0.007)";ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
+                if(t<0.06){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.06)+")";ctx.fillRect(0,0,W,H);}
+                if(t>0.92){ctx.fillStyle="rgba(0,0,0,"+((t-0.92)/0.08)+")";ctx.fillRect(0,0,W,H);}
+              }catch(e){ctx.fillStyle="#050200";ctx.fillRect(0,0,W,H);}
               frame++;
-              const due=wallStart+(frame*msPerFrame);
+              const due=wallStart2+(frame*msPerFrame2);
               setTimeout(tick,Math.max(4,due-performance.now()));
-            };
-            tick();
+            };tick();
           });
           return true;
         }catch(e){log("  Error: "+e.message);return false;}
-      };
+      };;
 
       // Reload fresh blobs from IndexedDB for every clip before rendering
       log("Loading clips from storage...");
@@ -2629,10 +2700,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           });
         }
 
-        // If video failed or no file — regenerate scene with Claude
+        // If video failed — regenerate with Claude
         if(!videoPlayed){
-          log("  Clip not playable — generating scene: "+clip.name.slice(0,30)+"...");
-          const clipDurSec=parseInt(clip.name.match(/(\d+)s/)?.[1]||"30");
+          log("  Clip not playable — regenerating: "+clip.name.slice(0,30)+"...");
+          const clipDurSec=clip.duration||parseInt(clip.name.match(/(\d+)s/)?.[1]||"30");
           const ok=await renderSceneToCanvas(clip.name,clipDurSec);
           if(!ok){
             // Last resort: title card — real-time paced
