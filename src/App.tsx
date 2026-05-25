@@ -2,7 +2,9 @@
 import { useState, useRef, useEffect } from "react";
 
 // ==================== INDEXEDDB ====================
-const DB_NAME = "mandastrong_db", DB_VER = 1, STORE = "clips";
+const DB_NAME = "mandastrong_db";
+const DB_VER = 1;
+const STORE = "clips";
 
 const openDB = () => new Promise((res, rej) => {
   const r = indexedDB.open(DB_NAME, DB_VER);
@@ -55,14 +57,13 @@ const Sp = { minHeight: "100vh", background: "#000", color: WHITE, fontFamily: "
 const H1 = { fontFamily: "'Cinzel',serif", color: GOLD, letterSpacing: 5, textTransform: "uppercase", margin: 0, fontSize: "clamp(16px,3vw,32px)" };
 const Card = (x = {}) => ({ background: "#0a0a0a", border: `1px solid ${GOLDDIM}`, borderRadius: 0, padding: 18, ...x });
 
-// ==================== YOUR FULL ARRAYS ====================
-// Paste your complete arrays here:
-const VOICE_CHARACTERS = [ /* full 54 voices */ ];
-const WRITING = [ /* full list */ ];
-const IMAGE_T = [ /* full list */ ];
-const VIDEO_T = [ /* full list */ ];
-const MOTION = [ /* full list */ ];
-const STOCK_VOICES = [ /* full list */ ];
+// ==================== ARRAYS (Paste your full versions) ====================
+const VOICE_CHARACTERS = [ /* ← PASTE YOUR FULL 54 VOICE ARRAY HERE */ ];
+const WRITING = [ /* your full WRITING tools */ ];
+const IMAGE_T = [ /* your full IMAGE tools */ ];
+const VIDEO_T = [ /* your full VIDEO tools */ ];
+const MOTION = [ /* your full MOTION tools */ ];
+const STOCK_VOICES = [ /* your STOCK_VOICES */ ];
 
 // ==================== HELPERS ====================
 const proxyFetch = async (body) => {
@@ -95,9 +96,18 @@ function stopSpeaking() {
   window.speechSynthesis.cancel();
 }
 
-// ==================== PASTE ALL YOUR COMPONENTS HERE ====================
-// P1, P2, P3, P4, ToolPage, P6Voice, MusicVideoStudio, P8VideoGenerator, P11–P23, etc.
-// Make sure there are no duplicate function names.
+// ==================== ALL COMPONENTS (P1 to P23) ====================
+// Paste your full component definitions here (Header, Footer, P1, P2, ..., P23, ToolPage, MusicVideoStudio, etc.)
+
+// Example placeholders - replace with your actual code:
+function P1({ go }) { return <div style={Sp}><h1 style={H1}>Welcome to MandaStrong Studio</h1></div>; }
+function P6Voice({ onSave, setMediaLib }) { /* your full P6Voice code */ return <div style={Sp}>Voice Engine</div>; }
+function P8VideoGenerator({ onSave, filmDuration, setFilmDuration }) { /* your full P8 code */ return <div style={Sp}>Video Generator</div>; }
+// ... add all other P components ...
+
+function Header({ go, setMenu }) { /* your Header */ return <div>...</div>; }
+function Footer({ page, go, onSave, onHistory }) { /* your Footer */ return <div>...</div>; }
+// Add ProjectHistoryModal, SaveSessionModal, ToolPage, etc.
 
 export default function App() {
   const [page, setPage] = useState(1);
@@ -113,23 +123,29 @@ export default function App() {
 
   const go = (p) => { setPage(p); window.scrollTo(0, 0); };
 
+  // Restore logic
   useEffect(() => {
-    // Restore logic
     const restore = async () => {
       try {
-        const p = JSON.parse(localStorage.getItem("ms_page") || "1");
-        setPage(p);
-        const t = JSON.parse(localStorage.getItem("ms_timeline") || "{}");
-        if (Object.keys(t).length) setTimeline(t);
+        const savedPage = JSON.parse(localStorage.getItem("ms_page") || "1");
+        setPage(Number(savedPage));
+
+        const savedTimeline = JSON.parse(localStorage.getItem("ms_timeline") || "{}");
+        if (Object.keys(savedTimeline).length) setTimeline(savedTimeline);
+
         const dbClips = await getAllClipsFromDB();
         if (dbClips.length > 0) {
           const restored = dbClips.map(c => ({
-            id: c.id, name: c.name, type: c.type, url: URL.createObjectURL(c.blob),
-            file: new File([c.blob], c.name, { type: c.type })
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            url: URL.createObjectURL(c.blob),
+            file: new File([c.blob], c.name, { type: c.type }),
+            dbId: c.id
           }));
           setMediaLib(restored);
         }
-      } catch (e) {}
+      } catch (e) { console.warn(e); }
     };
     restore();
   }, []);
@@ -137,5 +153,41 @@ export default function App() {
   const saveAsset = async (a) => {
     if (a.file) {
       try {
-        const dbId = a.id || Date.now().toString();
-        await saveClipTo
+        const dbId = a.id || "asset_" + Date.now().toString();
+        await saveClipToDB(dbId, a.file, a.name || "asset", a.type || "video/webm");
+        setMediaLib(prev => [...prev, { ...a, id: dbId, dbId, url: URL.createObjectURL(a.file) }]);
+      } catch (e) {
+        console.warn(e);
+        setMediaLib(prev => [...prev, a]);
+      }
+    } else {
+      setMediaLib(prev => [...prev, a]);
+    }
+  };
+
+  const renderPage = () => {
+    switch (page) {
+      case 1: return <P1 go={go} />;
+      case 6: return <P6Voice onSave={saveAsset} setMediaLib={setMediaLib} />;
+      case 8: return <P8VideoGenerator onSave={saveAsset} filmDuration={filmDuration} setFilmDuration={setFilmDuration} />;
+      // Add all your other cases here (2-5,7,9-23)
+      default: return <P1 go={go} />;
+    }
+  };
+
+  return (
+    <div style={{ background: "#000", minHeight: "100vh", fontFamily: "'Rajdhani',sans-serif" }}>
+      <Header go={go} setMenu={setMenu} />
+      {menu && <QAMenu go={go} onClose={() => setMenu(false)} user={user} />}
+      {showHistory && <ProjectHistoryModal onClose={() => setShowHistory(false)} />}
+      {showSaveModal && <SaveSessionModal onClose={() => setShowSaveModal(false)} onSave={() => {}} currentPage={page} assetCount={mediaLib.length} />}
+      {savedNotice && <div style={{position:"fixed", top:60, left:"50%", transform:"translateX(-50%)", background:GOLD, color:"#000", padding:"10px 24px", fontWeight:900, zIndex:999}}>✓ PROJECT SAVED</div>}
+
+      <div style={{ minHeight: "calc(100vh - 116px)" }}>
+        <div key={page}>{renderPage()}</div>
+      </div>
+
+      <Footer page={page} go={go} onSave={() => setShowSaveModal(true)} onHistory={() => setShowHistory(true)} />
+    </div>
+  );
+}
