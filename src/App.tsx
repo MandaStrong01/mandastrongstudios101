@@ -1258,7 +1258,7 @@ const G = (v, sm) => ({
   cursor:"pointer", letterSpacing:2, textTransform:"uppercase",
   fontFamily:"'Rajdhani',sans-serif",
 });
-const Sp = { minHeight:"100vh", background:"#000", color:WHITE, fontFamily:"'Rajdhani',sans-serif", paddingBottom:160, width:"100%", overflowX:"hidden" };
+const Sp = { minHeight:"100vh", background:BG, color:WHITE, fontFamily:"'Rajdhani',sans-serif", paddingBottom:160, width:"100%", overflowX:"hidden" };
 const H1 = { fontFamily:"'Cinzel',serif", color:GOLD, letterSpacing:5, textTransform:"uppercase", margin:0, fontSize:"clamp(16px,3vw,32px)" };
 const Card = (x) => ({ background:"#0a0a0a", border:`1px solid ${GOLDDIM}`, borderRadius:0, padding:18, ...(x||{}) });
 
@@ -1666,44 +1666,10 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   };
   const addLog=(msg)=>setLog(p=>[...p,msg]);
 
-  const FILM_GENRES=[
-    {id:"feature",label:"🎬 Feature Film",desc:"Full dramatic narrative"},
-    {id:"documentary",label:"🎥 Documentary",desc:"Real stories, real impact"},
-    {id:"musicvideo",label:"🎵 Music Video",desc:"Beat-synced visual"},
-    {id:"shortfilm",label:"🎭 Short Film",desc:"10-30 min narrative"},
-    {id:"horror",label:"👻 Horror",desc:"Dark atmosphere"},
-    {id:"scifi",label:"🚀 Sci-Fi",desc:"Futuristic worlds"},
-    {id:"romance",label:"💕 Romance",desc:"Emotional love story"},
-    {id:"thriller",label:"⚡ Thriller",desc:"Tension and suspense"},
-    {id:"action",label:"💥 Action",desc:"High energy scenes"},
-    {id:"comedy",label:"😄 Comedy",desc:"Light storytelling"},
-    {id:"drama",label:"🎭 Drama",desc:"Deep human emotion"},
-    {id:"animation",label:"✨ Animation",desc:"Stylised worlds"},
-    {id:"historical",label:"🏛 Historical",desc:"Epic period pieces"},
-    {id:"nature",label:"🌿 Nature",desc:"Landscapes and wildlife"},
-  ];
-
-  const GENRE_TEMPLATES={
-    feature:["A lone detective walks rain-soaked city streets at night. Neon reflections on wet pavement. Deep shadows.","Two strangers meet on a train platform at dusk. Golden hour light. Steam rising.","A family stands in an empty house. Afternoon sun through dusty windows. Nobody speaking."],
-    documentary:["Elderly woman sits in a small kitchen. Morning light from one window. Tea cooling. Hands folded.","Three children plant saplings on a hillside at golden hour. Muddy hands, wide smiles.","A scientist in a dark lab, single monitor light on their face, staring at data. 3am."],
-    musicvideo:["Night. A man on a windowsill, back to camera, face never shown. Ocean outside. Full moon. Guitar in hand.","Empty dance floor. One spotlight. A woman dances alone, eyes closed.","Rain on a window at night. City lights blurred. A figure sits still."],
-    shortfilm:["A child leaves a letter under a door and runs. Morning light in an empty corridor.","Two old friends sit on a park bench in autumn. Neither speaking. Completely present.","A woman votes for the first time. Small wooden box. Morning light."],
-    horror:["Dark corridor. Single flickering bulb at the far end. Something moves in shadow.","An old house at night. Every window dark except one on the top floor.","Deep forest at dusk. Mist between the trees. A figure standing far off, watching."],
-    scifi:["Vast space station interior. Stars visible through a curved window. An astronaut floats alone.","City of the future at night. Towers of glass and light. Flying vehicles. Rain.","An AI terminal glowing blue in a dark room. A scientist reads the output."],
-    romance:["Two people share an umbrella in the rain. Neither wanted to. Neither moves away.","Rooftop at sunset. City below. Two cups of coffee going cold.","Morning light through curtains. Someone asleep. Someone watching with complete tenderness."],
-    thriller:["A woman checks the locks on her door. Three times. Then again.","Empty parking garage. Footsteps echo. A car that was not there before.","A man opens an envelope. Reads it once. Reads it again. Sits very still."],
-    action:["A fighter stands alone in a ring, sweat and bruises, breathing hard.","Car chase through narrow streets at night. Rain on the windscreen.","Rooftop. Two figures face each other. City spread below. Wind."],
-    comedy:["A man tries to assemble furniture. The cat sits on the most important page.","First day of a new job. Wrong building. Wrong floor. Wrong meeting.","Someone attempts to cook a romantic dinner. Everything is slightly on fire."],
-    drama:["A father and grown child sit at opposite ends of a table. Food going cold.","A hospital waiting room at 4am. One person. Fluorescent light.","Graduation day. Parents watching. Their child does not look for them."],
-    animation:["A tiny boat on a vast sea of stars. The sailor does not know they are in space.","A forest where every tree glows from inside. A child walks through it gently.","An old clockmaker winds the last clock. The world outside begins to move again."],
-    historical:["A woman writes a letter by candlelight. 1942. She does not know if it will arrive.","A soldier returns to a village after the war. People he knew are not all there.","A coronation. Thousands watching. One person looks at the others, not the stage."],
-    nature:["Dawn on a mountain lake. Absolute stillness. First light touching the water. A single bird.","Deep ocean. A whale passes slowly below. Silence except for the sea.","A forest in winter. Everything white and still. Then a fox. Then stillness again."],
-  };
-
   const buildPrompt=(sceneDesc,refNote,styleRules)=>{
     const styleName=(RENDER_STYLES[renderStyle]||RENDER_STYLES.photorealistic).label;
     const styleRulesText=styleRules||(RENDER_STYLES[renderStyle]||RENDER_STYLES.photorealistic).rules;
-    const genreObj=genre?FILM_GENRES.find(g=>g.id===genre):null;
+    const genreObj=genre?GENRES.find(g=>g.id===genre):null;
     const genreName=genreObj?genreObj.label+" — "+genreObj.desc:"";
     const jsonTemplate='{\n  "timeOfDay": "night|day|golden|interior|space|underwater",\n  "skyTop": "R,G,B", "skyMid": "R,G,B", "skyBot": "R,G,B",\n  "hasStars": true, "hasOcean": false, "hasForest": false, "hasCity": false,\n  "hasFire": false, "hasRain": false, "hasSnow": false, "hasCandle": false,\n  "hasMoon": true, "isIndoor": false, "isSpace": false, "isUnderwater": false,\n  "wallColor": "R,G,B", "horizonY": 0.54,\n  "gradeR": 30, "gradeG": 15, "gradeB": 0, "gradeA": 0.06,\n  "textOverlay": "", "textY": 0.87, "fireX": 0.5, "fireY": 0.7,\n  "characters": [{"x":0.3,"y":0.6,"facingBack":false,"seated":false,"skinLight":"220,170,120","skinDark":"150,100,65","clothingTop":"60,40,20","clothingBot":"30,20,10","hairColor":"30,20,10","hasGuitar":false}],\n  "candleX": 0.68, "candleY": 0.58\n}';
     return ["You are a cinematographer. Return ONLY valid JSON for this scene.","LOCKED STYLE: "+styleName,styleRulesText,genreName?"GENRE: "+genreName:"","SCENE: "+sceneDesc,refNote||"","Return ONLY this JSON:\n"+jsonTemplate].filter(Boolean).join("\n\n");
@@ -1871,10 +1837,10 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
               <select value={genre} onChange={e=>{setGenre(e.target.value);setShowTemplates(!!e.target.value);}}
                 style={{flex:1,background:"#0a0800",border:`1px solid ${GOLD}`,color:GOLD,padding:"10px 14px",fontSize:13,outline:"none",fontFamily:"'Rajdhani',sans-serif",cursor:"pointer"}}>
                 <option value="">— SELECT A GENRE FOR TEMPLATES —</option>
-                {FILM_GENRES.map(g=><option key={g.id} value={g.id} style={{background:"#000"}}>{g.label} · {g.desc}</option>)}
+                {GENRES.map(g=><option key={g.id} value={g.id} style={{background:"#000"}}>{g.label} · {g.desc}</option>)}
               </select>
             </div>
-            {showTemplates&&genre&&GENRE_TEMPLATES&&GENRE_TEMPLATES[genre]&&(
+            {showTemplates&&genre&&GENRE_TEMPLATES[genre]&&(
               <div style={{background:"#030200",border:`1px solid ${GOLDDIM}`,padding:12}}>
                 <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,marginBottom:8}}>CLICK ANY TEMPLATE TO LOAD IT</div>
                 {GENRE_TEMPLATES[genre].map((tmpl,i)=>(
@@ -3562,7 +3528,7 @@ export default function App() {
 
   // Auto-populate timeline with 13 doc scenes + narration track if empty
   useEffect(()=>{
-    if(Object.keys(timeline).length===0&&typeof DOC_SCENES!=="undefined"&&DOC_SCENES.length>0){
+    if(Object.keys(timeline).length===0){
       const videoClips=DOC_SCENES.map((s,i)=>({
         id:"doc_scene_"+(i+1),
         name:s.title.replace(/[^a-zA-Z0-9]/g,"_")+"_"+s.duration+"s.webm",
