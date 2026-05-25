@@ -15,6 +15,21 @@ const BLACK = "#000000";
 const BG4 = "#080808";
 const WHITE = "#d4c9a8";
 const DIM = "#aaaaaa";
+const G = (v, sm) => ({
+  background: v==="gold" ? `linear-gradient(135deg,${GOLDDIM},${GOLD})` : "transparent",
+  border: v==="gold" ? "none" : `1px solid ${GOLD}`,
+  color: v==="gold" ? "#000" : GOLD,
+  borderRadius:0, fontWeight:900,
+  padding: sm ? "5px 14px" : "10px 26px",
+  fontSize: sm ? 11 : 13,
+  cursor:"pointer", letterSpacing:2, textTransform:"uppercase",
+  fontFamily:"'Rajdhani',sans-serif",
+});
+const Sp = { minHeight:"100vh", background:"#000", color:WHITE, fontFamily:"'Rajdhani',sans-serif", paddingBottom:160, width:"100%", overflowX:"hidden" };
+const H1 = { fontFamily:"'Cinzel',serif", color:GOLD, letterSpacing:5, textTransform:"uppercase", margin:0, fontSize:"clamp(16px,3vw,32px)" };
+const Card = (x) => ({ background:"#0a0a0a", border:`1px solid ${GOLDDIM}`, borderRadius:0, padding:18, ...(x||{}) });
+
+
 const TOTAL = 23;
 
 const STRIPE = {
@@ -1247,20 +1262,6 @@ async function proxyFetch(body){
   });
   return res.json();
 }
-
-const G = (v, sm) => ({
-  background: v==="gold" ? `linear-gradient(135deg,${GOLDDIM},${GOLD})` : "transparent",
-  border: v==="gold" ? "none" : `1px solid ${GOLD}`,
-  color: v==="gold" ? "#000" : GOLD,
-  borderRadius:0, fontWeight:900,
-  padding: sm ? "5px 14px" : "10px 26px",
-  fontSize: sm ? 11 : 13,
-  cursor:"pointer", letterSpacing:2, textTransform:"uppercase",
-  fontFamily:"'Rajdhani',sans-serif",
-});
-const Sp = { minHeight:"100vh", background:"#000", color:WHITE, fontFamily:"'Rajdhani',sans-serif", paddingBottom:160, width:"100%", overflowX:"hidden" };
-const H1 = { fontFamily:"'Cinzel',serif", color:GOLD, letterSpacing:5, textTransform:"uppercase", margin:0, fontSize:"clamp(16px,3vw,32px)" };
-const Card = (x) => ({ background:"#0a0a0a", border:`1px solid ${GOLDDIM}`, borderRadius:0, padding:18, ...(x||{}) });
 
 const STOCK_VOICES = [
   { id:"aurora", name:"Aurora", desc:"Warm British Female", style:"Documentary · Narrator", accent:"British RP" },
