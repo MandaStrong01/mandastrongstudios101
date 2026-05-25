@@ -23,108 +23,6 @@ const STRIPE = {
   studio:"https://buy.stripe.com/fZubJ35BE3B53oHdiyafS02",
 };
 
-async function proxyFetch(body){
-  const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)
-  });
-  return res.json();
-}
-
-const G = (v, sm) => ({
-  background: v==="gold" ? `linear-gradient(135deg,${GOLDDIM},${GOLD})` : "transparent",
-  border: v==="gold" ? "none" : `1px solid ${GOLD}`,
-  color: v==="gold" ? "#000" : GOLD,
-  borderRadius:0, fontWeight:900,
-  padding: sm ? "5px 14px" : "10px 26px",
-  fontSize: sm ? 11 : 13,
-  cursor:"pointer", letterSpacing:2, textTransform:"uppercase",
-  fontFamily:"'Rajdhani',sans-serif",
-});
-const Sp = { minHeight:"100vh", background:BG, color:WHITE, fontFamily:"'Rajdhani',sans-serif", paddingBottom:160, width:"100%", overflowX:"hidden" };
-const H1 = { fontFamily:"'Cinzel',serif", color:GOLD, letterSpacing:5, textTransform:"uppercase", margin:0, fontSize:"clamp(16px,3vw,32px)" };
-const Card = (x) => ({ background:"#0a0a0a", border:`1px solid ${GOLDDIM}`, borderRadius:0, padding:18, ...(x||{}) });
-
-const STOCK_VOICES = [
-  { id:"aurora", name:"Aurora", desc:"Warm British Female", style:"Documentary · Narrator", accent:"British RP" },
-  { id:"marcus", name:"Marcus", desc:"Deep American Male", style:"Cinematic · Authoritative", accent:"American" },
-  { id:"sophia", name:"Sophia", desc:"Bright Australian Female", style:"Upbeat · Engaging", accent:"Australian" },
-  { id:"james",  name:"James",  desc:"Dry British Male", style:"Sarcastic · Witty", accent:"British" },
-  { id:"nova",   name:"Nova",   desc:"Neutral AI Female", style:"Clean · Professional", accent:"Neutral" },
-  { id:"river",  name:"River",  desc:"Warm American Male", style:"Friendly · Intimate", accent:"American South" },
-];
-
-const VOICE_TOOLS = ["Text to Voice","Text to Speech","Text to Narration","Text to Audiobook","Text to Voiceover","AI Voice Actor","Neural Voice Generator","Emotion Voice Synth","Documentary Voice","Trailer Voice Generator","Commercial Voice","Character Voice Creator","Audiobook Creator","Podcast Voice"];
-
-let VOICE_ASSIGNMENTS = {};
-const loadVoiceAssignments = () => {
-  try { VOICE_ASSIGNMENTS = JSON.parse(localStorage.getItem("ms_voice_assign")||"{}"); } catch{}
-};
-if (typeof window !== "undefined") loadVoiceAssignments();
-
-let currentUtterance = null;
-
-function speakText(voiceId, txt, onStart, onEnd) {
-  if (!txt||!txt.trim()) return;
-  window.speechSynthesis.cancel();
-  currentUtterance = null;
-  const clean = txt
-    .replace(/\.\.\.|\.{3}/g," ... ")
-    .replace(/—/g,", ")
-    .replace(/[*\/]/g," ")
-    .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
-    .trim();
-  const doSpeak = () => {
-    const allVoices = window.speechSynthesis.getVoices();
-    const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
-      ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.pitch = voiceChar ? voiceChar.pitch : 1.0;
-    utt.rate  = voiceChar ? voiceChar.rate  : 0.85;
-    utt.volume = 1.0;
-    const assignedName = VOICE_ASSIGNMENTS[voiceId];
-    let picked = null;
-    if(assignedName) picked = allVoices.find(v=>v.name===assignedName);
-    if(!picked && voiceChar){
-      const origin = (voiceChar.origin||"").toLowerCase();
-      const gender = (voiceChar.gender||"").toLowerCase();
-      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm"];
-      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen"];
-      const premiumUSMale   = ["Alex","Tom","Fred","Aaron"];
-      const premiumAussie   = ["Karen","Lee"];
-      const premiumIrish    = ["Moira"];
-      const premiumScottish = ["Fiona"];
-      let candidates = [];
-      if(origin.includes("british")||origin.includes("english"))
-        candidates = gender==="female" ? ["Serena","Tessa","Kate"] : premiumBritish;
-      else if(origin.includes("irish"))    candidates = premiumIrish;
-      else if(origin.includes("scottish")) candidates = premiumScottish;
-      else if(origin.includes("australian")) candidates = premiumAussie;
-      else if(gender==="female") candidates = premiumUSFemale;
-      else candidates = premiumUSMale;
-      for(const name of candidates){
-        picked = allVoices.find(v=>v.name.includes(name));
-        if(picked) break;
-      }
-    }
-    if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
-    if(!picked && allVoices.length) picked = allVoices[0];
-    if(picked) utt.voice = picked;
-    utt.lang = "en-GB";
-    utt.onstart  = ()=>{ currentUtterance=utt; if(onStart) onStart(); };
-    utt.onend    = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
-    utt.onerror  = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
-    window.speechSynthesis.speak(utt);
-  };
-  if(window.speechSynthesis.getVoices().length===0){
-    window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
-  } else { doSpeak(); }
-}
-
-function stopSpeaking() {
-  window.speechSynthesis.cancel();
-  currentUtterance = null;
-}
-
 const WRITING = ["Script to Movie","Text to Script","Script to Screenplay","Prompt to Story","Story to Script","Feature Film Script","Short Film Script","TV Pilot Script","Documentary Script","Commercial Script","YouTube Script","Podcast Script","Social Media Script","Explainer Script","Plot Generator","Story Outline","Three Act Structure","Five Act Structure","Beat Sheet Builder","Character Bio Writer","Character Arc Builder","Subplot Generator","Plot Twist Generator","Opening Hook Creator","Climax Designer","Logline Generator","Synopsis Writer","Treatment Writer","Scene Writer","Text to Dialogue","Dialogue Generator","Narration Writer","Voiceover Script","Interview Script","Action Line Writer","Scene Heading Tool","Parenthetical Generator","Script Formatter","Dialogue Tightener","Script Timer","Word Counter","Page Counter","Reading Time Estimator","Format Checker","Grammar Polish","Spell Checker","Continuity Checker","Plot Hole Detector","Tone Checker","Genre Classifier"];
 const VOICE = ["Upload Own Voice","Record My Voice","Clone My Voice","Text to Voice","Text to Speech","Text to Narration","Text to Audiobook","Text to Voiceover","Voice Cloning","Voice to Voice","AI Voice Actor","Neural Voice Generator","Emotion Voice Synth","Trailer Voice Generator","Documentary Voice","Commercial Voice","Character Voice Creator","Accent Generator","Multi Language Voice","Voice Translator","Lip Sync AI","Dialogue Synth","Audiobook Creator","Podcast Voice","Radio DJ Voice","Sports Commentary Voice","ASMR Creator","Whisper Generator","Meditation Voice","Alien Voice","Deep Voice Generator","Robot Voice","Monster Voice","Child Voice","Elderly Voice","Male to Female Voice","Female to Male Voice","Speed Controller","Tone Adjuster","Pitch Controller","Volume Normalizer","Clarity Booster","Voice Denoiser","Echo Remover","Reverb Remover","Background Noise Remover","Voice EQ Studio"];
 const IMAGE_T = ["Text to Image","Prompt to Image","Image to Image","Image Upscaler","Image Generator","AI Art Generator","Photo to Painting","Sketch to Image","Wireframe to Image","Background Generator","Background Remover","Sky Replacer","Object Remover","Face Generator","Character Design","Portrait Generator","Avatar Creator","Product Image Generator","Architecture Visualizer","Interior Design Generator","Landscape Generator","Abstract Art Generator","Logo Generator","Icon Creator","Texture Generator","Pattern Maker","Color Palette Generator","Style Transfer","Photo Enhancer","Photo Restorer","Old Photo Colorizer","Black & White to Color","Image Denoiser","Sharpness Enhancer","Clarity Booster","Detail Enhancer","HDR Image Creator","Exposure Fixer","White Balance AI","Color Grading Studio","LUT Creator","Tone Mapper","Contrast Adjuster","Brightness Tool","Saturation Engine","Hue Shift","Temperature Control","Vignette Tool"];
@@ -609,7 +507,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           audioCtx = new (window.AudioContext||window.webkitAudioContext)();
           const ab = await audioFile.arrayBuffer();
           const buf = await audioCtx.decodeAudioData(ab);
-          totalDur = (isFinite(buf.duration)&&buf.duration>0)?Math.min(buf.duration,10800):180;
+          totalDur = buf.duration;
           // Energy-based beat detection
           const data = buf.getChannelData(0);
           const sr = buf.sampleRate;
@@ -646,47 +544,154 @@ function MusicVideoStudio({ onClose, onSave }) {
 
       const filmPrompt = `You are the MandaStrong Cinema Engine — the world's most advanced browser-based photorealistic film renderer.
 
-ABSOLUTE PHOTOREALISM RULES — NEVER BREAK:
-- ZERO cartoon outlines. ZERO thick strokes. ZERO cell shading. ZERO flat colour fills.
-- EVERY surface: ctx.createLinearGradient or ctx.createRadialGradient ONLY.
-- SKY: 4-stop minimum linearGradient. Night sky example: grd.addColorStop(0,"rgb(1,2,12)"); grd.addColorStop(0.4,"rgb(4,8,35)"); grd.addColorStop(0.8,"rgb(8,18,55)"); grd.addColorStop(1,"rgb(12,28,75)");
-- STARS: 150+ dots, radius 0.3-1.2, Math.sin(sec*0.7+i)*0.4+0.8 opacity flicker.
-- HUMANS: head = ctx.arc filled with radialGradient rgba(220,170,120,1) to rgba(150,100,65,1). Torso = fillRect with linearGradient. BREATHING = torso height * (1+Math.sin(sec*0.85)*0.007). Hair = bezierCurveTo filled dark brown. Eyes = small ctx.arc filled. ZERO outlines on any body part ever.
-- WATER/OCEAN: 10 wave paths. for(let w=0;w<10;w++){ ctx.beginPath(); for(let x=0;x<=W;x+=4){ ctx.lineTo(x, baseY+Math.sin(x*0.007+sec*(0.2+w*0.06)+w)*18+w*6); } fill with linearGradient navy rgba(2,8,40) to rgba(1,3,18). }
-- MOONLIGHT: narrow vertical shimmer column on water, 12px wide, linearGradient rgba(220,235,255,0.35) fading to transparent top and bottom.
-- ALL LIGHTS: radialGradient only. Moon: rgba(255,255,248,0.9) to rgba(200,220,255,0.3) to rgba(0,0,0,0). Candle: rgba(255,220,80,0.95)*Math.sin(sec*8.3)*0.06 flicker to transparent.
-- PARALLAX: 3 layers. ctx.save();ctx.translate(-t*W*0.012,0); [far bg]; ctx.restore(); ctx.save();ctx.translate(-t*W*0.032,0); [mid]; ctx.restore(); ctx.save();ctx.translate(-t*W*0.068,0); [near]; ctx.restore();
-- POST-PROCESSING — draw LAST in this exact order:
-  1. VIGNETTE: const vg=ctx.createRadialGradient(W/2,H/2,H*0.25,W/2,H/2,H*0.85); vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,0.92)"); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
-  2. LETTERBOX: ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);
-  3. GRAIN: for(let g=0;g<25;g++){ctx.fillStyle="rgba(200,200,200,0.008)";ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
-  4. COLOUR GRADE: ctx.globalAlpha=0.055; ctx.fillStyle="rgba(${config.colorGrade==="Cinematic Teal & Orange"?"0,40,60":"40,20,0"},1)"; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
-  5. FADE IN: if(t<0.05){ctx.fillStyle=\`rgba(0,0,0,\${1-t/0.05})\`;ctx.fillRect(0,0,W,H);}
-  6. FADE OUT: if(t>0.92){ctx.fillStyle=\`rgba(0,0,0,\${(t-0.92)/0.08})\`;ctx.fillRect(0,0,W,H);}
+Write a SINGLE JavaScript function that renders a complete cinematic music video. NO cartoons. NO outlines. NO flat colours. PHOTOREALISTIC gradients only.
 
-Write a SINGLE self-contained JavaScript function:
-function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) { ... }
+SCENE: "${sceneDesc}"
+SONG: "${config.title}" by ${config.artist}
+MOOD: ${config.mood}
+COLOUR GRADE: ${config.colorGrade}
+TOTAL DURATION: ${totalDur.toFixed(0)} seconds
 
-Where:
-- ctx = canvas 2D context
-- W = canvas width (1280), H = canvas height (720)
-- t = progress 0.0 to 1.0
-- sec = elapsed seconds
-- totalSec = total duration seconds
-- beatNow = true on audio beat peaks
+Function signature: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow)
+- t = 0.0 to 1.0 (overall film progress)
+- sec = current second
+- beatNow = true on beat frames
+- W=1280, H=720
 
-SCENE TO RENDER (apply all photorealism rules above):
-${config.visualDesc||"Cinematic night ocean vista. Full moon. Silver moonlight road on water."}
+PHOTOREALISM RULES — NEVER BREAK THESE:
+- NO cartoon outlines. NO thick strokes around shapes. NO cell shading.
+- Every surface built from gradients. Every shape has light side and shadow side.
+- Sky: multi-stop linearGradient matching time of day. Never flat colour.
+- Humans: skin = radialGradient (warm highlight centre, cooler edge). Face has real features.
+- Water/ocean: animated wave layers using Math.sin(x*freq+sec*speed) filled paths. Deep blue-black.
+- Moon: radialGradient white glow. Long silver shimmer column on water below.
+- Candle: radialGradient flicker with Math.sin(sec*9.1)*0.05. Warm amber glow fills room.
+- Room interior: dark walls, floor visible, furniture shapes, lamp glow radialGradients.
+- Silhouette: solid dark shape, NOT an outline — filled ellipses and rects for body parts.
 
-MUSIC CONTEXT:
-Title: ${config.title||"Untitled"}
-Artist: ${config.artist||"Unknown"}
-Genre: ${config.genre||"Cinematic"}
-Mood: ${config.mood||"Melancholic"}
-Style: ${config.videoStyle||"Cinematic Narrative"}
-Grade: ${config.colorGrade||"Cinematic Teal & Orange"}
+FOR THIS SPECIFIC SCENE — DRAW LITERALLY:
+${sceneDesc.includes('windowsill') || sceneDesc.includes('ocean') || sceneDesc.includes('guitar') ? `
+// NIGHT SKY gradient:
+const sky = ctx.createLinearGradient(0,0,0,H*0.55);
+sky.addColorStop(0,'rgb(2,4,15)');
+sky.addColorStop(1,'rgb(8,20,55)');
+ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
 
-IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. No explanation. Start with: function renderFilm(ctx,W,H,t,sec,totalSec,beatNow){`
+// STARS: 180 dots with sin flicker
+for(let s=0;s<180;s++){
+  const sx=(s*137.5)%W, sy=(s*97.3)%H*0.5;
+  ctx.fillStyle='rgba(255,255,255,'+(0.4+Math.sin(sec*0.7+s)*0.3)+')';
+  ctx.fillRect(sx,sy,1,1);
+}
+
+// MOON at upper right:
+const moonX=W*0.72, moonY=H*0.15;
+const mg=ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,H*0.08);
+mg.addColorStop(0,'rgba(255,255,248,0.95)');
+mg.addColorStop(0.5,'rgba(240,240,220,0.6)');
+mg.addColorStop(1,'rgba(200,200,180,0)');
+ctx.fillStyle=mg; ctx.fillRect(moonX-H*0.1,moonY-H*0.1,H*0.2,H*0.2);
+
+// MOONLIGHT SHIMMER on water:
+const shim=ctx.createLinearGradient(moonX-20,H*0.5,moonX+20,H);
+shim.addColorStop(0,'rgba(255,255,220,0)');
+shim.addColorStop(0.4,'rgba(255,255,200,0.15)');
+shim.addColorStop(1,'rgba(255,255,180,0)');
+ctx.fillStyle=shim; ctx.fillRect(moonX-25,H*0.5,50,H*0.5);
+
+// OCEAN: 8 wave layers
+for(let w=0;w<8;w++){
+  const wg=ctx.createLinearGradient(0,H*0.54+w*12,0,H);
+  wg.addColorStop(0,'rgba('+(5+w*3)+','+(15+w*8)+','+(50+w*12)+','+(0.6+w*0.04)+')');
+  wg.addColorStop(1,'rgba(1,3,8,0.95)');
+  ctx.fillStyle=wg;
+  ctx.beginPath(); ctx.moveTo(-10,H);
+  for(let x=0;x<=W+10;x+=4){
+    const y=H*0.58+w*14+Math.sin(x*0.008+sec*(0.3+w*0.08)+w*1.2)*18+Math.sin(x*0.02+sec*0.6+w)*7;
+    x===0?ctx.lineTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();
+}
+
+// ROOM INTERIOR (dark walls behind figure):
+const wall=ctx.createLinearGradient(0,0,0,H*0.6);
+wall.addColorStop(0,'rgba(8,5,3,0.95)');
+wall.addColorStop(1,'rgba(4,2,1,0.98)');
+ctx.fillStyle=wall; ctx.fillRect(0,0,W*0.55,H*0.9);
+
+// WINDOW FRAME:
+const wx=W*0.08, wy=H*0.08, ww=W*0.4, wh=H*0.75;
+ctx.strokeStyle='rgba(60,40,20,0.95)'; ctx.lineWidth=10;
+ctx.strokeRect(wx,wy,ww,wh);
+ctx.beginPath(); ctx.moveTo(wx,wy+wh*0.48); ctx.lineTo(wx+ww,wy+wh*0.48); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(wx+ww*0.5,wy); ctx.lineTo(wx+ww*0.5,wy+wh); ctx.stroke();
+
+// FIGURE ON WINDOWSILL — silhouette, head bowed over guitar:
+const fx=W*0.22, fy=H*0.52;
+ctx.fillStyle='rgba(2,1,1,0.97)';
+// Head bowed forward
+ctx.beginPath(); ctx.ellipse(fx,fy-H*0.13,H*0.038,H*0.042,0.35,0,Math.PI*2); ctx.fill();
+// Torso
+ctx.fillRect(fx-H*0.028,fy-H*0.09,H*0.056,H*0.15);
+// Guitar body
+ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy+H*0.02,H*0.05,H*0.065,0.25,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.ellipse(fx+H*0.07,fy-H*0.04,H*0.04,H*0.05,0.25,0,Math.PI*2); ctx.fill();
+// Guitar neck
+ctx.fillRect(fx+H*0.025,fy-H*0.09,H*0.01,H*0.12);
+// Arm reaching to guitar
+ctx.save(); ctx.strokeStyle='rgba(2,1,1,0.97)'; ctx.lineWidth=H*0.022;
+ctx.beginPath(); ctx.moveTo(fx-H*0.02,fy); ctx.lineTo(fx+H*0.06,fy+H*0.02); ctx.stroke();
+ctx.restore();
+// Legs
+ctx.fillRect(fx-H*0.022,fy+H*0.06,H*0.018,H*0.1);
+ctx.fillRect(fx+H*0.004,fy+H*0.06,H*0.018,H*0.1);
+
+// CANDLE (right side of room):
+const cx2=W*0.68, cy2=H*0.6;
+const flicker=0.9+Math.sin(sec*8.3)*0.07+Math.sin(sec*13.1)*0.04;
+ctx.fillStyle='rgba(235,215,170,0.9)'; ctx.fillRect(cx2-5,cy2,10,32);
+const cf=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,32*flicker);
+cf.addColorStop(0,'rgba(255,255,200,0.95)');
+cf.addColorStop(0.3,'rgba(255,180,40,0.75)');
+cf.addColorStop(1,'rgba(255,100,0,0)');
+ctx.fillStyle=cf; ctx.fillRect(cx2-32,cy2-32,64,64);
+const rg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,W*0.3);
+rg.addColorStop(0,'rgba(255,140,30,0.1)');
+rg.addColorStop(1,'rgba(0,0,0,0)');
+ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+
+// CURTAIN (flowing breeze):
+const ct=sec*0.6;
+ctx.strokeStyle='rgba(160,140,120,0.45)'; ctx.lineWidth=2.5;
+for(let ci=0;ci<2;ci++){
+  const cxb=wx+ww*(ci===0?0.02:0.96);
+  ctx.beginPath(); ctx.moveTo(cxb,wy);
+  ctx.bezierCurveTo(cxb+Math.sin(ct+ci)*22,wy+wh*0.3,cxb+Math.sin(ct+1+ci)*28,wy+wh*0.6,cxb+Math.sin(ct+2+ci)*18,wy+wh);
+  ctx.stroke();
+}
+` : ''}
+
+STRUCTURE — divide by t:
+- t 0.00-0.08: Fade in from black. Title card gold text.
+- t 0.08-0.30: Wide establishing shot. Camera slowly drifts forward.
+- t 0.30-0.55: Close ups — hands on strings, candle flame, curtains, moonlit water.
+- t 0.55-0.75: Pull back wide. Emotional peak. Ocean wider.
+- t 0.75-0.90: Return to figure silhouette. Stillness.
+- t 0.90-1.00: Fade to black. Final title.
+
+ALWAYS END WITH — in this exact order:
+1. Vignette: const vig=ctx.createRadialGradient(W/2,H/2,W*0.08,W/2,H/2,W*0.85); vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.92)'); ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+2. Letterbox: ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H*0.074); ctx.fillRect(0,H*0.926,W,H*0.074);
+3. Grain: for(let g=0;g<25;g++){ctx.fillStyle='rgba(200,200,200,0.007)';ctx.fillRect(Math.random()*W,Math.random()*H,1,1);}
+4. Fade in: if(t<0.05){ctx.fillStyle='rgba(0,0,0,'+(1-t*20)+')';ctx.fillRect(0,0,W,H);}
+5. Fade out: if(t>0.92){ctx.fillStyle='rgba(0,0,0,'+((t-0.92)*12.5)+')';ctx.fillRect(0,0,W,H);}
+
+BEAT RESPONSE: if(beatNow){ctx.save();ctx.translate(W/2,H/2);ctx.scale(1.012,1.012);ctx.translate(-W/2,-H/2);}
+[draw scene]
+if(beatNow){ctx.restore();}
+
+Return ONLY the function starting with exactly:
+function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
 
       const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",
@@ -726,7 +731,7 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-            messages:[{role:"user",content:`Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) that renders a PHOTOREALISTIC cinematic music video. ZERO cartoon outlines. ZERO flat colours. ALL gradients. Photorealistic humans with skin-tone radialGradients. Animated wave layers for ocean. All light sources as radialGradients. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. t=0-1 overall progress. Draw ocean waves, a silhouetted figure on a windowsill with guitar, moonlight, candle glow, dark room. Use acts based on t. Return only the function.`}]})
+            messages:[{role:"user",content:`Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) that renders a cinematic music video. Scene: "${sceneDesc}". Song: ${config.title}. Mood: ${config.mood}. t=0-1 overall progress. Draw ocean waves, a silhouetted figure on a windowsill with guitar, moonlight, candle glow, dark room. Use acts based on t. Return only the function.`}]})
         });
         const sd = await simple.json();
         let sc = sd.content&&sd.content[0]?sd.content[0].text.trim():"";
@@ -781,6 +786,7 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
 
           try{ renderFn(ctx,W,H,t,sec,totalDur,beatNow); }
           catch(e){
+            // Graceful fallback — keep rendering
             const bg=ctx.createLinearGradient(0,0,0,H);
             bg.addColorStop(0,"rgb(2,5,18)");
             bg.addColorStop(1,"rgb(4,8,28)");
@@ -892,7 +898,7 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
   );
 
   const steps = ["🎵 SONG","🎤 STYLE","🎬 SCENE","▶ GENERATE"];
-  const fmt=(s)=>{if(!s||!isFinite(s)||isNaN(s))return "00:00";const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");}
+  const fmt = (s)=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");};
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:1100,background:"rgba(0,0,0,0.98)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -976,19 +982,12 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
                   placeholder="e.g. A man sits alone on a windowsill fingerpicking acoustic guitar. Only his back is visible. Facing the open ocean at night. Full moon low on the water. A single candle burns to his right. The room behind him is empty. A cold couch. A coat still on a hook. He does not move. A man who has lost someone."
                   style={{...inp,height:160,resize:"vertical",lineHeight:1.8,border:`1px solid ${GOLD}`}}
                 />
-                {label("DURATION (MINUTES)")}
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-                  <input type="range" min={1} max={180} step={1}
-                    value={parseInt(config.duration)||3}
-                    onChange={e=>set("duration",e.target.value+" Minutes")}
-                    style={{flex:1,accentColor:GOLD}}/>
-                  <span style={{color:GOLD,fontWeight:900,fontSize:14,minWidth:60}}>{parseInt(config.duration)||3} MIN</span>
-                </div>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                  {[1,3,5,10,30,60,90,120,180].map(d=>(
-                    <button key={d} onClick={()=>set("duration",d+" Minutes")}
-                      style={{background:(parseInt(config.duration)||3)===d?GOLD:"#111",border:`1px solid ${(parseInt(config.duration)||3)===d?"#000":GOLDDIM}`,color:(parseInt(config.duration)||3)===d?"#000":WHITE,padding:"3px 8px",cursor:"pointer",fontSize:10,fontWeight:900}}>
-                      {d}m
+                {label("DURATION")}
+                <div style={{display:"flex",gap:6}}>
+                  {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
+                    <button key={d} onClick={()=>set("duration",d)}
+                      style={{background:config.duration===d?GOLD:"#111",border:`1px solid ${config.duration===d?"#000":GOLDDIM}`,color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
+                      {d}
                     </button>
                   ))}
                 </div>
@@ -1025,7 +1024,7 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
                 )}
                 <div style={{...{background:"#0a0500",border:`1px solid ${GOLDDIM}`,padding:14},marginBottom:14}}>
                   <div style={{color:GOLD,fontSize:11,letterSpacing:2,marginBottom:8,fontWeight:900}}>YOUR MUSIC VIDEO</div>
-                  {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",(parseInt(config.duration)||3)+" minutes"],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
+                  {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",config.duration||"—"],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
                     <div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:`1px solid #0a0800`}}>
                       <span style={{color:GOLDDIM,letterSpacing:2}}>{k}</span>
                       <span style={{color:WHITE,fontWeight:700}}>{v}</span>
@@ -1090,7 +1089,7 @@ IMPORTANT: Return ONLY the JavaScript function code. No markdown. No backticks. 
                         {playing?"⏸":"▶"}
                       </button>
                       <button onClick={()=>videoRef.current&&(videoRef.current.currentTime=Math.min(duration2,videoRef.current.currentTime+10))} style={{background:"none",border:"none",color:GOLDDIM,cursor:"pointer",fontSize:14}}>⏩</button>
-                      <span style={{color:WHITE,fontSize:11,fontFamily:"monospace"}}>{fmt(currentTime)} / {config.duration||"3 Minutes"}</span>
+                      <span style={{color:WHITE,fontSize:11,fontFamily:"monospace"}}>{fmt(currentTime)} / {fmt(duration2)}</span>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{color:GOLDDIM,fontSize:10}}>VOL</span>
@@ -1221,6 +1220,129 @@ const VOICE_CHARACTERS = [
   {id:"atlas",name:"Atlas",emoji:"🌐",gender:"Male",age:"Adult",origin:"Neutral",region:"Epic",style:"Cinematic · Epic · Booming",pitch:0.68,rate:0.76,desc:"The voice of a thousand documentaries."},
   {id:"echo",name:"Echo",emoji:"🔮",gender:"Female",age:"Adult",origin:"Neutral",region:"Ethereal",style:"Ethereal · Dreamy · Otherworldly",pitch:1.22,rate:0.72,desc:"Sounds like it came from somewhere else."},
 ];
+
+
+
+
+const DOC_SCENES = [
+  { title: "AI For Humanity — Opening", prompt: "Vast dark cathedral. Ancient stone arches. Screens lining both walls — caveman with torch, pyramids, clay tablets, moon landing, mobile phone, AI server racks cold blue. Gold title glows centre: HUMANITY FOR FUTURE AI. Camera drifts slowly forward. Film grain. Letterbox bars. Warm gold grade.", duration: 60 },
+  { title: "Who Are These Hairless Apes", prompt: "Mock documentary. Man in animal pelts on rock in cave. Cave paintings behind. Boom mic visible top corner. Deadpan to camera. Subtitle: OTHER TRIBE SUSPICIOUS OF HOW THEY ARRANGE THEIR ROCKS. Hard cut to identical modern news pundit at desk. Same fury. Subtitle: 2025 CE. Amber grade.", duration: 60 },
+  { title: "Why We Built Pyramids and TikTok", prompt: "Split frame. Left: ancient human on golden savanna, hand shielding eyes, scanning horizon. Text: 35,000 BCE. Right: modern man in bed, cold blue phone glow, same tense expression. Text: 2025 CE. Same brain. Different predator. Black bars top and bottom.", duration: 60 },
+  { title: "Fire, Wheels and Wi-Fi", prompt: "Three people crouch in vast dark server room. Cold blue racks to infinity both sides. They huddle around a single warm amber lantern on floor looking at laptop. One points. One nods. One looks like they might cry. Gold grade on three faces only. Everything else cold blue.", duration: 60 },
+  { title: "Gods, Gurus and Groupthink", prompt: "Vast golden landscape. Guru figure speaks to thousands facing away from camera. Ancient deity statue looms in background. Sistine Chapel hands reaching in upper corner. Single silhouette on lit screen before crowd. Text: GODS GURUS AND GROUPTHINK. Belief. Influence. Identity.", duration: 60 },
+  { title: "Love, War and Memes", prompt: "Outdoor jazz festival at golden dusk. Couples on blankets. Strangers dancing. Eyes closed in music. Camera moves slowly through crowd at ground level. Then cut to black. Text: AND WAR. Hold. Text: AND MEMES. Warm amber grade.", duration: 60 },
+  { title: "Oops We Broke the Planet", prompt: "Split frame. Left: vivid coral reef, colour, fish, light shafting. Text: 1980s. Right: same reef bleached bone white, near silent. Text: 2024. Caption: WE KNEW SINCE THE 1970s. Hold ten seconds. Complete silence. No music. No narration.", duration: 60 },
+  { title: "Cash, Crypto and Conundrums", prompt: "Split frame. Left: woman on yacht at golden hour, champagne, total ease. Right: children at hand pump on cracked earth, jerrycans, waiting. Caption: SAME PLANET. SAME YEAR. Hold in complete silence ten full seconds. No music. No narration.", duration: 60 },
+  { title: "Laws, Lies and Liberty", prompt: "Two news presenters back to back at curved studio desk. DEBATE NIGHT on screens. Both talking simultaneously into separate cameras. Neither listening. Camera pulls back to reveal they are at the same desk. Nobody watching. They keep going. Gold and blue grade.", duration: 60 },
+  { title: "Art, Angst and Algorithms", prompt: "Extreme close up. Young child in vast golden concert hall. Eyes wide. Two tears. Not sad. Overwhelmed by something too large and beautiful for words. Orchestra blurred gold behind. Camera still. One tear catches the light. Hold. Warmest gold grade in the film.", duration: 60 },
+  { title: "Ethics, Empathy and Existential Dread", prompt: "Elderly man and woman on weathered park bench. Autumn leaves falling. Hands folded. Neither speaking. Completely present together. They have survived everything. Camera holds wide and still. Warm gold grade. Hold longer than feels comfortable.", duration: 60 },
+  { title: "What We Could've Done Differently", prompt: "A woman places a folded paper into a wooden ballot box. Smiling, eyes wet. Behind her a row of women watch — elderly, young, some with tears, none performing. Morning light from a window. A quiet room. A small wooden box. Everything we should have done sooner. Warm amber.", duration: 60 },
+  { title: "Dear Humans Get It Together", prompt: "Children planting saplings in a deforested hillside at golden hour. Muddy hands, big smiles, getting it wrong, trying again, laughing. Boy closest holds tiny sapling, grins into lens. Camera rises slowly above them as light turns amber. Fade to black. Title: WE MADE YOU TO BE BETTER THAN US. WE REALLY HOPE YOU ARE.", duration: 60 },
+];
+
+
+async function proxyFetch(body){
+  const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)
+  });
+  return res.json();
+}
+
+const G = (v, sm) => ({
+  background: v==="gold" ? `linear-gradient(135deg,${GOLDDIM},${GOLD})` : "transparent",
+  border: v==="gold" ? "none" : `1px solid ${GOLD}`,
+  color: v==="gold" ? "#000" : GOLD,
+  borderRadius:0, fontWeight:900,
+  padding: sm ? "5px 14px" : "10px 26px",
+  fontSize: sm ? 11 : 13,
+  cursor:"pointer", letterSpacing:2, textTransform:"uppercase",
+  fontFamily:"'Rajdhani',sans-serif",
+});
+const Sp = { minHeight:"100vh", background:BG, color:WHITE, fontFamily:"'Rajdhani',sans-serif", paddingBottom:160, width:"100%", overflowX:"hidden" };
+const H1 = { fontFamily:"'Cinzel',serif", color:GOLD, letterSpacing:5, textTransform:"uppercase", margin:0, fontSize:"clamp(16px,3vw,32px)" };
+const Card = (x) => ({ background:"#0a0a0a", border:`1px solid ${GOLDDIM}`, borderRadius:0, padding:18, ...(x||{}) });
+
+const STOCK_VOICES = [
+  { id:"aurora", name:"Aurora", desc:"Warm British Female", style:"Documentary · Narrator", accent:"British RP" },
+  { id:"marcus", name:"Marcus", desc:"Deep American Male", style:"Cinematic · Authoritative", accent:"American" },
+  { id:"sophia", name:"Sophia", desc:"Bright Australian Female", style:"Upbeat · Engaging", accent:"Australian" },
+  { id:"james",  name:"James",  desc:"Dry British Male", style:"Sarcastic · Witty", accent:"British" },
+  { id:"nova",   name:"Nova",   desc:"Neutral AI Female", style:"Clean · Professional", accent:"Neutral" },
+  { id:"river",  name:"River",  desc:"Warm American Male", style:"Friendly · Intimate", accent:"American South" },
+];
+
+const VOICE_TOOLS = ["Text to Voice","Text to Speech","Text to Narration","Text to Audiobook","Text to Voiceover","AI Voice Actor","Neural Voice Generator","Emotion Voice Synth","Documentary Voice","Trailer Voice Generator","Commercial Voice","Character Voice Creator","Audiobook Creator","Podcast Voice"];
+
+let VOICE_ASSIGNMENTS = {};
+const loadVoiceAssignments = () => {
+  try { VOICE_ASSIGNMENTS = JSON.parse(localStorage.getItem("ms_voice_assign")||"{}"); } catch{}
+};
+if (typeof window !== "undefined") loadVoiceAssignments();
+
+let currentUtterance = null;
+
+function speakText(voiceId, txt, onStart, onEnd) {
+  if (!txt||!txt.trim()) return;
+  window.speechSynthesis.cancel();
+  currentUtterance = null;
+  const clean = txt
+    .replace(/\.\.\.|\.{3}/g," ... ")
+    .replace(/—/g,", ")
+    .replace(/[*\/]/g," ")
+    .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
+    .trim();
+  const doSpeak = () => {
+    const allVoices = window.speechSynthesis.getVoices();
+    const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
+      ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.pitch = voiceChar ? voiceChar.pitch : 1.0;
+    utt.rate  = voiceChar ? voiceChar.rate  : 0.85;
+    utt.volume = 1.0;
+    const assignedName = VOICE_ASSIGNMENTS[voiceId];
+    let picked = null;
+    if(assignedName) picked = allVoices.find(v=>v.name===assignedName);
+    if(!picked && voiceChar){
+      const origin = (voiceChar.origin||"").toLowerCase();
+      const gender = (voiceChar.gender||"").toLowerCase();
+      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm"];
+      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen"];
+      const premiumUSMale   = ["Alex","Tom","Fred","Aaron"];
+      const premiumAussie   = ["Karen","Lee"];
+      const premiumIrish    = ["Moira"];
+      const premiumScottish = ["Fiona"];
+      let candidates = [];
+      if(origin.includes("british")||origin.includes("english"))
+        candidates = gender==="female" ? ["Serena","Tessa","Kate"] : premiumBritish;
+      else if(origin.includes("irish"))    candidates = premiumIrish;
+      else if(origin.includes("scottish")) candidates = premiumScottish;
+      else if(origin.includes("australian")) candidates = premiumAussie;
+      else if(gender==="female") candidates = premiumUSFemale;
+      else candidates = premiumUSMale;
+      for(const name of candidates){
+        picked = allVoices.find(v=>v.name.includes(name));
+        if(picked) break;
+      }
+    }
+    if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
+    if(!picked && allVoices.length) picked = allVoices[0];
+    if(picked) utt.voice = picked;
+    utt.lang = "en-GB";
+    utt.onstart  = ()=>{ currentUtterance=utt; if(onStart) onStart(); };
+    utt.onend    = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
+    utt.onerror  = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
+    window.speechSynthesis.speak(utt);
+  };
+  if(window.speechSynthesis.getVoices().length===0){
+    window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
+  } else { doSpeak(); }
+}
+
+function stopSpeaking() {
+  window.speechSynthesis.cancel();
+  currentUtterance = null;
+}
+
 
 function buildChunks(txt) {
   // Split text into sentence-level chunks safe for Web Speech API
@@ -1447,21 +1569,6 @@ const CINEMA_TECHNIQUES = [
 ].join(" | ");
 
 
-const DOC_SCENES = [
-  { title: "AI For Humanity — Opening", prompt: "Vast dark cathedral. Ancient stone arches. Screens lining both walls — caveman with torch, pyramids, clay tablets, moon landing, mobile phone, AI server racks cold blue. Gold title glows centre: HUMANITY FOR FUTURE AI. Camera drifts slowly forward. Film grain. Letterbox bars. Warm gold grade.", duration: 60 },
-  { title: "Who Are These Hairless Apes", prompt: "Mock documentary. Man in animal pelts on rock in cave. Cave paintings behind. Boom mic visible top corner. Deadpan to camera. Subtitle: OTHER TRIBE SUSPICIOUS OF HOW THEY ARRANGE THEIR ROCKS. Hard cut to identical modern news pundit at desk. Same fury. Subtitle: 2025 CE. Amber grade.", duration: 60 },
-  { title: "Why We Built Pyramids and TikTok", prompt: "Split frame. Left: ancient human on golden savanna, hand shielding eyes, scanning horizon. Text: 35,000 BCE. Right: modern man in bed, cold blue phone glow, same tense expression. Text: 2025 CE. Same brain. Different predator. Black bars top and bottom.", duration: 60 },
-  { title: "Fire, Wheels and Wi-Fi", prompt: "Three people crouch in vast dark server room. Cold blue racks to infinity both sides. They huddle around a single warm amber lantern on floor looking at laptop. One points. One nods. One looks like they might cry. Gold grade on three faces only. Everything else cold blue.", duration: 60 },
-  { title: "Gods, Gurus and Groupthink", prompt: "Vast golden landscape. Guru figure speaks to thousands facing away from camera. Ancient deity statue looms in background. Sistine Chapel hands reaching in upper corner. Single silhouette on lit screen before crowd. Text: GODS GURUS AND GROUPTHINK. Belief. Influence. Identity.", duration: 60 },
-  { title: "Love, War and Memes", prompt: "Outdoor jazz festival at golden dusk. Couples on blankets. Strangers dancing. Eyes closed in music. Camera moves slowly through crowd at ground level. Then cut to black. Text: AND WAR. Hold. Text: AND MEMES. Warm amber grade.", duration: 60 },
-  { title: "Oops We Broke the Planet", prompt: "Split frame. Left: vivid coral reef, colour, fish, light shafting. Text: 1980s. Right: same reef bleached bone white, near silent. Text: 2024. Caption: WE KNEW SINCE THE 1970s. Hold ten seconds. Complete silence. No music. No narration.", duration: 60 },
-  { title: "Cash, Crypto and Conundrums", prompt: "Split frame. Left: woman on yacht at golden hour, champagne, total ease. Right: children at hand pump on cracked earth, jerrycans, waiting. Caption: SAME PLANET. SAME YEAR. Hold in complete silence ten full seconds. No music. No narration.", duration: 60 },
-  { title: "Laws, Lies and Liberty", prompt: "Two news presenters back to back at curved studio desk. DEBATE NIGHT on screens. Both talking simultaneously into separate cameras. Neither listening. Camera pulls back to reveal they are at the same desk. Nobody watching. They keep going. Gold and blue grade.", duration: 60 },
-  { title: "Art, Angst and Algorithms", prompt: "Extreme close up. Young child in vast golden concert hall. Eyes wide. Two tears. Not sad. Overwhelmed by something too large and beautiful for words. Orchestra blurred gold behind. Camera still. One tear catches the light. Hold. Warmest gold grade in the film.", duration: 60 },
-  { title: "Ethics, Empathy and Existential Dread", prompt: "Elderly man and woman on weathered park bench. Autumn leaves falling. Hands folded. Neither speaking. Completely present together. They have survived everything. Camera holds wide and still. Warm gold grade. Hold longer than feels comfortable.", duration: 60 },
-  { title: "What We Could've Done Differently", prompt: "A woman places a folded paper into a wooden ballot box. Smiling, eyes wet. Behind her a row of women watch — elderly, young, some with tears, none performing. Morning light from a window. A quiet room. A small wooden box. Everything we should have done sooner. Warm amber.", duration: 60 },
-  { title: "Dear Humans Get It Together", prompt: "Children planting saplings in a deforested hillside at golden hour. Muddy hands, big smiles, getting it wrong, trying again, laughing. Boy closest holds tiny sapling, grins into lens. Camera rises slowly above them as light turns amber. Fade to black. Title: WE MADE YOU TO BE BETTER THAN US. WE REALLY HOPE YOU ARE.", duration: 60 },
-];
 
 function DocRecoveryPanel({ setTitle, setPrompt, setDuration }) {
   const [open, setOpen] = useState(false);
