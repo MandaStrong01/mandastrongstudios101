@@ -2076,21 +2076,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       <div style={{display:"grid",gridTemplateColumns:"1fr 420px",minHeight:"calc(100vh - 120px)"}}>
         <div style={{padding:20,overflowY:"auto"}}>
           <div style={{marginBottom:12}}>
-            <div style={{marginBottom:12}}>
-            <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:5}}>RENDER STYLE</div>
-            <select value={renderStyle} onChange={e=>setRenderStyle(e.target.value)}
-              style={{width:"100%",background:"#0a0800",border:"1px solid "+GOLD,color:GOLD,padding:"9px 12px",fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif",cursor:"pointer"}}>
-              {RENDER_STYLES.map(s=><option key={s.id} value={s.id} style={{background:"#000"}}>{s.label} — {s.desc}</option>)}
-            </select>
-          </div>
-          <div style={{marginBottom:12}}>
-            <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:5}}>GENRE <span style={{color:GOLDDIM,fontWeight:400}}>(optional)</span></div>
-            <select value={genre} onChange={e=>setGenre(e.target.value)}
-              style={{width:"100%",background:"#0a0800",border:"1px solid "+GOLDDIM,color:genre?GOLD:GOLDDIM,padding:"9px 12px",fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif",cursor:"pointer"}}>
-              {FILM_GENRES.map(g=><option key={g.id} value={g.id} style={{background:"#000"}}>{g.label}</option>)}
-            </select>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
             <div>
               <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:5}}>RENDER STYLE</div>
               <select value={renderStyle} onChange={e=>setRenderStyle(e.target.value)}
@@ -2147,29 +2133,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 </div>
               ))}
             </div>
-          </div>
-          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:12,marginBottom:14}}>
-            <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>⬆ UPLOAD REFERENCE IMAGE / VIDEO</div>
-            <div style={{color:DIM,fontSize:10,marginBottom:8}}>Upload a reference and the engine will match its colours, lighting and mood exactly.</div>
-            {refMedia?(
-              <div style={{position:"relative",marginBottom:8}}>
-                {refMediaType==="video"
-                  ?<video src={refMedia} muted playsInline style={{width:"100%",height:80,objectFit:"cover",border:"1px solid "+GOLD}}/>
-                  :<img src={refMedia} alt="ref" style={{width:"100%",height:80,objectFit:"cover",border:"1px solid "+GOLD}}/>}
-                <button onClick={()=>{setRefMedia(null);setRefMediaType("");setRefDataUrl(null);}}
-                  style={{position:"absolute",top:4,right:4,background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"1px 7px",cursor:"pointer",fontSize:10,fontWeight:900}}>✕</button>
-                <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:4}}>✓ REFERENCE LOADED — ENGINE WILL MATCH THIS STYLE</div>
-              </div>
-            ):(
-              <div onClick={()=>refMediaRef.current&&refMediaRef.current.click()}
-                style={{border:`1px dashed ${GOLDDIM}`,padding:"12px",textAlign:"center",cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
-                <div style={{color:WHITE,fontSize:12,fontWeight:700}}>⬆ CLICK TO UPLOAD REFERENCE</div>
-                <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG · PNG · MP4 · WEBM</div>
-              </div>
-            )}
-            <input ref={refMediaRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={handleRefUpload}/>
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
