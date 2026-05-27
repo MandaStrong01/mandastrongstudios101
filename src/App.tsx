@@ -3595,14 +3595,20 @@ function HowToGuide() {
 
 function P23({ go }) {
   const bgRef = useRef(null);
-  useEffect(()=>{if(bgRef.current){bgRef.current.muted=true;bgRef.current.defaultMuted=true;bgRef.current.play().catch(()=>{});}},[]);
+  useEffect(()=>{
+    if(bgRef.current){
+      bgRef.current.muted=true;
+      bgRef.current.defaultMuted=true;
+      bgRef.current.play().catch(()=>{});
+    }
+  },[]);
 
   return(
-    <div style={{...Sp,padding:0}}>
+    <div style={{...Sp,padding:0,background:"#000"}}>
 
-      {/* background.mp4 — top, smooth autoplay */}
+      {/* 1. BACKGROUND.MP4 — smooth, no jump */}
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-        style={{width:"100%",display:"block",objectFit:"cover",background:"#000",maxHeight:"56vw"}}
+        style={{width:"100%",display:"block",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
@@ -3611,34 +3617,35 @@ function P23({ go }) {
       <div style={{padding:"28px 40px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
 
+          {/* 2. TITLE */}
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:20}}>THAT'S ALL FOLKS</h1>
           <div style={{color:WHITE,fontSize:14,letterSpacing:3,marginBottom:28}}>THANK YOU FOR CREATING WITH US</div>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
 
-          {/* THANK YOU LETTER — creators, now and in the future */}
+          {/* 3. THANK YOU LETTER — creators, now and future */}
           <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500",border:"2px solid "+GOLD}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ THANK YOU ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>This platform was built for <strong style={{color:GOLD}}>you</strong> — the creator. Not just the ones creating today, but every creator who comes after. The ones who have not yet found their voice. The ones who have a story the world needs to hear but no studio budget to tell it.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>You now have 600+ AI tools, a full cinema production pipeline, 54 voice characters, and a render engine that outputs in 4K. What you do with that is entirely yours. The technology that was once locked inside major studios now lives in your browser.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>To every creator using this platform today, and every single one who will use it in the future — this was made for you. Keep creating. The world needs your stories. — <strong style={{color:GOLD}}>Amanda</strong></p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>This platform was built for <strong style={{color:GOLD}}>you</strong> — the creator. Not just the ones here today, but every creator who comes after. The ones who have not yet found their voice. The ones with a story the world needs to hear but no studio budget to tell it.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>You now have 600+ AI tools, a full cinema production pipeline, 54 voice characters, and a render engine that outputs in 4K. The technology once locked inside major studios now lives in your browser. What you do with it is entirely yours.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>To every creator using this platform today, and every single one who will discover it in the future — this was made for you. Keep creating. The world needs your stories. — <strong style={{color:GOLD}}>Amanda</strong></p>
           </div>
 
-          {/* MANDASTRONG STUDIO HOW TO USE GUIDE — gold bar, click to expand */}
+          {/* 4. GOLD BAR — MANDASTRONG STUDIO HOW TO USE GUIDE */}
           <HowToGuide/>
 
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",margin:"28px 0"}}/>
 
-          {/* MISSION STATEMENT */}
+          {/* 5. MISSION STATEMENT */}
           <div style={{...Card(),textAlign:"left",marginBottom:24,background:"#030300",border:"1px solid "+GOLDDIM}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:12,textAlign:"center"}}>✦ OUR MISSION ✦</div>
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>MandaStrong Studio was built on one belief: <strong style={{color:GOLD}}>every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>We believe the next great filmmaker is not in Hollywood. They are in a bedroom somewhere, with a story the world needs to hear, and no way to tell it. Until now.</p>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>We believe the next great filmmaker is not in Hollywood. They are in a bedroom somewhere, with a story the world needs to hear and no way to tell it. Until now.</p>
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>Every subscription funds anti-bullying programmes in schools and veterans mental health initiatives. When you create here, you are part of something bigger than a film.</p>
           </div>
 
-          {/* ETSY */}
+          {/* 6. ETSY DONATIONS */}
           <div style={{...Card(),marginBottom:16,background:"#0a0600",border:"1px solid "+GOLDDIM,padding:"14px 20px",textAlign:"center"}}>
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>All proceeds from <strong style={{color:GOLD}}>MandaStrong1.Etsy.com</strong> are donated directly to humanitarian causes — veterans mental health, anti-bullying programmes in schools, and children in need.</p>
           </div>
@@ -3647,6 +3654,7 @@ function P23({ go }) {
             🛍 VISIT MANDASTRONG1.ETSY.COM
           </a>
 
+          {/* 7. HOME + EXIT */}
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
             <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
             <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
