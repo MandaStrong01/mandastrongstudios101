@@ -1952,7 +1952,53 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       if(t>0.92){ctx.fillStyle=`rgba(0,0,0,${(t-0.92)/0.08})`;ctx.fillRect(0,0,W,H);}
     };
 
-    addLog("Photorealistic renderer ready — camera rolling...");
+    // ── DECIDE: built-in or Claude-generated renderer ──────────────
+    // Built-in handles: night/ocean/indoor/city/forest/space/candle/person
+    // Claude handles: everything else, or when user explicitly needs custom
+    const needsClaude = !isNight && !isOcean && !isCity && !isForest && !isSpace && !isIndoor && !hasPerson;
+
+    if(needsClaude) {
+      addLog("Complex scene — Claude writing custom renderer...");
+      setProgress(20);
+      try {
+        const scenePrompt2 = `You are MandaStrong Cinema Engine. Write function drawFn(ctx,W,H,t,sec) for this scene: "${prompt}". Style: ${renderStyle}. Genre: ${genre||"cinematic"}.
+
+RULES — NEVER BREAK:
+- NO cartoon outlines. NO ctx.stroke() on people. NO flat single-colour backgrounds.
+- Every background: createLinearGradient multi-stop.
+- Every person: skin = createRadialGradient warm centre rgba(235,185,135) to cool edge rgba(155,102,65).
+- t=0-1 progress. sec=current second. W=1920 H=1080.
+- End with: vignette radialGradient + letterbox black bars + grain.
+- Fade in t<0.05, fade out t>0.92.
+Return ONLY the function starting with: function drawFn(ctx,W,H,t,sec){`;
+
+        const res2 = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3500,
+            messages:[{role:"user",content:scenePrompt2}]})
+        });
+        const d2 = await res2.json();
+        let code2 = d2.content&&d2.content[0]?d2.content[0].text.trim():"";
+        code2 = code2.replace(/```javascript|```js|```/g,"").trim();
+        const fi2=code2.indexOf("function drawFn");if(fi2>0)code2=code2.slice(fi2);
+        const bo2=code2.indexOf("{");const bc2=code2.lastIndexOf("}");
+        const body2=bo2>=0&&bc2>bo2?code2.slice(bo2+1,bc2):"";
+        const customFn = new Function("ctx","W","H","t","sec",body2);
+        addLog("Custom renderer compiled — camera rolling...");
+        setProgress(28);
+        // Override drawFn with Claude's version
+        const origDraw = drawFn;
+        Object.defineProperty(window,'__msDrawFn',{value:customFn,writable:true,configurable:true});
+        // Use customFn in render loop below
+        (window as any).__msUseCustom = true;
+      } catch(ce) {
+        addLog("Custom renderer failed — using built-in");
+        (window as any).__msUseCustom = false;
+      }
+    } else {
+      addLog("Built-in photorealistic renderer — camera rolling...");
+      (window as any).__msUseCustom = false;
+    }
     setProgress(28);
     try{
 
@@ -1982,7 +2028,8 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
           const sec=frame/fps;
           try{
             ctx.clearRect(0,0,1920,1080);
-            drawFn(ctx,1920,1080,t,sec);
+            const activeDraw = (window as any).__msUseCustom && (window as any).__msDrawFn ? (window as any).__msDrawFn : drawFn;
+            activeDraw(ctx,1920,1080,t,sec);
             // vignette+letterbox applied inside drawFn
             for(let g=0;g<80;g++){
               ctx.fillStyle=`rgba(${Math.random()>0.5?180:20},${Math.random()>0.5?180:20},${Math.random()>0.5?180:20},0.012)`;
@@ -2779,7 +2826,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
     }catch(e){console.warn("DB load failed",e);}
 
     // Fall back to current mediaLib if DB empty
-    const clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
+    let clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
     const audioAsset=getAudioTrack();
     if(clips.length===0){alert("No video clips found. Generate clips on Page 8 first.");return;}
     setRendering(true);setDone(false);setProgress(0);setRenderLog([]);setRenderUrl("");setCurrentClipIdx(-1);
@@ -2865,7 +2912,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       try{
         const freshDB=await getAllClipsFromDB();
         if(freshDB.length>0){
-          let refreshed=clips.map(cl=>{
+          const refreshed=clips.map(cl=>{
             const db=freshDB.find(d=>d.id===cl.dbId||d.id===cl.id||d.name===cl.name);
             if(db&&db.blob){
               return {...cl,file:new File([db.blob],cl.name,{type:db.type||"video/webm"}),url:URL.createObjectURL(db.blob)};
@@ -3597,7 +3644,7 @@ function P23({ go }) {
           <div style={{color:WHITE,fontSize:14,letterSpacing:3,marginBottom:28}}>THANK YOU FOR CREATING WITH US</div>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
 
-          {/* 3. THANK YOU LETTER — creators, now and future */}
+          {/* 3. THANK YOU LETTER */}
           <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500",border:"2px solid "+GOLD}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ THANK YOU ✦</div>
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio.</p>
@@ -3606,7 +3653,7 @@ function P23({ go }) {
             <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>To every creator using this platform today, and every single one who will discover it in the future — this was made for you. Keep creating. The world needs your stories. — <strong style={{color:GOLD}}>Amanda</strong></p>
           </div>
 
-          {/* 4. GOLD BAR — MANDASTRONG STUDIO HOW TO USE GUIDE */}
+          {/* 4. MANDASTRONG STUDIO HOW TO USE GUIDE — gold bar, click to expand */}
           <HowToGuide/>
 
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",margin:"28px 0"}}/>
@@ -3619,7 +3666,7 @@ function P23({ go }) {
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>Every subscription funds anti-bullying programmes in schools and veterans mental health initiatives. When you create here, you are part of something bigger than a film.</p>
           </div>
 
-          {/* 6. ETSY DONATIONS */}
+          {/* 6. ETSY */}
           <div style={{...Card(),marginBottom:16,background:"#0a0600",border:"1px solid "+GOLDDIM,padding:"14px 20px",textAlign:"center"}}>
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>All proceeds from <strong style={{color:GOLD}}>MandaStrong1.Etsy.com</strong> are donated directly to humanitarian causes — veterans mental health, anti-bullying programmes in schools, and children in need.</p>
           </div>
