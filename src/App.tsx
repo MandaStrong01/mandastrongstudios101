@@ -3617,11 +3617,7 @@ function HowToGuide() {
 function P23({ go }) {
   const bgRef = useRef(null);
   useEffect(()=>{
-    if(bgRef.current){
-      bgRef.current.muted=true;
-      bgRef.current.defaultMuted=true;
-      bgRef.current.play().catch(()=>{});
-    }
+    if(bgRef.current){bgRef.current.muted=true;bgRef.current.defaultMuted=true;bgRef.current.play().catch(()=>{});}
   },[]);
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
