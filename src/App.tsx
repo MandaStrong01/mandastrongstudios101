@@ -7,7 +7,15 @@ const openDB=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VER);
 
 function buildChunks(text){const clean=text.replace(/\s+/g," ").trim();const sentences=clean.match(/[^.!?]+[.!?]+[\s]*/g)||[clean];const chunks=[];for(const s of sentences){const trimmed=s.trim();if(trimmed.length>0){const type=trimmed.endsWith("?")?"question":trimmed.endsWith("!")?"exclaim":"sentence";chunks.push({text:trimmed,type});}}return chunks.length>0?chunks:[{text:clean.slice(0,200),type:"sentence"}];}
 
-async function proxyFetch(body){const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});return res.json();}
+async function proxyFetch(body){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),55000);
+  try{
+    const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timeout);
+    return res.json();
+  }catch(e){clearTimeout(timeout);throw e;}
+}
 const saveClipToDB=async(id,blob,name,type)=>{try{const db=await openDB();const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put({id,blob,name,type});await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=j;});}catch(e){console.warn("DB save failed",e);}};
 const loadClipFromDB=async(id)=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).get(id);req.onsuccess=()=>res(req.result);req.onerror=rej;});}catch(e){return null;}};
 const getAllClipsFromDB=async()=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).getAll();req.onsuccess=()=>res(req.result||[]);req.onerror=rej;});}catch(e){return[];}};
@@ -598,7 +606,8 @@ function MusicVideoStudio({ onClose, onSave }) {
 
       // ── BEAT ANALYSIS ─────────────────────────────────────────────
       const durationMap = {"2 Minutes":120,"3 Minutes":180,"4 Minutes":240,"5 Minutes":300};
-      let totalDur = Math.max(30, durationMap[config.duration]||180);
+      let totalDur = Math.max(30, Number(durationMap[config.duration])||180);
+      if(!isFinite(totalDur)||isNaN(totalDur)) totalDur = 180;
       let beatGrid = [];
       let audioCtx = null, audioDest = null, audioSource = null;
 
@@ -1125,12 +1134,15 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                     <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:3}}>✓ REFERENCE LOADED</div>
                   </div>
                 ):(
-                  <div onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f){set("refMedia",URL.createObjectURL(f));}};inp.click();}}
-                    style={{border:`1px dashed ${GOLDDIM}`,padding:"10px",textAlign:"center",cursor:"pointer",marginBottom:10}}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor=GOLDDIM}>
-                    <div style={{color:WHITE,fontSize:12,fontWeight:700}}>⬆ CLICK TO UPLOAD REFERENCE</div>
-                    <div style={{color:DIM,fontSize:10,marginTop:2}}>JPG · PNG · used to match style and mood</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.capture="environment";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                      style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                      📷 UPLOAD PHOTO
+                    </button>
+                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                      style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                      📁 UPLOAD FILE
+                    </button>
                   </div>
                 )}
                 <div style={{...{background:"#0a0500",border:"1px solid "+GOLDDIM,padding:14},marginBottom:14}}>
@@ -1392,6 +1404,10 @@ function P6Voice({ onSave, setMediaLib }) {
 
   const speakNow=(txt)=>{
     window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
+    // iOS Safari fix — keepalive ping every 10s
+    if(/iphone|ipad|ipod/i.test(navigator.userAgent)){
+      const keepAlive=setInterval(()=>{if(window.speechSynthesis.speaking){window.speechSynthesis.pause();window.speechSynthesis.resume();}else{clearInterval(keepAlive);}},9000);
+    }
     const chunks=buildChunks(txt);chunksRef.current=chunks;idxRef.current=0;setSpeaking(true);
     const baseRate=speed*(selected.rate||0.9),basePitch=pitchV*(selected.pitch||1.0);
     const next=()=>{
@@ -1504,42 +1520,9 @@ function P6Voice({ onSave, setMediaLib }) {
     </div>
   );
 }
-
-const CINEMA_TECHNIQUES = [
-  "OCEAN: 10 wave layers. Each: linearGradient deep blue to near black; Math.sin(x*0.007+sec*(0.2+w*0.07)+w)*17 animated path.",
-  "MOON: createRadialGradient rgba(255,255,248,1) centre to transparent. Moonlight shimmer: narrow vertical linearGradient rgba(255,255,235,0.12) column.",
-  "CANDLE: radialGradient flicker Math.sin(sec*9.1)*0.05. Stops: rgba(255,255,195,0.95) to rgba(255,185,42,0.72) to rgba(255,80,0,0.32) to transparent.",
-  "HUMAN FIGURE: head=ellipse skin tone, eyes=ellipses with blink Math.sin(sec*0.4)>0.93, mouth=arc, torso=rect gradient clothing, arms=rects skin.",
-  "BREATHING: const breath=Math.sin(sec*0.9)*0.008; scale torso height by (1+breath).",
-  "NIGHT SKY: linearGradient rgb(2,4,15) to rgb(8,20,55). 200 star dots with sin flicker.",
-  "SUNSET: linearGradient rgb(20,10,40) to rgb(180,50,10) to rgb(255,200,80).",
-  "CITY: 20 building rects, window grids with random lit cells rgba(255,240,180).",
-  "FIRE: 6 overlapping orange radialGradients with Math.sin(sec*3+f) flicker.",
-  "RAIN: 150 angled strokeStyle lines rgba(150,170,200,0.25) moving with sec.",
-  "VIGNETTE: createRadialGradient transparent centre to rgba(0,0,0,0.92) edge.",
-  "LETTERBOX: fillStyle black; fillRect(0,0,W,H*0.074); fillRect(0,H*0.926,W,H*0.074).",
-  "GRAIN: 25 random 1px dots rgba(200,200,200,0.008).",
-  "PARALLAX: ctx.save translate(-t*W*0.015) far, -t*W*0.035 mid, -t*W*0.07 near.",
-  "FADE IN: if(t<0.05) fillStyle rgba(0,0,0,1-t*20) fillRect.",
-  "FADE OUT: if(t>0.92) fillStyle rgba(0,0,0,(t-0.92)*12.5) fillRect.",
-].join(" | ");
+;
 
 
-const DOC_SCENES = [
-  { title: "AI For Humanity — Opening", prompt: "Vast dark cathedral. Ancient stone arches. Screens lining both walls — caveman with torch, pyramids, clay tablets, moon landing, mobile phone, AI server racks cold blue. Gold title glows centre: HUMANITY FOR FUTURE AI. Camera drifts slowly forward. Film grain. Letterbox bars. Warm gold grade.", duration: 60 },
-  { title: "Who Are These Hairless Apes", prompt: "Mock documentary. Man in animal pelts on rock in cave. Cave paintings behind. Boom mic visible top corner. Deadpan to camera. Subtitle: OTHER TRIBE SUSPICIOUS OF HOW THEY ARRANGE THEIR ROCKS. Hard cut to identical modern news pundit at desk. Same fury. Subtitle: 2025 CE. Amber grade.", duration: 60 },
-  { title: "Why We Built Pyramids and TikTok", prompt: "Split frame. Left: ancient human on golden savanna, hand shielding eyes, scanning horizon. Text: 35,000 BCE. Right: modern man in bed, cold blue phone glow, same tense expression. Text: 2025 CE. Same brain. Different predator. Black bars top and bottom.", duration: 60 },
-  { title: "Fire, Wheels and Wi-Fi", prompt: "Three people crouch in vast dark server room. Cold blue racks to infinity both sides. They huddle around a single warm amber lantern on floor looking at laptop. One points. One nods. One looks like they might cry. Gold grade on three faces only. Everything else cold blue.", duration: 60 },
-  { title: "Gods, Gurus and Groupthink", prompt: "Vast golden landscape. Guru figure speaks to thousands facing away from camera. Ancient deity statue looms in background. Sistine Chapel hands reaching in upper corner. Single silhouette on lit screen before crowd. Text: GODS GURUS AND GROUPTHINK. Belief. Influence. Identity.", duration: 60 },
-  { title: "Love, War and Memes", prompt: "Outdoor jazz festival at golden dusk. Couples on blankets. Strangers dancing. Eyes closed in music. Camera moves slowly through crowd at ground level. Then cut to black. Text: AND WAR. Hold. Text: AND MEMES. Warm amber grade.", duration: 60 },
-  { title: "Oops We Broke the Planet", prompt: "Split frame. Left: vivid coral reef, colour, fish, light shafting. Text: 1980s. Right: same reef bleached bone white, near silent. Text: 2024. Caption: WE KNEW SINCE THE 1970s. Hold ten seconds. Complete silence. No music. No narration.", duration: 60 },
-  { title: "Cash, Crypto and Conundrums", prompt: "Split frame. Left: woman on yacht at golden hour, champagne, total ease. Right: children at hand pump on cracked earth, jerrycans, waiting. Caption: SAME PLANET. SAME YEAR. Hold in complete silence ten full seconds. No music. No narration.", duration: 60 },
-  { title: "Laws, Lies and Liberty", prompt: "Two news presenters back to back at curved studio desk. DEBATE NIGHT on screens. Both talking simultaneously into separate cameras. Neither listening. Camera pulls back to reveal they are at the same desk. Nobody watching. They keep going. Gold and blue grade.", duration: 60 },
-  { title: "Art, Angst and Algorithms", prompt: "Extreme close up. Young child in vast golden concert hall. Eyes wide. Two tears. Not sad. Overwhelmed by something too large and beautiful for words. Orchestra blurred gold behind. Camera still. One tear catches the light. Hold. Warmest gold grade in the film.", duration: 60 },
-  { title: "Ethics, Empathy and Existential Dread", prompt: "Elderly man and woman on weathered park bench. Autumn leaves falling. Hands folded. Neither speaking. Completely present together. They have survived everything. Camera holds wide and still. Warm gold grade. Hold longer than feels comfortable.", duration: 60 },
-  { title: "What We Could've Done Differently", prompt: "A woman places a folded paper into a wooden ballot box. Smiling, eyes wet. Behind her a row of women watch — elderly, young, some with tears, none performing. Morning light from a window. A quiet room. A small wooden box. Everything we should have done sooner. Warm amber.", duration: 60 },
-  { title: "Dear Humans Get It Together", prompt: "Children planting saplings in a deforested hillside at golden hour. Muddy hands, big smiles, getting it wrong, trying again, laughing. Boy closest holds tiny sapling, grins into lens. Camera rises slowly above them as light turns amber. Fade to black. Title: WE MADE YOU TO BE BETTER THAN US. WE REALLY HOPE YOU ARE.", duration: 60 },
-];
 
 function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const canvasRef=useRef(null);
@@ -2000,10 +1983,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
           try{
             ctx.clearRect(0,0,1920,1080);
             drawFn(ctx,1920,1080,t,sec);
-            const vig=ctx.createRadialGradient(960,540,200,960,540,1100);
-            vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.85)");
-            ctx.fillStyle=vig;ctx.fillRect(0,0,1920,1080);
-            ctx.fillStyle="#000";ctx.fillRect(0,0,1920,78);ctx.fillRect(0,1002,1920,78);
+            // vignette+letterbox applied inside drawFn
             for(let g=0;g<80;g++){
               ctx.fillStyle=`rgba(${Math.random()>0.5?180:20},${Math.random()>0.5?180:20},${Math.random()>0.5?180:20},0.012)`;
               ctx.fillRect(Math.random()*1920,Math.random()*1080,1,1);
@@ -2046,7 +2026,14 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
         addLog("✓ Saved to media library");
       }catch(e){}
 
-      setTimeout(()=>{if(videoRef.current){videoRef.current.src=url;videoRef.current.load();videoRef.current.play().catch(()=>{});}},300);
+      setTimeout(()=>{
+        if(videoRef.current){
+          videoRef.current.src=url;
+          videoRef.current.load();
+          videoRef.current.muted=false;
+          videoRef.current.play().catch(()=>{});
+        }
+      },500);
 
     }catch(e){addLog("Error: "+e.message);}
     setGenerating(false);
@@ -2108,6 +2095,16 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 <div style={{color:DIM,fontSize:10,marginTop:1}}>JPG · PNG · MP4</div>
               </div>
             )}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:6}}>
+              <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.capture="environment";i.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefMedia(URL.createObjectURL(f));const reader=new FileReader();reader.onload=ev=>setRefDataUrl(ev.target.result);reader.readAsDataURL(f);};i.click();}}
+                style={{background:"#0a0800",border:"1px solid "+GOLD,color:GOLD,padding:"8px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                📷 UPLOAD PHOTO
+              </button>
+              <button onClick={()=>refMediaRef.current&&refMediaRef.current.click()}
+                style={{background:"#0a0800",border:"1px solid "+GOLDDIM,color:WHITE,padding:"8px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                📁 UPLOAD FILE
+              </button>
+            </div>
             <input ref={refMediaRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefMedia(URL.createObjectURL(f));const reader=new FileReader();reader.onload=ev=>setRefDataUrl(ev.target.result);reader.readAsDataURL(f);}}/>
           </div>
           <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>SCENE TITLE</div>
@@ -2395,10 +2392,16 @@ function P3() {
 
               {/* Upload button */}
               {!uploads[i]?(
-                <button onClick={()=>refs[i].current&&refs[i].current.click()}
-                  style={{...G("gold",false),width:"100%",padding:"10px",fontSize:11,letterSpacing:2}}>
-                  ⬆ UPLOAD FILM
-                </button>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  <button onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*,video/*";inp2.capture="environment";inp2.onchange=e=>handleFile(i,e);inp2.click();}}
+                    style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                    📷 PHOTO
+                  </button>
+                  <button onClick={()=>refs[i].current&&refs[i].current.click()}
+                    style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                    📁 FILE
+                  </button>
+                </div>
               ):(
                 <div>
                   <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginBottom:6}}>✓ {uploads[i].name.slice(0,28)} · {uploads[i].size}MB</div>
@@ -2521,11 +2524,19 @@ function P11({ mediaLib, setMediaLib }) {
         <div onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;}}
           onDragLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;}}
           onDrop={e=>{e.preventDefault();onFiles(e.dataTransfer.files);e.currentTarget.style.borderColor=GOLDDIM;}}
-          onClick={()=>fileRef.current&&fileRef.current.click()}
-          style={{border:`2px dashed ${GOLDDIM}`,padding:"50px 40px",textAlign:"center",cursor:"pointer",marginBottom:16}}>
+          style={{border:`2px dashed ${GOLDDIM}`,padding:"30px 40px",textAlign:"center",marginBottom:12}}>
           <div style={{fontSize:36,marginBottom:10}}>🎬</div>
-          <div style={{color:WHITE,fontWeight:900,fontSize:16,letterSpacing:3}}>DRAG & DROP YOUR MEDIA HERE</div>
-          <div style={{color:WHITE,fontSize:13,marginTop:8,letterSpacing:1}}>Or click to browse · Video · Audio · Images</div>
+          <div style={{color:WHITE,fontWeight:900,fontSize:16,letterSpacing:3,marginBottom:16}}>DRAG & DROP YOUR MEDIA HERE</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,maxWidth:360,margin:"0 auto"}}>
+            <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*,video/*";i.capture="environment";i.multiple=true;i.onchange=e=>onFiles(e.target.files);i.click();}}
+              style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+              📷 UPLOAD PHOTOS
+            </button>
+            <button onClick={()=>fileRef.current&&fileRef.current.click()}
+              style={{background:"#0a0a0a",border:"2px solid "+GOLDDIM,color:WHITE,padding:"14px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+              📁 UPLOAD FILES
+            </button>
+          </div>
         </div>
         {mediaLib.length>0&&(
           <div>
@@ -2595,8 +2606,8 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
           <button onClick={()=>setTracks(p=>[...p,`TRACK ${p.length+1}`])} style={{...G("out",true)}}>+ ADD TRACK</button>
           <button onClick={()=>{
             // Auto-populate tracks from media library and sync
-            const videoAssets=mediaLib.filter(a=>a.type&&a.type.startsWith("video"));
-            const audioAssets=mediaLib.filter(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
+            const videoAssets=mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||a.type.includes("webm")));
+            const audioAssets=mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type.includes("webm")&&!a.type.startsWith("video")));
             const newTl={};
             if(videoAssets.length>0)newTl[0]=videoAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));
             if(audioAssets.length>0)newTl[1]=audioAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));
@@ -2854,7 +2865,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       try{
         const freshDB=await getAllClipsFromDB();
         if(freshDB.length>0){
-          clips=clips.map(cl=>{
+          let refreshed=clips.map(cl=>{
             const db=freshDB.find(d=>d.id===cl.dbId||d.id===cl.id||d.name===cl.name);
             if(db&&db.blob){
               return {...cl,file:new File([db.blob],cl.name,{type:db.type||"video/webm"}),url:URL.createObjectURL(db.blob)};
