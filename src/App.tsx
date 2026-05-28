@@ -1135,7 +1135,7 @@ function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {`;
                   </div>
                 ):(
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
-                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.capture="environment";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
                       style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                       📷 UPLOAD PHOTO
                     </button>
@@ -2440,7 +2440,7 @@ function P3() {
               {/* Upload button */}
               {!uploads[i]?(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  <button onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*,video/*";inp2.capture="environment";inp2.onchange=e=>handleFile(i,e);inp2.click();}}
+                  <button onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*,video/*";inp2.onchange=e=>handleFile(i,e);inp2.click();}}
                     style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                     📷 PHOTO
                   </button>
