@@ -647,60 +647,187 @@ function MusicVideoStudio({ onClose, onSave }) {
       }
       setRenderProgress(10);
 
-      // ── CLAUDE WRITES THE ENTIRE FILM AS ONE RENDERER ─────────────
-      // One function. All scenes. Seamless transitions. Beat responsive.
-      addLog("Claude is writing your film renderer...");
+      // ── BUILT-IN RENDERER (NO PROXY) ─────────────
+      addLog("MandaStrong Engine — built-in renderer ready");
+      const pr = sceneDesc.toLowerCase();
+      const isNight = /night|dark|moon|evening|dusk/.test(pr);
+      const isGolden = /golden|sunset|sunrise|amber/.test(pr);
+      const isOcean = /ocean|sea|water|wave|shore|coast/.test(pr);
+      const isCity = /city|urban|street|skyline|neon/.test(pr);
+      const isSpace = /space|star|galaxy|planet|cosmos/.test(pr);
+      const isIndoor = /room|interior|inside|window|wall/.test(pr);
+      const isRain = /rain|storm|wet|drizzle/.test(pr);
+      const isFog = /fog|mist|haze|smoke/.test(pr);
+      const hasPerson = /woman|man|person|figure|human/.test(pr);
+      const hasCandle = /candle|flame|fire|torch/.test(pr);
+      const hasGuitar = /guitar|musician|fingerpick/.test(pr);
+      const isSilhouette = /silhouette|back to camera|facing away/.test(pr);
 
-      const filmPrompt = "You are MandaStrong Cinema Engine — photorealistic film renderer, better than Runway and Leonardo.\n\nWrite function renderFilm(ctx,W,H,t,sec,totalSec,beatNow) for this music video.\nSCENE: "+JSON.stringify(sceneDesc)+"\nSONG: "+config.title+" by "+config.artist+"\nMOOD: "+config.mood+"\nCOLOUR: "+config.colorGrade+"\nDURATION: "+totalDur.toFixed(0)+" seconds\nW=1280 H=720. t=0-1. beatNow=true on beats.\n\nABSOLUTE RULES: NO outlines, NO ctx.stroke on people, NO flat backgrounds. Gradients everywhere. Real skin tones. Stars flicker. Ocean waves animate. Candle flickers. Vignette+letterbox+grain every frame. Fade in t<0.05 fade out t>0.92.\n\nReturn ONLY: function renderFilm(ctx, W, H, t, sec, totalSec, beatNow) {";
-
-      const res = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:filmPrompt}]})
-      });
-      const d = await res.json();
-      if(d.error){addLog("Error: "+d.error.message);setGenerating(false);return;}
-
-      let code = d.content&&d.content[0]?d.content[0].text.trim():"";
-      const bt=String.fromCharCode(96,96,96);
-      code = code.replace(new RegExp(bt+"javascript|"+bt+"js|"+bt,"g"),"").trim();
-      const fi = code.indexOf("function renderFilm"); if(fi>0)code=code.slice(fi);
-      const fnStart=code.indexOf("function renderFilm");
-      if(fnStart>0)code=code.slice(fnStart);
-      // Strip function wrapper safely
-      const braceOpen=code.indexOf("{");
-      const braceClose=code.lastIndexOf("}");
-      const body=braceOpen>0&&braceClose>braceOpen?code.slice(braceOpen+1,braceClose):"";
-
-      // Clean generated code before compiling
-      code = code.replace(new RegExp(bt+"javascript|"+bt+"js|"+bt,"g"),"").trim();
-      if(code.indexOf("function renderFilm")>0)code=code.slice(code.indexOf("function renderFilm"));
-      // Strip template literals that break Function constructor
-      code = code.replace(new RegExp(bt+"[^"+bt+"]*"+bt,"g"),function(m){return JSON.stringify(m.slice(1,-1));});
-      let renderFn = null;
-      try{
-        const braceOpen=code.indexOf("{");
-        const braceClose=code.lastIndexOf("}");
-        const body=braceOpen>0&&braceClose>braceOpen?code.slice(braceOpen+1,braceClose):"";
-        renderFn = new Function("ctx","W","H","t","sec","totalSec","beatNow",body);
-        addLog("Film renderer compiled — "+Math.round(body.length/1000)+"kb of cinema code");
-      }catch(e){
-        addLog("Compile error: "+e.message+". Retrying...");
-        // Retry with simpler prompt
-        const simple = await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-            messages:[{role:"user",content:"Write function renderFilm(ctx,W,H,t,sec,totalSec,beatNow). Scene: "+sceneDesc+". Mood: "+config.mood+". Photorealistic gradients only, no cartoons, no outlines. t=0-1. Return only the function."}]})
-        });
-        const sd = await simple.json();
-        let sc = sd.content&&sd.content[0]?sd.content[0].text.trim():"";
-        sc = sc.replace(new RegExp(bt+"javascript|"+bt+"js|"+bt,"g"),"").trim();
-        const sfi = sc.indexOf("function renderFilm"); if(sfi>0)sc=sc.slice(sfi);
-        const sb = sc.replace(/^function renderFilm\s*\([^)]*\)\s*\{/,"").replace(/\}$/,"");
-        try{ renderFn = new Function("ctx","W","H","t","sec","totalSec","beatNow",sb); addLog("Retry compiled"); }
-        catch(e2){ addLog("Fatal: "+e2.message); setGenerating(false); return; }
-      }
+      const renderFn = (ctx, W, H, t, sec, totalSec, beatNow) => {
+        const pulse = beatNow ? 1.02 : 1.0;
+        ctx.save();
+        ctx.translate(W/2, H/2);
+        ctx.scale(pulse + t*0.04, pulse + t*0.04);
+        ctx.translate(-W/2, -H/2);
+        // SKY
+        if(isSpace){
+          const sky=ctx.createLinearGradient(0,0,0,H);
+          sky.addColorStop(0,"rgb(1,1,8)"); sky.addColorStop(1,"rgb(3,3,18)");
+          ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+          for(let s=0;s<300;s++){
+            const sx=(s*137.5)%W, sy=(s*97.3)%H;
+            ctx.fillStyle="rgba(240,245,255,"+(0.3+Math.sin(sec*0.7+s)*0.28)+")";
+            ctx.fillRect(sx,sy,s%5===0?1.8:0.8,s%5===0?1.8:0.8);
+          }
+        } else if(isNight){
+          const sky=ctx.createLinearGradient(0,0,0,H*0.62);
+          sky.addColorStop(0,"rgb(2,4,15)");
+          sky.addColorStop(0.5,"rgb(5,10,32)");
+          sky.addColorStop(1,"rgb(8,18,50)");
+          ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+          for(let s=0;s<200;s++){
+            const sx=(s*137.5)%W, sy=(s*97.3)%(H*0.55);
+            ctx.fillStyle="rgba(240,245,255,"+(0.3+Math.sin(sec*0.5+s*0.3)*0.22)+")";
+            ctx.fillRect(sx,sy,s%4===0?1.4:0.7,s%4===0?1.4:0.7);
+          }
+          const mx=W*0.78, my=H*0.13;
+          const mg=ctx.createRadialGradient(mx,my,0,mx,my,H*0.078);
+          mg.addColorStop(0,"rgba(255,255,248,0.96)");
+          mg.addColorStop(1,"rgba(200,200,180,0)");
+          ctx.fillStyle=mg; ctx.fillRect(mx-H*0.09,my-H*0.09,H*0.18,H*0.18);
+        } else if(isGolden){
+          const sky=ctx.createLinearGradient(0,0,0,H*0.66);
+          sky.addColorStop(0,"rgb(18,10,35)");
+          sky.addColorStop(0.3,"rgb(165,50,12)");
+          sky.addColorStop(0.65,"rgb(248,135,28)");
+          sky.addColorStop(1,"rgb(255,205,75)");
+          ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+        } else {
+          const sky=ctx.createLinearGradient(0,0,0,H*0.6);
+          sky.addColorStop(0,"rgb(28,60,140)");
+          sky.addColorStop(1,"rgb(180,210,240)");
+          ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+        }
+        const horizY = isIndoor ? H : H*0.56;
+        // OCEAN
+        if(isOcean && !isIndoor){
+          for(let w=0;w<10;w++){
+            const wg=ctx.createLinearGradient(0,horizY+w*13,0,H);
+            const d=isNight?[2+w*2,8+w*6,30+w*10]:[0+w*3,55+w*12,115+w*10];
+            wg.addColorStop(0,"rgba("+d[0]+","+d[1]+","+d[2]+","+(0.7+w*0.03)+")");
+            wg.addColorStop(1,"rgba(1,3,8,0.98)");
+            ctx.fillStyle=wg;
+            ctx.beginPath(); ctx.moveTo(-10,H);
+            for(let x=0;x<=W+10;x+=3){
+              const y=horizY+w*14+Math.sin(x*0.007+sec*(0.24+w*0.07)+w*1.3)*17;
+              ctx.lineTo(x,y);
+            }
+            ctx.lineTo(W+10,H); ctx.closePath(); ctx.fill();
+          }
+        }
+        // CITY
+        if(isCity && !isIndoor){
+          const grd=ctx.createLinearGradient(0,horizY,0,H);
+          grd.addColorStop(0,"rgb(16,16,20)"); grd.addColorStop(1,"rgb(8,8,10)");
+          ctx.fillStyle=grd; ctx.fillRect(0,horizY,W,H-horizY);
+          for(let b=0;b<18;b++){
+            const bx=(b*151)%W, bh=H*0.15+((b*97)%H)*0.35, bw=W*0.035;
+            ctx.fillStyle=isNight?"rgb(10,10,18)":"rgb(75,80,90)";
+            ctx.fillRect(bx,horizY-bh,bw,bh);
+            for(let wy=0;wy<Math.floor(bh/18);wy++){
+              for(let wx=0;wx<Math.floor(bw/10);wx++){
+                if(Math.sin(b*13+wy*7+wx*11)>0.1){
+                  const lit=Math.sin(sec*0.3+b+wy)>-0.3;
+                  ctx.fillStyle=lit?"rgba(255,240,180,0.88)":"rgba(20,20,28,0.5)";
+                  ctx.fillRect(bx+wx*10+2,horizY-bh+wy*18+4,7,10);
+                }
+              }
+            }
+          }
+        }
+        // INDOOR
+        if(isIndoor){
+          const wall=ctx.createLinearGradient(0,0,W,H);
+          wall.addColorStop(0,"rgb(9,6,3)"); wall.addColorStop(1,"rgb(4,3,2)");
+          ctx.fillStyle=wall; ctx.fillRect(0,0,W,H);
+          const fl=ctx.createLinearGradient(0,H*0.65,0,H);
+          fl.addColorStop(0,"rgb(18,12,7)"); fl.addColorStop(1,"rgb(7,5,3)");
+          ctx.fillStyle=fl; ctx.fillRect(0,H*0.65,W,H*0.35);
+          const wox=W*0.12, woy=H*0.05, wow=W*0.46, woh=H*0.74;
+          if(isNight){
+            const ws=ctx.createLinearGradient(wox,woy,wox,woy+woh);
+            ws.addColorStop(0,"rgb(2,4,15)"); ws.addColorStop(1,"rgb(6,14,42)");
+            ctx.fillStyle=ws; ctx.fillRect(wox,woy,wow,woh);
+            if(isOcean){
+              for(let w=0;w<6;w++){
+                const wg2=ctx.createLinearGradient(0,woy+woh*0.55+w*8,0,woy+woh);
+                wg2.addColorStop(0,"rgba(2,8,35,0.9)");
+                wg2.addColorStop(1,"rgba(1,3,12,0.98)");
+                ctx.fillStyle=wg2;
+                ctx.beginPath(); ctx.moveTo(wox,woy+woh);
+                for(let x=wox;x<=wox+wow;x+=3){
+                  const y=woy+woh*0.58+w*10+Math.sin(x*0.01+sec*(0.2+w*0.07)+w)*10;
+                  ctx.lineTo(x,y);
+                }
+                ctx.lineTo(wox+wow,woy+woh); ctx.closePath(); ctx.fill();
+              }
+            }
+          }
+          ctx.strokeStyle="rgba(48,32,16,0.92)"; ctx.lineWidth=10;
+          ctx.strokeRect(wox,woy,wow,woh);
+        }
+        // CANDLE
+        if(hasCandle){
+          const candX=isIndoor?W*0.7:W*0.5, candY=isIndoor?H*0.58:H*0.5;
+          const flicker=0.88+Math.sin(sec*8.8)*0.07+Math.sin(sec*13.4)*0.04;
+          ctx.fillStyle="rgba(232,212,162,0.9)"; ctx.fillRect(candX-5,candY,10,32);
+          const cf=ctx.createRadialGradient(candX,candY,0,candX,candY,H*0.13*flicker);
+          cf.addColorStop(0,"rgba(255,255,200,0.95)");
+          cf.addColorStop(0.18,"rgba(255,180,40,0.72)");
+          cf.addColorStop(0.5,"rgba(255,100,8,0.3)");
+          cf.addColorStop(1,"rgba(255,60,0,0)");
+          ctx.fillStyle=cf; ctx.fillRect(candX-H*0.13,candY-H*0.13,H*0.26,H*0.26);
+        }
+        // PERSON
+        if(hasPerson){
+          const isSeated=/sit|bench|windowsill|chair/.test(pr);
+          const fx=isOcean&&isIndoor?W*0.22:W*0.4;
+          const fy=isSeated?H*0.52:H*0.44;
+          const breath=Math.sin(sec*0.88)*0.007;
+          if(isSilhouette){
+            ctx.fillStyle="rgba(2,1,1,0.97)";
+            ctx.beginPath();ctx.ellipse(fx,fy-H*0.13,H*0.036,H*0.044,0,0,Math.PI*2);ctx.fill();
+            ctx.fillRect(fx-H*0.028,fy-H*0.09,H*0.056,H*(0.15+breath*2));
+            if(hasGuitar){
+              ctx.beginPath();ctx.ellipse(fx+H*0.072,fy+H*0.02,H*0.05,H*0.064,0.22,0,Math.PI*2);ctx.fill();
+              ctx.fillRect(fx+H*0.026,fy-H*0.09,H*0.011,H*0.12);
+            }
+          } else {
+            const hg=ctx.createRadialGradient(fx-H*0.008,fy-H*0.145,0,fx,fy-H*0.13,H*0.042);
+            hg.addColorStop(0,"rgba(235,185,135,1)");
+            hg.addColorStop(1,"rgba(155,102,65,1)");
+            ctx.fillStyle=hg;
+            ctx.beginPath();ctx.ellipse(fx,fy-H*0.13,H*0.034,H*0.042,0,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle="rgba(28,18,10,0.97)";
+            ctx.fillRect(fx-H*0.03,fy-H*0.09,H*0.06,H*0.17);
+          }
+        }
+        if(isRain){
+          for(let r=0;r<120;r++){
+            const rx=(r*137+sec*200)%W, ry=(r*97+sec*450)%H;
+            ctx.strokeStyle="rgba(155,175,210,0.2)"; ctx.lineWidth=0.8;
+            ctx.beginPath(); ctx.moveTo(rx,ry); ctx.lineTo(rx-4,ry+18); ctx.stroke();
+          }
+        }
+        if(isFog){
+          const fog=ctx.createLinearGradient(0,H*0.38,0,H*0.72);
+          fog.addColorStop(0,"rgba(175,180,175,0)");
+          fog.addColorStop(0.5,"rgba(155,160,155,"+(0.1+Math.sin(sec*0.28)*0.04)+")");
+          fog.addColorStop(1,"rgba(138,142,138,0)");
+          ctx.fillStyle=fog; ctx.fillRect(0,H*0.38,W,H*0.34);
+        }
+        ctx.restore();
+      };
 
       setRenderProgress(30);
       addLog("Rendering "+totalDur.toFixed(0)+"s film at 12fps...");
