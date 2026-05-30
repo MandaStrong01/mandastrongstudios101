@@ -1561,6 +1561,54 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     addLog("MandaStrong Engine v2 — Cinema-grade renderer initialising...");
     setProgress(5);
 
+    // ════════════════════════════════════════════════════════════════
+    // CLAUDE-WRITTEN PER-SCENE RENDERER (Photorealistic depth)
+    // Claude analyses the prompt and writes a custom canvas function
+    // tuned to render THIS specific scene. Falls back to v2 engine if fail.
+    // ════════════════════════════════════════════════════════════════
+    let claudeRenderer = null;
+    try {
+      addLog("Claude is writing a custom renderer for your scene...");
+      setProgress(8);
+      const styleNote = renderStyle === "photorealistic" ? "photorealistic with real-world lighting and depth"
+                      : renderStyle === "cinematic" ? "cinematic teal-orange grade, anamorphic feel"
+                      : renderStyle === "noir" ? "black and white, high contrast film noir"
+                      : renderStyle === "golden" ? "golden hour warmth, rich amber light"
+                      : renderStyle === "scifi" ? "blue-tinted sci-fi with deep blacks"
+                      : renderStyle === "horror" ? "desaturated greens, deep shadows, unease"
+                      : renderStyle === "documentary" ? "naturalistic documentary look"
+                      : "stylised";
+      const claudePrompt = "You are writing a canvas2d render function for a "+duration+"-second cinematic video. Scene: \""+prompt+"\". Style: "+styleNote+". \n\nWrite ONLY a function called drawFrame(ctx, W, H, t, sec) where t is 0-1 progress and sec is current seconds. The function must produce PHOTOREALISTIC output using these techniques:\n- Multiple gradient layers for depth (sky has 5+ stops, ground has 3+ stops)\n- Multi-layer parallax for distance falloff\n- Volumetric lighting (radial gradients for any light source)\n- Atmospheric haze (subtle layers between distance planes)\n- Subsurface scattering on figures (radial face gradients with skin shadow tones)\n- Procedural environment-specific detail (water with 12 wave layers, foliage with depth gradients, city with window light variation per building)\n- Camera motion: subtle push-in (1+t*0.05) and drift (sin(sec*0.08))\n- Per-frame variation so each frame is different\n- Film grain (35 dots/frame), letterbox (7.2% top/bottom), vignette\n- For people: detailed anatomy with skin gradients, hair, eye blinks (sin(sec*0.35)>0.93), mouth, shoulders, arms with rotation, hands, breathing animation (sin(sec*0.9)*0.008)\n\nRules: Only use ctx (CanvasRenderingContext2D), W, H, t, sec, Math. No external resources. No images. No fonts beyond Arial. Output a SINGLE function declaration only, no markdown fences, no explanation. The function should be 200-400 lines of dense rendering code tuned specifically for THIS scene description.";
+      const res = await proxyFetch({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8000,
+        messages: [{role: "user", content: claudePrompt}]
+      });
+      let code = res && res.content && res.content[0] ? res.content[0].text.trim() : "";
+      // Strip markdown fences
+      code = code.replace(/^```(?:javascript|js)?/gm, "").replace(/```$/gm, "").trim();
+      // Extract function body
+      const fi = code.indexOf("function drawFrame");
+      if (fi >= 0) code = code.slice(fi);
+      const bo = code.indexOf("{");
+      const bc = code.lastIndexOf("}");
+      if (bo > 0 && bc > bo) {
+        const body = code.slice(bo+1, bc);
+        // Compile the function
+        claudeRenderer = new Function("ctx", "W", "H", "t", "sec", body);
+        // Test-run on a small canvas to make sure it doesn't throw
+        const testCanvas = document.createElement("canvas");
+        testCanvas.width = 200; testCanvas.height = 112;
+        claudeRenderer(testCanvas.getContext("2d"), 200, 112, 0.5, duration*0.5);
+        addLog("✓ Claude renderer compiled and verified — photorealistic mode engaged");
+      }
+    } catch(claudeErr) {
+      addLog("Claude renderer unavailable — using MandaStrong Engine v2 fallback");
+      claudeRenderer = null;
+    }
+    setProgress(15);
+
+
     const pr=prompt.toLowerCase();
     const styleId=renderStyle||"photorealistic";
 
@@ -2565,7 +2613,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       canvas.width=1920;canvas.height=1080;
       const ctx=canvas.getContext("2d");
       // Prime frame
-      try{drawFn(ctx,1920,1080,0,0);}catch(e){addLog("Prime error: "+e.message);}
+      try{(claudeRenderer||drawFn)(ctx,1920,1080,0,0);}catch(e){addLog("Prime error: "+e.message);}
       await new Promise(r=>setTimeout(r,300));
 
       const fps=24;
@@ -2588,7 +2636,12 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
           const sec=frame/fps;
           try{
             ctx.clearRect(0,0,1920,1080);
-            drawFn(ctx,1920,1080,t,sec);
+            if(claudeRenderer){
+              try{ claudeRenderer(ctx,1920,1080,t,sec); }
+              catch(e){ drawFn(ctx,1920,1080,t,sec); }
+            } else {
+              drawFn(ctx,1920,1080,t,sec);
+            }
             // Final title card at end
             if(t>0.9){
               const a=(t-0.9)/0.1;
@@ -4172,8 +4225,8 @@ function P23({ go }) {
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="/background (5).mp4" type="video/mp4"/>
-        <source src="background (5).mp4" type="video/mp4"/>
+        <source src="/background_(5).mp4" type="video/mp4"/>
+        <source src="background_(5).mp4" type="video/mp4"/>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
       </video>
