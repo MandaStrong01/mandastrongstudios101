@@ -1506,6 +1506,8 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [refMedia,setRefMedia]=useState(null);
   const [refMediaType,setRefMediaType]=useState("");
   const [refDataUrl,setRefDataUrl]=useState(null);
+  const [refImages,setRefImages]=useState([]); // Array of {url, name, img:HTMLImageElement} for Reality Engine
+  const [useReality,setUseReality]=useState(true);
   const [renderStyle,setRenderStyle]=useState("photorealistic");
   const [genre,setGenre]=useState("");
   const addLog=(msg)=>setLog(p=>[...p,msg]);
@@ -1558,8 +1560,212 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const generateVideo=async()=>{
     if(!prompt.trim()){alert("Describe your scene first");return;}
     setGenerating(true);setProgress(0);setLog([]);setVideoUrl("");setSaved(false);
-    addLog("MandaStrong Engine v2 — Cinema-grade renderer initialising...");
+    addLog("MandaStrong Reality Engine — initialising...");
     setProgress(5);
+
+    // ════════════════════════════════════════════════════════════════
+    // REALITY ENGINE — Real photographs animated into cinema
+    // No diffusion models. Real imagery. Claude-directed composition.
+    // ════════════════════════════════════════════════════════════════
+    let realityPlan = null;
+    let loadedImages = [];
+
+    if(useReality && refImages.length > 0){
+      addLog("Reality Engine: loading "+refImages.length+" reference photo(s)...");
+      // Preload images as HTMLImageElements
+      try {
+        loadedImages = await Promise.all(refImages.map(ri => new Promise((res, rej) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => res({...ri, img, w: img.naturalWidth, h: img.naturalHeight});
+          img.onerror = () => res(null);
+          img.src = ri.url;
+        })));
+        loadedImages = loadedImages.filter(Boolean);
+        addLog("✓ "+loadedImages.length+" photo(s) loaded");
+      } catch(e){ addLog("Image load error: "+e.message); }
+
+      // Ask Claude to write a composite plan
+      if(loadedImages.length > 0){
+        try {
+          addLog("Claude is directing your scene composition...");
+          const photoList = loadedImages.map((p,i) => "Photo "+(i+1)+": "+(p.name||"image")+" ("+p.w+"x"+p.h+")").join("\n");
+          const planPrompt = "You are a film director assembling a "+duration+"-second scene from real photographs.\n\nScene description: \""+prompt+"\"\n\nAvailable photographs:\n"+photoList+"\n\nReturn a JSON plan with this exact structure (no markdown fences, just JSON):\n{\n  \"backgroundIdx\": 0,\n  \"backgroundMotion\": \"kenburns-in\" | \"kenburns-out\" | \"pan-left\" | \"pan-right\" | \"static-drift\",\n  \"layers\": [\n    {\"idx\": 1, \"role\": \"foreground\" | \"midground\" | \"detail\" | \"overlay\", \"position\": {\"x\": 0.5, \"y\": 0.7}, \"scale\": 0.4, \"blur\": 0, \"opacity\": 0.9, \"blend\": \"normal\" | \"screen\" | \"multiply\"}\n  ],\n  \"atmosphere\": [\"rain\" | \"fog\" | \"snow\" | \"dust\" | \"none\"],\n  \"lightWrap\": {\"color\": \"warm\" | \"cool\" | \"golden\" | \"moonlight\" | \"none\", \"intensity\": 0.3},\n  \"colorGrade\": \"teal-orange\" | \"golden\" | \"noir\" | \"natural\" | \"cool\" | \"warm\",\n  \"vignette\": 0.5,\n  \"grainAmount\": 0.04,\n  \"cameraShake\": 0.002,\n  \"depthBlur\": true\n}\n\nChoose backgroundIdx carefully (the widest/most environmental photo). Place foreground subjects (people, candles, objects) on top. Use 'screen' blend for fire/candle/light photos. Use atmospheric effects to match the scene mood. Return ONLY the JSON.";
+          const res = await proxyFetch({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1500,
+            messages: [{role: "user", content: planPrompt}]
+          });
+          let planText = res && res.content && res.content[0] ? res.content[0].text.trim() : "";
+          planText = planText.replace(/^```(?:json)?/gm, "").replace(/```$/gm, "").trim();
+          // Strip anything before the first {
+          const jsonStart = planText.indexOf("{");
+          const jsonEnd = planText.lastIndexOf("}");
+          if(jsonStart >= 0 && jsonEnd > jsonStart) planText = planText.slice(jsonStart, jsonEnd+1);
+          realityPlan = JSON.parse(planText);
+          addLog("✓ Composition plan: "+(realityPlan.layers?.length||0)+" layers · "+realityPlan.colorGrade+" grade · "+realityPlan.backgroundMotion);
+        } catch(e){
+          addLog("Plan failed ("+e.message+") — using default composition");
+          realityPlan = {
+            backgroundIdx: 0,
+            backgroundMotion: "kenburns-in",
+            layers: loadedImages.slice(1).map((_,i) => ({
+              idx: i+1, role: i===0?"foreground":"midground",
+              position: {x: 0.3+i*0.2, y: 0.6}, scale: 0.5-i*0.1,
+              blur: 0, opacity: 0.95, blend: "normal"
+            })),
+            atmosphere: ["none"],
+            lightWrap: {color: "warm", intensity: 0.3},
+            colorGrade: "teal-orange",
+            vignette: 0.55, grainAmount: 0.04, cameraShake: 0.002, depthBlur: true
+          };
+        }
+      }
+    }
+    setProgress(15);
+
+    // REALITY RENDERER — runs if we have a plan and loaded images
+    const realityDrawFn = realityPlan && loadedImages.length > 0 ? (ctx, W, H, t, sec) => {
+      const plan = realityPlan;
+      const bgImg = loadedImages[plan.backgroundIdx || 0];
+      // Camera motion
+      let camScale = 1, camX = 0, camY = 0;
+      const motion = plan.backgroundMotion || "kenburns-in";
+      if(motion === "kenburns-in") camScale = 1 + t*0.18;
+      else if(motion === "kenburns-out") camScale = 1.18 - t*0.18;
+      else if(motion === "pan-left") camX = -W*0.1*t;
+      else if(motion === "pan-right") camX = W*0.1*t;
+      camX += Math.sin(sec*0.7)*W*plan.cameraShake;
+      camY += Math.cos(sec*0.6)*H*plan.cameraShake;
+      // Background — cover-fit the photo
+      if(bgImg){
+        const ar = bgImg.w / bgImg.h;
+        const targetAR = W/H;
+        let dw, dh, dx, dy;
+        if(ar > targetAR){ dh = H*camScale; dw = dh*ar; }
+        else{ dw = W*camScale; dh = dw/ar; }
+        dx = (W-dw)/2 + camX;
+        dy = (H-dh)/2 + camY;
+        ctx.drawImage(bgImg.img, dx, dy, dw, dh);
+      }
+      // Depth blur on background (subtle gaussian via offset overlays)
+      if(plan.depthBlur){
+        ctx.globalAlpha = 0.08;
+        for(let b=0;b<3;b++){
+          const off = b+1;
+          if(bgImg){
+            const ar = bgImg.w/bgImg.h;
+            const dh = H*camScale*1.02; const dw = dh*ar;
+            ctx.drawImage(bgImg.img, (W-dw)/2+off+camX, (H-dh)/2+off+camY, dw, dh);
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+      // Foreground/midground layers
+      (plan.layers || []).forEach((layer, li) => {
+        const img = loadedImages[layer.idx];
+        if(!img) return;
+        const pos = layer.position || {x: 0.5, y: 0.5};
+        const scale = layer.scale || 0.4;
+        const parallax = layer.role === "foreground" ? 1 : layer.role === "midground" ? 0.5 : 0.2;
+        const lx = W*pos.x + Math.sin(sec*0.4+li)*W*0.005*parallax + camX*parallax;
+        const ly = H*pos.y + Math.cos(sec*0.3+li)*H*0.004*parallax + camY*parallax;
+        const lw = W*scale;
+        const lh = lw * (img.h/img.w);
+        ctx.globalAlpha = layer.opacity || 1;
+        ctx.globalCompositeOperation = layer.blend || "normal";
+        // Subtle layer breathing/sway
+        const sway = Math.sin(sec*0.5+li)*2;
+        ctx.drawImage(img.img, lx-lw/2+sway, ly-lh/2, lw, lh);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+      });
+      // Atmosphere
+      (plan.atmosphere || []).forEach(atm => {
+        if(atm === "rain"){
+          for(let r=0;r<150;r++){
+            const rx = (r*137+sec*250)%W;
+            const ry = (r*97+sec*550)%H;
+            ctx.strokeStyle = "rgba(180,195,220,0.25)";
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx-5, ry+22); ctx.stroke();
+          }
+        } else if(atm === "fog"){
+          const fog = ctx.createLinearGradient(0, H*0.4, 0, H*0.8);
+          fog.addColorStop(0, "rgba(200,200,210,0)");
+          fog.addColorStop(0.5, "rgba(190,190,200,"+(0.2+Math.sin(sec*0.3)*0.05)+")");
+          fog.addColorStop(1, "rgba(180,180,190,0)");
+          ctx.fillStyle = fog; ctx.fillRect(0, H*0.4, W, H*0.4);
+        } else if(atm === "snow"){
+          for(let s=0;s<180;s++){
+            const sx = (s*137+sec*30+Math.sin(sec+s)*15)%W;
+            const sy = (s*97+sec*60)%H;
+            const sz = 0.8+(s%5)*0.4;
+            ctx.fillStyle = "rgba(255,255,255,"+(0.7+Math.sin(s)*0.2)+")";
+            ctx.fillRect(sx, sy, sz, sz);
+          }
+        } else if(atm === "dust"){
+          for(let d=0;d<60;d++){
+            const dx = (d*73+sec*15)%W;
+            const dy = (d*47+Math.sin(sec*0.3+d)*30)%H;
+            ctx.fillStyle = "rgba(220,200,170,"+(0.15+Math.sin(d)*0.05)+")";
+            ctx.fillRect(dx, dy, 2, 2);
+          }
+        }
+      });
+      // Light wrap (volumetric tint)
+      if(plan.lightWrap && plan.lightWrap.color !== "none"){
+        const lc = plan.lightWrap.color;
+        const li = plan.lightWrap.intensity || 0.3;
+        const tints = {
+          warm: [255, 180, 80], cool: [80, 140, 220], golden: [255, 200, 100],
+          moonlight: [180, 200, 255]
+        };
+        const col = tints[lc] || [255, 255, 255];
+        const lw = ctx.createRadialGradient(W*0.5, H*0.4, 0, W*0.5, H*0.4, W*0.7);
+        lw.addColorStop(0, "rgba("+col[0]+","+col[1]+","+col[2]+","+(li*0.5)+")");
+        lw.addColorStop(1, "rgba("+col[0]+","+col[1]+","+col[2]+",0)");
+        ctx.fillStyle = lw; ctx.fillRect(0, 0, W, H);
+      }
+      // Colour grade
+      const grades = {
+        "teal-orange": {r: 10, g: 5, b: 25, a: 0.08},
+        "golden": {r: 40, g: 20, b: 0, a: 0.1},
+        "noir": {r: 0, g: 0, b: 0, a: 0.2, desat: true},
+        "natural": {r: 5, g: 5, b: 0, a: 0.03},
+        "cool": {r: 0, g: 10, b: 30, a: 0.08},
+        "warm": {r: 30, g: 15, b: 0, a: 0.08}
+      };
+      const grade = grades[plan.colorGrade || "teal-orange"];
+      if(grade.desat){
+        ctx.globalCompositeOperation = "saturation";
+        ctx.fillStyle = "rgb(128,128,128)"; ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = "source-over";
+      }
+      ctx.fillStyle = "rgba("+grade.r+","+grade.g+","+grade.b+","+grade.a+")";
+      ctx.fillRect(0, 0, W, H);
+      // Vignette
+      const vig = ctx.createRadialGradient(W/2, H/2, W*0.1, W/2, H/2, W*0.85);
+      vig.addColorStop(0, "rgba(0,0,0,0)");
+      vig.addColorStop(1, "rgba(0,0,0,"+(plan.vignette||0.5)+")");
+      ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+      // Letterbox
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H*0.072);
+      ctx.fillRect(0, H*0.928, W, H*0.072);
+      // Film grain
+      const gAmount = Math.round((plan.grainAmount||0.04) * 1000);
+      for(let g=0;g<gAmount;g++){
+        const gv = Math.random()>0.5 ? 160 : 30;
+        ctx.fillStyle = "rgba("+gv+","+gv+","+gv+",0.01)";
+        ctx.fillRect(Math.random()*W, Math.random()*H, 1.2, 1.2);
+      }
+      // Fade
+      if(t < 0.05){ ctx.fillStyle = "rgba(0,0,0,"+(1-t/0.05)+")"; ctx.fillRect(0, 0, W, H); }
+      if(t > 0.92){ ctx.fillStyle = "rgba(0,0,0,"+((t-0.92)/0.08)+")"; ctx.fillRect(0, 0, W, H); }
+    } : null;
+
+
 
     // ════════════════════════════════════════════════════════════════
     // CLAUDE-WRITTEN PER-SCENE RENDERER (Photorealistic depth)
@@ -2613,7 +2819,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       canvas.width=1920;canvas.height=1080;
       const ctx=canvas.getContext("2d");
       // Prime frame
-      try{(claudeRenderer||drawFn)(ctx,1920,1080,0,0);}catch(e){addLog("Prime error: "+e.message);}
+      try{(realityDrawFn||claudeRenderer||drawFn)(ctx,1920,1080,0,0);}catch(e){addLog("Prime error: "+e.message);}
       await new Promise(r=>setTimeout(r,300));
 
       const fps=24;
@@ -2636,7 +2842,10 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
           const sec=frame/fps;
           try{
             ctx.clearRect(0,0,1920,1080);
-            if(claudeRenderer){
+            if(realityDrawFn){
+              try{ realityDrawFn(ctx,1920,1080,t,sec); }
+              catch(e){ (claudeRenderer||drawFn)(ctx,1920,1080,t,sec); }
+            } else if(claudeRenderer){
               try{ claudeRenderer(ctx,1920,1080,t,sec); }
               catch(e){ drawFn(ctx,1920,1080,t,sec); }
             } else {
@@ -2709,7 +2918,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"12px 20px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
-          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG ENGINE v2 · CINEMA-GRADE RENDERER</div>
+          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG REALITY ENGINE · COMPOSE REAL PHOTOS INTO CINEMA</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,letterSpacing:5,margin:0,fontSize:24,textTransform:"uppercase"}}>VIDEO GENERATOR</h1>
         </div>
         <div style={{color:GOLD,fontSize:11,fontWeight:700,letterSpacing:2}}>✦ MANDASTRONG ENGINE · ANY PROMPT · ANY SUBJECT</div>
@@ -2732,6 +2941,44 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
               </select>
             </div>
           </div>
+          {/* REALITY ENGINE — Real Photo Composition */}
+          <div style={{background:"linear-gradient(135deg,#0a0500,#1a0a00)",border:"2px solid "+GOLD,padding:14,marginBottom:12,boxShadow:"0 0 20px "+GOLD+"22"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div>
+                <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900}}>✦ REALITY ENGINE — REAL PHOTO COMPOSITION</div>
+                <div style={{color:DIM,fontSize:10,marginTop:2,lineHeight:1.5}}>Upload 2-6 real photos. Claude composes them into your scene with parallax, depth, light wrap & atmosphere.</div>
+              </div>
+              <button onClick={()=>setUseReality(u=>!u)} style={{background:useReality?GOLD:"#000",border:"1px solid "+GOLD,color:useReality?"#000":GOLD,padding:"4px 10px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:1}}>
+                {useReality?"ON":"OFF"}
+              </button>
+            </div>
+            {refImages.length>0&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:8}}>
+                {refImages.map((ri,i)=>(
+                  <div key={i} style={{position:"relative"}}>
+                    <img src={ri.url} alt={ri.name||"ref"} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}}/>
+                    <button onClick={()=>setRefImages(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:1,right:1,background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"0 4px",cursor:"pointer",fontSize:9,fontWeight:900,lineHeight:1.2}}>✕</button>
+                    <div style={{color:GOLD,fontSize:8,letterSpacing:1,marginTop:1,textAlign:"center",fontWeight:900}}>{i===0?"BG":"L"+i}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={()=>{
+              if(refImages.length>=6){alert("Max 6 photos");return;}
+              const i=document.createElement("input");
+              i.type="file";i.accept="image/*";i.multiple=true;
+              i.onchange=e=>{
+                const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
+                const newOnes=files.map(f=>({url:URL.createObjectURL(f),name:f.name}));
+                setRefImages(p=>[...p,...newOnes]);
+              };
+              i.click();
+            }} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+              📷 {refImages.length===0?"ADD PHOTOS (UP TO 6)":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED"}
+            </button>
+            <div style={{color:GOLDDIM,fontSize:9,marginTop:5,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others composited as foreground layers</div>
+          </div>
+
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:12,marginBottom:12}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:5}}>⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)</div>
             {refMedia?(
