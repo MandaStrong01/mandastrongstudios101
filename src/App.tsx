@@ -11,7 +11,7 @@ async function proxyFetch(body){
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),55000);
   try{
-    const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
+    const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:conASaACtroller.signal});
     clearTimeout(timeout);
     return res.json();
   }catch(e){clearTimeout(timeout);throw e;}
