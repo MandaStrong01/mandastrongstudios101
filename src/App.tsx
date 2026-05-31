@@ -3910,7 +3910,7 @@ function P19({ go }) {
       });
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
-      code=code.replace(/\"\"\"javascript|\"\"\"js|\"\"\`/g,"").trim();
+      const bt=String.fromCharCode(96);code=code.split(bt+bt+bt+"javascript").join("").split(bt+bt+bt+"js").join("").split(bt+bt+bt).join("").trim();
       const fi=code.indexOf("function drawFrame");if(fi>0)code=code.slice(fi);
       const bo=code.indexOf("{");const bc=code.lastIndexOf("}");
       const body=bo>=0&&bc>bo?code.slice(bo+1,bc):"";
