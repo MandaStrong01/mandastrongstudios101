@@ -4174,8 +4174,10 @@ function P23({ go }) {
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="background.mp4" type="video/mp4"/>
+        
+        
         <source src="/background.mp4" type="video/mp4"/>
+        <source src="background.mp4" type="video/mp4"/>
       </video>
       <div style={{padding:"28px 40px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
