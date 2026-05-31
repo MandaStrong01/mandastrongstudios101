@@ -406,7 +406,11 @@ function ToolPanel({ tool, onClose, onSave }) {
                 📁 UPLOAD FILE
               </button>
             </div>
-            <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+            <a href="https://photos.google.com" target="_blank" rel="noopener noreferrer"
+              style={{display:"block",background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:GOLDDIM,padding:"8px",textAlign:"center",fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none",fontFamily:"'Rajdhani',sans-serif",marginBottom:4}}>
+              🌐 OPEN GOOGLE PHOTOS → download photo → then Upload Photo above
+            </a>
+            <input ref={photoRef} type="file" accept="image/*, .jpg, .jpeg, .png, .gif, .webp, .heic, .heif" style={{display:"none"}} onChange={e=>{
               const f=e.target.files&&e.target.files[0];
               if(f&&onSave){onSave({id:Date.now()+Math.random(),name:f.name,type:f.type,file:f,url:URL.createObjectURL(f)});setSaved(true);}
             }}/>
