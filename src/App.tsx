@@ -2701,7 +2701,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                 📷 UPLOAD PHOTO
               </button>
-              <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefMedia(URL.createObjectURL(f));setRefMediaType(f.type.startsWith("video")?"video":"image");const reader=new FileReader();reader.onload=ev=>setRefDataUrl(ev.target.result);reader.readAsDataURL(f);};i.click();}}
+              <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*,video/*";i.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefMedia(URL.createObjectURL(f));setRefMediaType(f.type.startsWith("video")?"video":"image");const reader=new FileReader();reader.onload=ev=>setRefDataUrl(ev.target.result);reader.readAsDataURL(f);};i.click();}}
                 style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                 📁 UPLOAD FILE
               </button>
@@ -3124,7 +3124,7 @@ function P11({ mediaLib, setMediaLib }) {
           <div style={{fontSize:36,marginBottom:10}}>🎬</div>
           <div style={{color:WHITE,fontWeight:900,fontSize:16,letterSpacing:3,marginBottom:16}}>DRAG & DROP YOUR MEDIA HERE</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,maxWidth:360,margin:"0 auto"}}>
-            <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.multiple=true;i.capture="environment";i.onchange=e=>onFiles(e.target.files);i.click();}}
+            <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.multiple=true;i.onchange=e=>onFiles(e.target.files);i.click();}}
               style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
               📷 UPLOAD PHOTOS
             </button>
@@ -4130,28 +4130,23 @@ function P22() {
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
-    {t:"🚀 GETTING STARTED",c:"LIVE APP: mandastrongstudio2026.bolt.host\n\nADMIN LOGIN: woolleya129@gmail.com · Password: Mangler1970!!\n\nNAVIGATION: Use the top menu bar to jump to any of the 23 pages instantly. The hamburger menu on mobile collapses all pages.\n\nSAVING: Hit Save Project in the footer after every session. Your media library persists automatically via IndexedDB — clips survive closing the tab.\n\nMOBILE INSTALL: On iPhone/iPad tap Share → Add to Home Screen. On Android tap Menu → Add to Home Screen."},
-    {t:"📋 PAGE 2 — STUDIO DASHBOARD",c:"Your production command centre.\n\nPIPELINE: Click any step (Write → Voice → Image → Video → Timeline → Mix → Render) to jump directly to that page.\n\nQUICK START TEMPLATES: Six pre-built film templates — Feature Film, Documentary, Music Video, Short Film, Family Movie, Audiobook. Each shows which pages to visit in order.\n\nNEW PROJECT: Gold button top right to start fresh."},
-    {t:"✍ PAGE 5 — WRITING TOOLS (100+ TOOLS)",c:"Over 100 AI-powered writing tools covering every aspect of film production.\n\nHOW TO USE:\n1. Click any tool card to open it\n2. A panel slides in with three modes:\n   • UPLOAD — upload a reference file or photo\n   • PASTE — paste a URL or text\n   • AI CREATE — describe what you want and hit the gold button\n3. Hit SAVE TO MEDIA LIBRARY to keep any result\n\nTOOLS INCLUDE: Script to Movie, Logline Generator, Scene Writer, Dialogue Generator, Character Bio Writer, Beat Sheet Builder, Plot Generator, Synopsis Writer, Treatment Writer, and 90+ more.\n\nTIP: Use Script to Movie first — paste your full idea and get a complete scene breakdown instantly."},
-    {t:"🎙 PAGE 6 — VOICE ENGINE (54 VOICES)",c:"54 cinematic voice characters covering every accent, age, gender, and style.\n\nFINDING A VOICE:\n• Filter by Gender (Male / Female)\n• Filter by Age (Child / Teen / Adult / Elderly)\n• Filter by Origin (British / American / Scottish / Irish / Australian / Indian and more)\n• Search bar finds by name or style\n• TEST button on any card plays a preview\n\nSETTINGS:\n• MOOD — 13 options including Sarcastic, Dramatic, Romantic, Mysterious\n• SPEED — pace of delivery\n• PITCH — voice height\n• PAUSE — gap between sentences in milliseconds\n• VOLUME — overall level\n\nJAMES VOICE (AI FOR HUMANITY):\nSpeed 0.62 · Pitch 0.86 · Pause 1600ms · Mood: Sarcastic\n\nHOW TO SPEAK:\n1. Select your voice\n2. Paste narration script\n3. Hit TEST SCRIPT to hear it raw\n4. Hit PREPARE AND SPEAK for AI-enhanced delivery\n5. Hit SAVE TO MEDIA LIBRARY\n\nMUSIC VIDEO STUDIO: Gold button top right."},
-    {t:"🎨 PAGE 7 — IMAGE TOOLS",c:"AI image generation and enhancement tools.\n\nHOW TO USE:\n1. Click any tool\n2. Choose a style (Photorealistic, Cinematic, Oil Painting, Watercolour, Concept Art, Noir, Golden Hour, Epic Fantasy)\n3. Describe your image\n4. Hit Generate\n\nThe AI returns a complete visual direction brief — lighting, composition, colour palette, depth, atmosphere — ready to use as a reference prompt on Page 8."},
-    {t:"🎬 PAGE 8 — VIDEO GENERATOR",c:"The MandaStrong Reality Engine — cinema-quality scene generation.\n\nREALITY ENGINE (recommended for best results):\n1. Click ADD PHOTOS — upload 2 to 6 real photographs\n2. First photo becomes the background layer\n3. Additional photos are composited as foreground layers with parallax depth\n4. Claude directs the composition automatically\n\nSTANDARD GENERATION:\n1. Choose Render Style (Photorealistic, Cinematic, Documentary, Noir, Golden Hour, Sci-Fi, Horror, Stylised)\n2. Choose Genre (optional)\n3. Enter a Scene Title\n4. Describe your scene in detail\n5. Set Duration (5 to 60 seconds)\n6. Hit GENERATE SCENE\n\nSaving: Clips save automatically. Hit NEXT SCENE after each one.\n\nTIP FOR DOXY: Generate all 20 scenes one at a time using your scene prompts guide. Save each before moving on."},
-    {t:"⬆ PAGE 11 — UPLOAD MEDIA",c:"Your master media ingestion hub.\n\nUPLOADING:\n• 📷 UPLOAD PHOTOS — opens your device photo gallery\n• 📁 UPLOAD FILES — opens file picker for video, audio, image, text\n• DRAG AND DROP — drag any file onto the upload zone\n\nRELOAD CLIPS: Hit Reload Clips from Storage to load all IndexedDB-saved clips from Page 8 back into your media library.\n\nAll uploaded assets appear in the grid. Remove any with the ✕ button."},
-    {t:"⏱ PAGE 13 — TIMELINE EDITOR",c:"Multi-track timeline for assembling your film.\n\nSETUP:\n1. Ensure all clips are in media library (Page 11)\n2. Hit SYNC ALL TRACKS — all clips populate automatically in order\n\nMANUAL EDITING:\n• Drag clips from the bottom tray to any track\n• Click ✕ on a clip to remove it\n• Hit ADD TRACK for additional tracks\n\nFILM DURATION: Slider or 60 / 90 / 180 minute buttons.\n\nTRANSPORT: ⏮ ⏪ ▶ ⏩ ⏭ controls at the bottom.\n\nWHEN READY: Hit RENDER top right → goes to Page 16."},
-    {t:"✨ PAGE 14 — ENHANCEMENT STUDIO",c:"90+ AI enhancement tools for image and video quality.\n\nSELECT a tool from the left panel. Adjust sliders (Intensity, Clarity, Color, Brightness). Hit Apply Enhancement.\n\nTOOLS INCLUDE: AI 8K Upscaling, Video Denoiser, Colour Correction, Cinematic Grade, Face Enhancement, Sky Enhancer, Motion Stabilisation, Shadow Recovery, and many more."},
-    {t:"🎚 PAGE 15 — AUDIO MIXER",c:"Four-channel professional audio mixing console.\n\nCHANNELS:\n• VOICE — narration / dialogue level\n• MUSIC — background score\n• EFX — sound effects\n• MASTER — overall output gain\n\nRECOMMENDED SETTINGS:\nDocumentary / AI For Humanity: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85\nMusic Video: VOICE 60 · MUSIC 75 · EFX 40 · MASTER 85\nDrama (Doxy): VOICE 80 · MUSIC 45 · EFX 55 · MASTER 85"},
-    {t:"⚡ PAGE 16 — RENDER ENGINE",c:"Professional film rendering up to 4K resolution.\n\nSETTINGS:\n• RESOLUTION: 1080p HD · 1440p QHD · 4K UHD\n• FRAME RATE: 24fps Cinema · 25fps · 30fps TV · 60fps HFR\n• COLOUR GRADE: Teal/Orange · Golden · Noir B&W · Natural · Cool Blue\n• FILM GRAIN: Adds authentic cinematic texture\n• LETTERBOX: Classic cinema black bars\n• VIGNETTE: Darkens edges for cinematic depth\n\nRENDERING:\n1. Check your clip sequence below\n2. Hit START RENDER\n3. Watch the render log — do not close the tab\n4. When complete hit DOWNLOAD\n\nMERGE IN SEQUENCE: All clips render in order — this is your merge for Doxy and AI For Humanity."},
-    {t:"▶ PAGE 17 — FILM PREVIEW",c:"Full-screen film preview player.\n\nAll video clips in your library appear as selectable thumbnails. Click any to load it in the player.\n\nCONTROLS: Play · Pause · Stop · Skip Forward · Skip Back · Volume · Full Screen.\n\nUSE FOR: Reviewing each scene before final render. Quality checking before export."},
-    {t:"📤 PAGE 18 — EXPORT & DISTRIBUTE",c:"Export your completed film to any platform.\n\nPLATFORM PRESETS:\n• YouTube — 16:9 · 4K\n• TikTok — 9:16 · 1080p\n• Instagram — 1:1 · 1080p\n• Vimeo — 16:9 · 4K\n• X / Twitter — 16:9 · 1080p\n• Film Festival — 2.39:1 · 4K\n\nHOW TO USE:\n1. Select your target platform\n2. All clips appear with download buttons\n3. Hit EXPORT ALL CLIPS to batch download"},
-    {t:"📖 PAGE 19 — TUTORIALS",c:"12 step-by-step guided tutorials.\n\nTUTORIALS:\n1. Getting Started\n2. Writing Your Script\n3. Generating Video\n4. Voice Narration\n5. Music Video Studio\n6. Timeline Editing\n7. Audio Mixing\n8. Rendering Your Film\n9. Exporting and Sharing\n10. Doxy The School Bully — full production walkthrough\n11. AI For Humanity Documentary — James voice workflow\n12. Music Video: If Only — ocean/windowsill production\n\nHOW TO USE: Click any tutorial in the left panel. Follow numbered steps on the right."},
-    {t:"🤖 PAGE 21 — AGENT GROK",c:"Your personal 24/7 AI cinema intelligence advisor.\n\nWHAT GROK CAN DO:\n• Answer any question about the platform\n• Help develop your film concept and story\n• Advise on production workflow\n• Recommend settings for voice, video, audio, rendering\n• Script consultation and creative sounding board\n• Distribution and marketing strategy\n\nHOW TO USE: Type your question in the bar at the bottom. Hit SEND or press Enter.\n\nTIP: Tell Grok which project you are working on and he tailors all advice to your specific film."},
-    {t:"🎵 MUSIC VIDEO STUDIO",c:"Complete self-contained music video production suite. Open from Page 6 top right button.\n\nSTEP 1 — SONG: Title, artist, genre, mood, tempo.\nSTEP 2 — STYLE: Video style, colour grade, effects, cut style, aspect ratio, duration.\nSTEP 3 — SCENE: Write detailed scene description. Upload audio (MP3/WAV/M4A) or hit red RECORD YOUR OWN SONG button to record live.\nSTEP 4 — GENERATE: Hit GENERATE MUSIC VIDEO. Engine renders scene synced to music.\nSTEP 5 — LIBRARY: All generated music videos saved here. Download or add to timeline.\nSTEP 6 — TIMELINE: Drag clips into tracks. Duration slider sets total runtime 30 sec to 10 min.\n\nDOWNLOAD: Gold button on right panel once generated."},
-    {t:"🎬 RECOMMENDED PRODUCTION WORKFLOW",c:"Follow this order for every project.\n\nFEATURE FILM / DOCUMENTARY:\n1. Page 4 — Login\n2. Page 5 — Write and develop your script\n3. Page 6 — Record all narration (save each to library)\n4. Page 8 — Generate all scenes one at a time\n5. Page 11 — Upload additional media, reload all clips\n6. Page 13 — Sync all tracks, set film duration\n7. Page 15 — Set audio mix levels\n8. Page 16 — Configure render, hit Start Render\n9. Page 17 — Preview completed film\n10. Page 18 — Export to platform\n\nDOXY THE SCHOOL BULLY (2-hour film):\n1. Page 8 — Generate all 20 scenes\n2. Page 6 — Record dialogue for all characters\n3. Page 13 — Sync, set 120 minutes\n4. Page 15 — VOICE 80 · MUSIC 45 · EFX 55 · MASTER 85\n5. Page 16 — 4K · 24fps · Teal-Orange · Grain + Letterbox + Vignette\n\nAI FOR HUMANITY (13 scenes):\n1. Page 6 — James · Speed 0.62 · Pitch 0.86 · Pause 1600ms · Sarcastic\n2. Page 8 — Generate 13 scenes\n3. Page 16 — 4K · Teal-Orange grade"},
-    {t:"💳 SUBSCRIPTIONS",c:"Three plans via Stripe. Cancel any time.\n\nCREATOR — $20/month: HD 1080p · 100 Tools · 10GB · Email Support\n\nPRO — $30/month: 4K · 300 Tools · 100GB · Priority Support · Commercial Licence\n\nSTUDIO — $50/month (7-DAY FREE TRIAL): 8K · 600+ Tools · 1TB · 24/7 Support · Full Rights · API Access\n\nTo subscribe: Page 4 → choose plan → Stripe checkout opens.\n\nETSY: Books and merchandise at MandaStrong1.Etsy.com"},
+    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Admin login: woolleya129@gmail.com / Admin. Use hamburger menu top left to jump to any page. Hit Save Project in the footer regularly."},
+    {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI Create. Use the search bar to find tools fast. Save any result to your Media Library."},
+    {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, origin. Hit TEST to hear any voice. Settings tab: adjust Speed, Pitch, Pause, Volume, Mood. James settings: Speed 0.62 · Pitch 0.86 · Pause 1600ms · Mood Sarcastic. Speak tab: paste script, hit Prepare and Speak. Music Video Studio button is top right."},
+    {t:"PAGE 8 — VIDEO GENERATOR",c:"Click Documentary Recovery Panel to expand your 13 scenes. Click any scene to load it. Hit Generate Scene. Clips save automatically to IndexedDB. Generate all 13 then go to Page 11."},
+    {t:"PAGE 11 — UPLOAD MEDIA",c:"Hit Reload Clips from Storage. All 13 clips load from IndexedDB into your Media Library. Also upload your own video, audio, and images here."},
+    {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit Sync All Tracks. All clips populate in correct order. Set film duration. Review timeline. When satisfied hit Render or go to Page 16."},
+    {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: Voice 85 · Music 40 · Effects 50 · Master 85. Music Video: Voice 60 · Music 75 · Effects 40 · Master 85. Hit Apply Mix when done."},
+    {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality — 720p, 1080p, or 4K. For AI For Humanity select 4K. Hit Start Render. Do not close the browser tab. Download button appears when complete."},
+    {t:"PAGE 17 & 18 — PREVIEW & EXPORT",c:"Page 17: watch your completed film. Page 18: download and share directly to YouTube, Instagram, TikTok, Facebook, X, and Vimeo."},
+    {t:"PAGE 19 — TUTORIALS",c:"12 lessons. Hit Generate to Watch on any lesson. Claude writes and plays an animated tutorial instantly. Each lesson has Pro Tips and an Open Page button."},
+    {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about the platform, workflow, or filmmaking. Type and hit Send."},
+    {t:"MUSIC VIDEO STUDIO",c:"Open from Page 6 top right. Step 1: Song details. Step 2: Style and duration 1-180 mins. Step 3: Write your scene in full detail, upload audio or hit red Record Your Own Song button. Step 4: Hit Generate Music Video. Download or Save to Media Library when done."},
+    {t:"RECOMMENDED WORKFLOW",c:"Page 5 → Write script. Page 6 → Record narration. Page 8 → Generate all scenes. Page 11 → Reload clips. Page 13 → Sync tracks. Page 15 → Set audio mix. Page 16 → Render. Page 17 → Preview. Page 18 → Export and share."},
   ];
   return(
     <div style={{padding:"20px 32px 40px",maxWidth:860,margin:"0 auto"}}>
-      <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:4,marginBottom:12,textAlign:"center"}}>MANDASTRONG STUDIO — COMPLETE USER GUIDE — CLICK ANY SECTION</div>
+      <div style={{color:GOLD,fontWeight:900,fontSize:12,letterSpacing:4,marginBottom:12,textAlign:"center"}}>📖 HOW TO USE MANDASTRONG STUDIO — CLICK ANY SECTION</div>
       {SECTIONS.map((g,i)=>{
         const isOpen=open===i;
         return(
@@ -4160,14 +4155,13 @@ function HowToGuide() {
               <span style={{color:isOpen?GOLD:WHITE,fontWeight:900,fontSize:13,letterSpacing:2}}>{g.t}</span>
               <span style={{color:GOLD,fontSize:16,fontWeight:900}}>{isOpen?"▲":"▼"}</span>
             </button>
-            {isOpen&&<div style={{background:"#040300",border:"1px solid "+GOLD,borderTop:"none",padding:"16px 20px",color:WHITE,fontSize:13,lineHeight:1.95,whiteSpace:"pre-line"}}>{g.c}</div>}
+            {isOpen&&<div style={{background:"#040300",border:"1px solid "+GOLD,borderTop:"none",padding:"16px 20px",color:WHITE,fontSize:13,lineHeight:1.95}}>{g.c}</div>}
           </div>
         );
       })}
     </div>
   );
 }
-
 
 function P23({ go }) {
   const bgRef = useRef(null);
@@ -4178,51 +4172,52 @@ function P23({ go }) {
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-        style={{width:"100%",maxHeight:"60vh",display:"block",objectFit:"cover"}}
+        style={{width:"100%",display:"block",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
         <source src="background.mp4" type="video/mp4"/>
         <source src="/background.mp4" type="video/mp4"/>
       </video>
-      <div style={{padding:"20px 28px 80px"}}>
+      <div style={{padding:"28px 40px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
-          <div style={{fontSize:9,color:GOLD,letterSpacing:5,marginBottom:4,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,4vw,38px)",fontWeight:900,letterSpacing:6,textShadow:"0 0 30px "+GOLD+"99",marginBottom:6}}>THAT'S ALL FOLKS</h1>
-          <div style={{color:WHITE,fontSize:12,letterSpacing:3,marginBottom:20}}>THANK YOU FOR CREATING WITH US</div>
-          <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:20}}/>
-          <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#050500",border:"2px solid "+GOLD}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:12,textAlign:"center"}}>✦ FROM AMANDA ✦</div>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>This platform was built for <strong style={{color:GOLD}}>you</strong> — the creator. Not just the ones here today, but every creator who comes after. The ones who have not yet found their voice. The ones with a story the world needs to hear but no studio budget to tell it.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>You now have 600+ AI tools, a full cinema production pipeline, 54 voice characters, and a render engine that outputs in 4K. The technology once locked inside major studios now lives in your browser. What you do with it is entirely yours.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>To every creator using this platform today, and every single one who will discover it in the future — this was made for you. Keep creating. The world needs your stories. — <strong style={{color:GOLD}}>Amanda</strong></p>
+          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:20}}>THAT\'S ALL FOLKS</h1>
+          <div style={{color:WHITE,fontSize:14,letterSpacing:3,marginBottom:28}}>THANK YOU FOR CREATING WITH US</div>
+          <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
+          <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500",border:"2px solid "+GOLD}}>
+            <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ THANK YOU ✦</div>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>This platform was built for <strong style={{color:GOLD}}>you</strong> — the creator. Not just the ones here today, but every creator who comes after. The ones who have not yet found their voice. The ones with a story the world needs to hear but no studio budget to tell it.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>You now have 600+ AI tools, a full cinema production pipeline, 54 voice characters, and a render engine that outputs in 4K. The technology once locked inside major studios now lives in your browser. What you do with it is entirely yours.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>To every creator using this platform today, and every single one who will discover it in the future — this was made for you. Keep creating. The world needs your stories. — <strong style={{color:GOLD}}>Amanda</strong></p>
           </div>
-          <div style={{...Card(),textAlign:"left",marginBottom:20,background:"#030300",border:"1px solid "+GOLDDIM}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:10,textAlign:"center"}}>✦ OUR MISSION ✦</div>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 8px"}}>MandaStrong Studio was built on one belief: <strong style={{color:GOLD}}>every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 8px"}}>We believe the next great filmmaker is not in Hollywood. They are in a bedroom somewhere, with a story the world needs to hear and no way to tell it. Until now.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 8px"}}>Every Etsy purchase from MandaStrong1.Etsy.com funds anti-bullying programmes in schools and veterans mental health initiatives. When you create here, you are part of something bigger than a film.</p>
+          <button onClick={()=>setHowOpen(o=>!o)} style={{width:"100%",background:howOpen?"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")":"#050500",border:"2px solid "+GOLD,color:howOpen?"#000":GOLD,padding:"18px 24px",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:900,letterSpacing:4,marginBottom:howOpen?0:28,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 0 30px "+GOLD+"44"}}>
+            <span>📖 MANDASTRONG STUDIO HOW TO USE GUIDE</span>
+            <span style={{fontSize:18}}>{howOpen?"▲":"▼"}</span>
+          </button>
+          {howOpen&&<div style={{background:"#030200",border:"2px solid "+GOLD,borderTop:"none",marginBottom:28}}><HowToGuide/></div>}
+          <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",margin:"28px 0"}}/>
+          <div style={{...Card(),textAlign:"left",marginBottom:24,background:"#030300",border:"1px solid "+GOLDDIM}}>
+            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:12,textAlign:"center"}}>✦ OUR MISSION ✦</div>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>MandaStrong Studio was built on one belief: <strong style={{color:GOLD}}>every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>We believe the next great filmmaker is not in Hollywood. They are in a bedroom somewhere, with a story the world needs to hear and no way to tell it. Until now.</p>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>Every Etsy purchase from MandaStrong1.Etsy.com funds anti-bullying programmes in schools and veterans mental health initiatives. When you create here, you are part of something bigger than a film.</p>
+          </div>
+          <div style={{...Card(),marginBottom:16,background:"#0a0600",border:"1px solid "+GOLDDIM,padding:"14px 20px",textAlign:"center"}}>
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>All proceeds from <strong style={{color:GOLD}}>MandaStrong1.Etsy.com</strong> are donated directly to humanitarian causes — veterans mental health, anti-bullying programmes in schools, and children in need.</p>
           </div>
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
-            style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",color:"#000",padding:"16px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:13,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",boxShadow:"0 0 30px "+GOLD+"44",marginBottom:20}}>
+            style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",color:"#000",padding:"20px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",boxShadow:"0 0 30px "+GOLD+"44",marginBottom:28}}>
             🛍 VISIT MANDASTRONG1.ETSY.COM
           </a>
-          <button onClick={()=>setHowOpen(o=>!o)} style={{width:"100%",background:howOpen?"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")":"#050500",border:"2px solid "+GOLD,color:howOpen?"#000":GOLD,padding:"16px 24px",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:900,letterSpacing:4,marginBottom:howOpen?0:20,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 0 20px "+GOLD+"44"}}>
-            <span>📖 MANDASTRONG STUDIO — HOW TO USE GUIDE</span>
-            <span style={{fontSize:16}}>{howOpen?"▲":"▼"}</span>
-          </button>
-          {howOpen&&<div style={{background:"#030200",border:"2px solid "+GOLD,borderTop:"none",marginBottom:20}}><HowToGuide/></div>}
-          <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",margin:"20px 0"}}/>
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"12px 36px",fontSize:12,letterSpacing:3}}>🏠 HOME</button>
-            <button onClick={()=>go(1)} style={{...G("out",false),padding:"12px 36px",fontSize:12,letterSpacing:3}}>EXIT APP</button>
+            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
+            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
 
 export default function App() {
   const [page,setPage]=useState(1);
