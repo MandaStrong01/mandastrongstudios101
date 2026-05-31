@@ -298,6 +298,7 @@ function ToolPanel({ tool, onClose, onSave }) {
   const [playing, setPlaying] = useState(null);
   const [selVoice, setSelVoice] = useState("james");
   const fileRef = useRef(null);
+  const photoRef = useRef(null);
   const inp = {width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"9px 12px",color:WHITE,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
 
   const speak = (vid, txt) => speakText(vid, txt, ()=>setPlaying(vid), ()=>setPlaying(null));
@@ -396,7 +397,7 @@ function ToolPanel({ tool, onClose, onSave }) {
         {mode==="upload"&&(
           <div style={{marginBottom:14}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:4}}>
-              <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f&&onSave){onSave({id:Date.now()+Math.random(),name:f.name,type:f.type,file:f,url:URL.createObjectURL(f)});setSaved(true);}};i.click();}}
+              <button onClick={()=>photoRef.current&&photoRef.current.click()}
                 style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"20px 8px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                 📷 UPLOAD PHOTO
               </button>
@@ -405,6 +406,10 @@ function ToolPanel({ tool, onClose, onSave }) {
                 📁 UPLOAD FILE
               </button>
             </div>
+            <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+              const f=e.target.files&&e.target.files[0];
+              if(f&&onSave){onSave({id:Date.now()+Math.random(),name:f.name,type:f.type,file:f,url:URL.createObjectURL(f)});setSaved(true);}
+            }}/>
             <input ref={fileRef} type="file" accept="video/*,audio/*,image/*,text/*" style={{display:"none"}} onChange={e=>{
               const f=e.target.files&&e.target.files[0];
               if(f&&onSave){onSave({id:Date.now()+Math.random(),name:f.name,type:f.type,file:f,url:URL.createObjectURL(f)});setSaved(true);}
@@ -3032,7 +3037,7 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    if(email==="woolleya129@gmail.com"&&pass==="Mangler1970!!"){
+    if(email==="woolleya129@gmail.com"&&pass==="Admin"){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
     } else if(email==="studio@mandastrong.com"&&pass==="Studio2026!"){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:true});go(5);},800);
@@ -3124,7 +3129,7 @@ function P11({ mediaLib, setMediaLib }) {
           <div style={{fontSize:36,marginBottom:10}}>🎬</div>
           <div style={{color:WHITE,fontWeight:900,fontSize:16,letterSpacing:3,marginBottom:16}}>DRAG & DROP YOUR MEDIA HERE</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,maxWidth:360,margin:"0 auto"}}>
-            <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.multiple=true;i.onchange=e=>onFiles(e.target.files);i.click();}}
+            <button onClick={()=>fileRef.current&&fileRef.current.click()}
               style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
               📷 UPLOAD PHOTOS
             </button>
@@ -4174,8 +4179,10 @@ function P23({ go }) {
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
         style={{width:"100%",display:"block",objectFit:"cover",background:"#000"}}
         onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="background.mp4" type="video/mp4"/>
+        
+        
         <source src="/background.mp4" type="video/mp4"/>
+        <source src="background.mp4" type="video/mp4"/>
       </video>
       <div style={{padding:"28px 40px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
