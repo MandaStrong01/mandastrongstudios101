@@ -30,9 +30,9 @@ const DIM = "#aaaaaa";
 const TOTAL = 23;
 
 const STRIPE = {
-  basic:"https://buy.stripe.com/4gM5kFaVYfjN7EX0vMafS00",
-  pro:"https://buy.stripe.com/14A00l8NQ0oTbVd3HYafS01",
-  studio:"https://buy.stripe.com/fZubJ35BE3B53oHdiyafS02",
+  basic:"https://buy.stripe.com/cNi8wRe8a9ZtcZh7YeafS05",
+  pro:"https://buy.stripe.com/cNi8wRe8a3B52kDceuafS04",
+  studio:"https://buy.stripe.com/00wcN7fcefjNgbtceuafS03",
 };
 
 const G = (v, sm) => ({
@@ -1577,6 +1577,23 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     addLog("MandaStrong Engine v2 — Cinema-grade renderer initialising...");
     setProgress(5);
 
+    // LOAD REFERENCE PHOTOS if user uploaded any
+    let loadedRefImages=[];
+    if(refImages.length>0){
+      addLog("Loading "+refImages.length+" reference photo(s)...");
+      try{
+        loadedRefImages=await Promise.all(refImages.map(ri=>new Promise((res)=>{
+          const img=new Image();
+          img.crossOrigin="anonymous";
+          img.onload=()=>res({...ri,img,w:img.naturalWidth,h:img.naturalHeight});
+          img.onerror=()=>res(null);
+          img.src=ri.url;
+        })));
+        loadedRefImages=loadedRefImages.filter(Boolean);
+        addLog("✓ "+loadedRefImages.length+" photo(s) loaded — photorealistic mode engaged");
+      }catch(e){addLog("Photo load error: "+e.message);}
+    }
+
     const pr=prompt.toLowerCase();
     const styleId=renderStyle||"photorealistic";
 
@@ -1736,6 +1753,40 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     const drawFn=(ctx,W,H,t,sec)=>{
       ctx.globalCompositeOperation="source-over";
       ctx.globalAlpha=1;
+
+      // If user uploaded photos — use them as photorealistic base
+      if(loadedRefImages&&loadedRefImages.length>0){
+        const bgImg=loadedRefImages[0];
+        const pushIn=1+t*0.06;
+        const driftX=Math.sin(sec*0.08)*6;
+        const driftY=Math.cos(sec*0.06)*3;
+        if(bgImg&&bgImg.img){
+          const ar=bgImg.w/bgImg.h;
+          const targetAR=W/H;
+          let dw,dh;
+          if(ar>targetAR){dh=H*pushIn;dw=dh*ar;}else{dw=W*pushIn;dh=dw/ar;}
+          ctx.drawImage(bgImg.img,(W-dw)/2+driftX,(H-dh)/2+driftY,dw,dh);
+        }
+        loadedRefImages.slice(1).forEach((ri,li)=>{
+          if(!ri||!ri.img)return;
+          const lw=W*0.4;const lh=lw*(ri.h/ri.w);
+          const lx=W*(0.25+li*0.25)+Math.sin(sec*0.4+li)*4;
+          const ly=H*0.5+Math.cos(sec*0.3+li)*3;
+          ctx.globalAlpha=0.88;ctx.drawImage(ri.img,lx-lw/2,ly-lh/2,lw,lh);ctx.globalAlpha=1;
+        });
+        const grades={"photorealistic":{r:10,g:8,b:20,a:0.08},"cinematic":{r:20,g:12,b:30,a:0.1},"noir":{r:0,g:0,b:0,a:0.25},"golden":{r:40,g:20,b:0,a:0.1},"documentary":{r:8,g:8,b:5,a:0.05}};
+        const grade=grades[styleId]||grades["cinematic"];
+        ctx.fillStyle="rgba("+grade.r+","+grade.g+","+grade.b+","+grade.a+")";
+        ctx.globalCompositeOperation="multiply";ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation="source-over";
+        const vig=ctx.createRadialGradient(W/2,H/2,W*0.1,W/2,H/2,W*0.85);
+        vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.82)");
+        ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#000";ctx.fillRect(0,0,W,H*0.072);ctx.fillRect(0,H*0.928,W,H*0.072);
+        for(let g=0;g<40;g++){const gv=Math.random()>0.5?180:20;ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.012)";ctx.fillRect(Math.random()*W,Math.random()*H,1.5,1.5);}
+        if(t<0.05){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.05)+")";ctx.fillRect(0,0,W,H);}
+        if(t>0.92){ctx.fillStyle="rgba(0,0,0,"+((t-0.92)/0.08)+")";ctx.fillRect(0,0,W,H);}
+        return;
+      }
 
       // ── CAMERA: cinematic push-in with subtle drift ─────────
       const pushIn=1+t*0.05;
@@ -3092,8 +3143,8 @@ function P4({ go, setUser }) {
         {/* Live subscriber counter */}
         <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
           <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 48px",textAlign:"center",boxShadow:"0 0 24px "+GOLD+"33"}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LIVE SUBSCRIBERS</div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:42,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>0</div>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LAUNCHED</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>LAUNCHED JUNE 1ST</div>
             <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING</div>
           </div>
         </div>
