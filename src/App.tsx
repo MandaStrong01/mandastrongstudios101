@@ -30,9 +30,9 @@ const DIM = "#aaaaaa";
 const TOTAL = 23;
 
 const STRIPE = {
-  basic:"https://buy.stripe.com/cNi8wRe8a9ZtcZh7YeafS05",
-  pro:"https://buy.stripe.com/cNi8wRe8a3B52kDceuafS04",
-  studio:"https://buy.stripe.com/00wcN7fcefjNgbtceuafS03",
+  basic:"https://buy.stripe.com/4gM5kFaVYfjN7EX0vMafS00",
+  pro:"https://buy.stripe.com/14A00l8NQ0oTbVd3HYafS01",
+  studio:"https://buy.stripe.com/fZubJ35BE3B53oHdiyafS02",
 };
 
 const G = (v, sm) => ({
@@ -3092,8 +3092,8 @@ function P4({ go, setUser }) {
         {/* Live subscriber counter */}
         <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
           <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 48px",textAlign:"center",boxShadow:"0 0 24px "+GOLD+"33"}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LAUNCHED</div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>LAUNCHED JUNE 1ST</div>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LIVE SUBSCRIBERS</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:42,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>0</div>
             <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING</div>
           </div>
         </div>
