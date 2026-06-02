@@ -30,9 +30,9 @@ const DIM = "#aaaaaa";
 const TOTAL = 23;
 
 const STRIPE = {
-  basic:"https://buy.stripe.com/4gM5kFaVYfjN7EX0vMafS00",
-  pro:"https://buy.stripe.com/14A00l8NQ0oTbVd3HYafS01",
-  studio:"https://buy.stripe.com/fZubJ35BE3B53oHdiyafS02",
+  basic:"https://buy.stripe.com/cNi8wRe8a9ZtcZh7YeafS05",
+  pro:"https://buy.stripe.com/cNi8wRe8a3B52kDceuafS04",
+  studio:"https://buy.stripe.com/00wcN7fcefjNgbtceuafS03",
 };
 
 const G = (v, sm) => ({
