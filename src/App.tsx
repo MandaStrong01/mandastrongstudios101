@@ -2765,7 +2765,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 ))}
               </div>
             )}
-            <input ref={realityPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
+            <input ref={realityPhotoRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,image/gif,image/*" multiple style={{display:"none"}} onChange={e=>{
               const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
@@ -2774,6 +2774,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
               📷 {refImages.length===0?"ADD PHOTOS (UP TO 6)":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED"}
             </button>
             <div style={{color:GOLDDIM,fontSize:9,marginTop:5,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others = foreground layers · guarantees photorealistic output</div>
+            <div style={{textAlign:"center",marginTop:6}}><a href="https://photos.google.com" target="_blank" rel="noopener noreferrer" style={{color:GOLD,fontSize:9,letterSpacing:1,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>📂 CHROMEBOOK USERS: Open Google Photos → download your photo → then add it here</a></div>
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:12,marginBottom:12}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:5}}>⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)</div>
