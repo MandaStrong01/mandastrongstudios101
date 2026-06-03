@@ -1510,6 +1510,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const canvasRef=useRef(null);
   const videoRef=useRef(null);
   const refMediaRef=useRef(null);
+  const realityPhotoRef=useRef(null);
   const [prompt,setPrompt]=useState("");
   const [title,setTitle]=useState("");
   const [duration,setDuration]=useState(30);
@@ -2764,16 +2765,12 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 ))}
               </div>
             )}
-            <button onClick={()=>{
-              if(refImages.length>=6){alert("Max 6 photos");return;}
-              const i=document.createElement("input");
-              i.type="file";i.accept="image/*";i.multiple=true;
-              i.onchange=e=>{
-                const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
-                setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name}))]);
-              };
-              i.click();
-            }} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+            <input ref={realityPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
+              const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
+              setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name}))]);
+              if(realityPhotoRef.current)realityPhotoRef.current.value="";
+            }}/>
+            <button onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
               📷 {refImages.length===0?"ADD PHOTOS (UP TO 6)":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED"}
             </button>
             <div style={{color:GOLDDIM,fontSize:9,marginTop:5,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others = foreground layers · guarantees photorealistic output</div>
