@@ -1574,6 +1574,10 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   // ════════════════════════════════════════════════════════════════
   const generateVideo=async()=>{
     if(!prompt.trim()){alert("Describe your scene first");return;}
+    if(refImages.length===0){
+      const go=window.confirm("No photos loaded in Reality Engine — output may be cartoon/illustrated.\n\nAdd photos first for photorealistic results.\n\nContinue anyway?");
+      if(!go)return;
+    }
     setGenerating(true);setProgress(0);setLog([]);setVideoUrl("");setSaved(false);
     addLog("MandaStrong Engine v2 — Cinema-grade renderer initialising...");
     setProgress(5);
@@ -2751,28 +2755,49 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <div>
                 <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900}}>✦ REALITY ENGINE — UPLOAD YOUR PHOTOS</div>
-                <div style={{color:DIM,fontSize:10,marginTop:2}}>Upload 1-6 real photos. Claude builds your scene from them. Guaranteed photorealistic — no cartoons.</div>
+                <div style={{color:DIM,fontSize:10,marginTop:2}}>Upload 1-6 real photos or videos. Drag & drop or click. Guaranteed photorealistic — no cartoons.</div>
               </div>
             </div>
             {refImages.length>0&&(
               <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:8}}>
                 {refImages.map((ri,i)=>(
                   <div key={i} style={{position:"relative"}}>
-                    <img src={ri.url} alt={ri.name||"ref"} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}}/>
+                    {ri.isVideo
+                      ?<video src={ri.url} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}} muted/>
+                      :<img src={ri.url} alt={ri.name||"ref"} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}}/>
+                    }
                     <button onClick={()=>setRefImages(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:1,right:1,background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"0 4px",cursor:"pointer",fontSize:9,fontWeight:900,lineHeight:1.2}}>✕</button>
                     <div style={{color:GOLD,fontSize:8,letterSpacing:1,marginTop:1,textAlign:"center",fontWeight:900}}>{i===0?"BG":"L"+i}</div>
                   </div>
                 ))}
               </div>
             )}
-            <input ref={realityPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
-              const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
-              setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name}))]);
+            <div
+              onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="rgba(232,201,109,0.08)";}}
+              onDragLeave={e=>{e.currentTarget.style.borderColor="";e.currentTarget.style.background="";}}
+              onDrop={e=>{
+                e.preventDefault();
+                e.currentTarget.style.borderColor="";e.currentTarget.style.background="";
+                if(refImages.length>=6){alert("Max 6 photos");return;}
+                const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/")||f.type.startsWith("video/")).slice(0,6-refImages.length);
+                setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
+              }}
+              style={{border:"2px dashed "+GOLDDIM,padding:"12px 8px",textAlign:"center",marginBottom:6,transition:"all 0.2s"}}>
+              <div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
+              <div style={{color:DIM,fontSize:9,marginTop:2}}>JPG · PNG · MP4 · MOV · up to 6 files</div>
+            </div>
+            <input ref={realityPhotoRef} type="file" accept="image/*,video/*" multiple style={{display:"none"}} onChange={e=>{
+              const files=Array.from(e.target.files||[]).filter(f=>f.type.startsWith("image/")||f.type.startsWith("video/")).slice(0,6-refImages.length);
+              setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
             }}/>
             <button onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-              📷 {refImages.length===0?"ADD PHOTOS (UP TO 6)":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED"}
+              📷 {refImages.length===0?"ADD PHOTOS / VIDEOS (UP TO 6)":"ADD MORE — "+refImages.length+"/6 LOADED"}
             </button>
+            <a href="https://photos.google.com" target="_blank" rel="noopener noreferrer"
+              style={{display:"block",background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:GOLDDIM,padding:"8px",textAlign:"center",fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none",fontFamily:"'Rajdhani',sans-serif",marginTop:4}}>
+              🌐 CHROMEBOOK USERS → OPEN GOOGLE PHOTOS → download photo → then Add Photos above
+            </a>
             <div style={{color:GOLDDIM,fontSize:9,marginTop:5,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others = foreground layers · guarantees photorealistic output</div>
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:12,marginBottom:12}}>
