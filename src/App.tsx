@@ -1523,6 +1523,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [refMediaType,setRefMediaType]=useState("");
   const [refDataUrl,setRefDataUrl]=useState(null);
   const [refImages,setRefImages]=useState([]);
+  const [realityDragOver,setRealityDragOver]=useState(false);
   const [renderStyle,setRenderStyle]=useState("photorealistic");
   const [genre,setGenre]=useState("");
   const addLog=(msg)=>setLog(p=>[...p,msg]);
@@ -2770,11 +2771,32 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
             }}/>
-            <button onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
-              📷 {refImages.length===0?"ADD PHOTOS (UP TO 6)":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED"}
-            </button>
-            <div style={{color:GOLDDIM,fontSize:9,marginTop:5,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others = foreground layers · guarantees photorealistic output</div>
-            <div style={{textAlign:"center",marginTop:6}}><a href="https://photos.google.com" target="_blank" rel="noopener noreferrer" style={{color:GOLD,fontSize:9,letterSpacing:1,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>📂 CHROMEBOOK USERS: Open Google Photos → download your photo → then add it here</a></div>
+            <div
+              onDragOver={e=>{e.preventDefault();e.stopPropagation();setRealityDragOver(true);}}
+              onDragEnter={e=>{e.preventDefault();e.stopPropagation();setRealityDragOver(true);}}
+              onDragLeave={e=>{e.preventDefault();e.stopPropagation();setRealityDragOver(false);}}
+              onDrop={e=>{
+                e.preventDefault();e.stopPropagation();setRealityDragOver(false);
+                if(refImages.length>=6){alert("Max 6 photos");return;}
+                const dropped=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/")).slice(0,6-refImages.length);
+                if(dropped.length===0){alert("Please drop image files only.");return;}
+                setRefImages(p=>[...p,...dropped.map(f=>({url:URL.createObjectURL(f),name:f.name}))]);
+              }}
+              onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}}
+              style={{
+                width:"100%",border:"2px dashed "+(realityDragOver?GOLD:GOLDDIM),
+                borderRadius:6,padding:"18px 10px",textAlign:"center",cursor:"pointer",
+                background:realityDragOver?"rgba(232,201,109,0.08)":"transparent",
+                transition:"all 0.2s",boxSizing:"border-box",marginBottom:6
+              }}>
+              <div style={{fontSize:28,marginBottom:6}}>📷</div>
+              <div style={{color:realityDragOver?GOLD:GOLDDIM,fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+                {refImages.length===0?"DRAG YOUR PHOTOS HERE — OR CLICK TO BROWSE":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED · DRAG OR CLICK"}
+              </div>
+              <div style={{color:DIM,fontSize:9,marginTop:4,letterSpacing:1}}>Drag from your Photos folder · JPG PNG WEBP HEIC supported · up to 6 photos</div>
+            </div>
+            <div style={{color:GOLDDIM,fontSize:9,marginTop:2,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others = foreground layers · guarantees photorealistic output</div>
+            <div style={{textAlign:"center",marginTop:6}}><a href="https://photos.google.com" target="_blank" rel="noopener noreferrer" style={{color:GOLD,fontSize:9,letterSpacing:1,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>📂 CHROMEBOOK USERS: Open Google Photos → download photo first → then drag or click here</a></div>
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:12,marginBottom:12}}>
             <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:5}}>⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)</div>
