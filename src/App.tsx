@@ -3143,9 +3143,9 @@ function P4({ go, setUser }) {
         {/* Live subscriber counter */}
         <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
           <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 48px",textAlign:"center",boxShadow:"0 0 24px "+GOLD+"33"}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>LAUNCHED</div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>LAUNCHED JUNE 1ST</div>
-            <div style={{color:"#22c55e",fontSize:9,letterSpacing:3,marginTop:4}}>● GROWING</div>
+            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>USER COUNT</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:42,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>0</div>
+            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,marginTop:4}}>launched june 1st 2026</div>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:36}}>
@@ -4488,18 +4488,15 @@ function P23({ go }) {
   },[]);
   return(
     <div style={{...Sp,padding:0,background:"#000"}}>
-      <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-        style={{width:"100%",display:"block",objectFit:"cover",background:"#000"}}
-        onError={e=>{e.currentTarget.style.display="none";}}>
-        
-        
-        <source src="/background.mp4" type="video/mp4"/>
-        <source src="background.mp4" type="video/mp4"/>
-      </video>
-      <div style={{padding:"28px 40px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:20}}>THAT\'S ALL FOLKS</h1>
+          <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
+            style={{width:"100%",maxHeight:300,objectFit:"cover",display:"block",border:"1px solid "+GOLD,marginBottom:20,boxShadow:"0 0 30px "+GOLD+"44"}}
+            onError={e=>{e.currentTarget.style.display="none";}}>
+            <source src="/background.mp4" type="video/mp4"/>
+            <source src="background.mp4" type="video/mp4"/>
+          </video>
           <div style={{color:WHITE,fontSize:14,letterSpacing:3,marginBottom:28}}>THANK YOU FOR CREATING WITH US</div>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
           <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500",border:"2px solid "+GOLD}}>
@@ -4534,15 +4531,12 @@ function P23({ go }) {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
 export default function App() {
   const [page,setPage]=useState(1);
   const [menu,setMenu]=useState(false);
-  const [visited,setVisited]=useState(()=>new Set([1]));
-
   useEffect(()=>{
     // Fonts
     const link=document.createElement("link");
