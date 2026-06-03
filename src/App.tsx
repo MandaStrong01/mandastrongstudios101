@@ -3201,6 +3201,201 @@ function P4({ go, setUser }) {
   );
 }
 
+
+function MergeVideos({ onSave }) {
+  const [clips, setClips] = useState([]);
+  const [merging, setMerging] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [mergeLog, setMergeLog] = useState([]);
+  const [mergedUrl, setMergedUrl] = useState("");
+  const fileRef = useRef(null);
+
+  const addClips = (files) => {
+    const newClips = Array.from(files).filter(f=>f.type.startsWith("video")).map(f=>({
+      id: Date.now()+Math.random(),
+      name: f.name,
+      url: URL.createObjectURL(f),
+      file: f,
+      duration: 0,
+    }));
+    setClips(p=>[...p,...newClips]);
+  };
+
+  const move = (from, to) => {
+    setClips(p=>{
+      const arr=[...p];
+      const moved=arr.splice(from,1)[0];
+      arr.splice(to,0,moved);
+      return arr;
+    });
+  };
+
+  const log = (msg) => setMergeLog(p=>[...p,msg]);
+
+  const mergeAll = async () => {
+    if(clips.length < 2){ alert("Add at least 2 videos to merge."); return; }
+    setMerging(true); setProgress(0); setMergeLog([]); setMergedUrl("");
+    log("MandaStrong Merge Engine — combining "+clips.length+" videos in sequence...");
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1920; canvas.height = 1080;
+      const ctx = canvas.getContext("2d");
+      const fps = 24;
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const stream = canvas.captureStream(fps);
+      const recorder = new MediaRecorder(stream, {mimeType, videoBitsPerSecond:8000000});
+      const chunks = [];
+      recorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+      recorder.start(100);
+
+      for(let ci=0; ci<clips.length; ci++) {
+        const clip = clips[ci];
+        setProgress(Math.round((ci/clips.length)*90));
+        log("  Adding clip "+(ci+1)+"/"+clips.length+": "+clip.name.slice(0,40));
+
+        await new Promise(resolve => {
+          const vid = document.createElement("video");
+          vid.muted = true; vid.playsInline = true;
+          vid.src = clip.url;
+          let done = false;
+          const finish = () => { if(!done){ done=true; resolve(); } };
+
+          vid.onloadeddata = async () => {
+            try { await vid.play(); } catch(e) {}
+            const clipDur = Math.min(vid.duration || 30, 120);
+            const startTime = Date.now();
+            const msPerF = Math.round(1000/fps);
+            let lastDraw = performance.now();
+
+            const draw = () => {
+              if(done) return;
+              const elapsed = (Date.now()-startTime)/1000;
+              if(vid.ended || elapsed >= clipDur) { vid.pause(); finish(); return; }
+              const now = performance.now();
+              if(now - lastDraw >= msPerF - 2) {
+                try {
+                  ctx.clearRect(0,0,1920,1080);
+                  ctx.drawImage(vid,0,0,1920,1080);
+                  // Vignette
+                  const vig = ctx.createRadialGradient(960,540,100,960,540,1000);
+                  vig.addColorStop(0,"rgba(0,0,0,0)"); vig.addColorStop(1,"rgba(0,0,0,0.7)");
+                  ctx.fillStyle=vig; ctx.fillRect(0,0,1920,1080);
+                  // Letterbox
+                  ctx.fillStyle="#000";
+                  ctx.fillRect(0,0,1920,78); ctx.fillRect(0,1002,1920,78);
+                  lastDraw = now;
+                } catch(e) { finish(); return; }
+              }
+              requestAnimationFrame(draw);
+            };
+            requestAnimationFrame(draw);
+          };
+          vid.onerror = finish;
+          setTimeout(finish, 180000);
+          vid.load();
+        });
+
+        // Brief black gap between clips
+        if(ci < clips.length-1) {
+          const gapFrames = fps * 0.5;
+          const gapStart = performance.now();
+          await new Promise(resolve => {
+            let f = 0;
+            const gap = () => {
+              if(f >= gapFrames) { resolve(); return; }
+              ctx.fillStyle = "#000"; ctx.fillRect(0,0,1920,1080);
+              f++;
+              const next = gapStart + (f*(1000/fps));
+              setTimeout(gap, Math.max(4, next-performance.now()));
+            };
+            gap();
+          });
+        }
+      }
+
+      setProgress(95);
+      log("Finalising merged film...");
+      recorder.stop();
+      await new Promise(r => { recorder.onstop = r; });
+      const blob = new Blob(chunks, {type:mimeType});
+      const url = URL.createObjectURL(blob);
+      setMergedUrl(url);
+      setProgress(100);
+      log("✓ Merge complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+clips.length+" clips combined");
+
+      const fn = "MandaStrong_Merged_"+Date.now()+".webm";
+      try {
+        const clipId = "merge_"+Date.now();
+        await saveClipToDB(clipId, blob, fn, "video/webm");
+        if(onSave) onSave({id:clipId, name:fn, type:"video/webm", url:URL.createObjectURL(blob), file:new File([blob],fn,{type:"video/webm"}), dbId:clipId});
+        log("✓ Saved to media library — ready for timeline");
+      } catch(e) {}
+
+    } catch(e) { log("Merge error: "+e.message); }
+    setMerging(false);
+  };
+
+  return (
+    <div>
+      <input ref={fileRef} type="file" multiple accept="video/*" style={{display:"none"}} onChange={e=>addClips(e.target.files)}/>
+      <button onClick={()=>fileRef.current&&fileRef.current.click()}
+        style={{width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:10}}>
+        ⬆ ADD VIDEOS TO MERGE ({clips.length} loaded)
+      </button>
+      {clips.length>0&&(
+        <div style={{marginBottom:10}}>
+          <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:6}}>DRAG TO REORDER — TOP = FIRST IN FILM</div>
+          {clips.map((c,i)=>(
+            <div key={c.id}
+              draggable
+              onDragStart={e=>e.dataTransfer.setData("mergeIdx",String(i))}
+              onDragOver={e=>e.preventDefault()}
+              onDrop={e=>{e.preventDefault();const from=Number(e.dataTransfer.getData("mergeIdx"));if(from!==i)move(from,i);}}
+              style={{background:"#0a0800",border:"1px solid "+GOLDDIM,padding:"8px 12px",marginBottom:4,display:"flex",alignItems:"center",gap:10,cursor:"grab"}}>
+              <span style={{color:GOLD,fontWeight:900,fontSize:13}}>⣿</span>
+              <span style={{color:GOLD,fontWeight:900,fontSize:11,minWidth:20}}>{i+1}.</span>
+              <span style={{color:WHITE,fontSize:11,flex:1}}>{c.name.slice(0,50)}</span>
+              <div style={{display:"flex",gap:4}}>
+                {i>0&&<button onClick={()=>move(i,i-1)} style={{background:"none",border:"1px solid "+GOLDDIM,color:GOLD,padding:"2px 7px",cursor:"pointer",fontSize:10,fontWeight:900}}>▲</button>}
+                {i<clips.length-1&&<button onClick={()=>move(i,i+1)} style={{background:"none",border:"1px solid "+GOLDDIM,color:GOLD,padding:"2px 7px",cursor:"pointer",fontSize:10,fontWeight:900}}>▼</button>}
+                <button onClick={()=>setClips(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"2px 7px",cursor:"pointer",fontSize:10,fontWeight:900}}>✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {clips.length>=2&&(
+        <button onClick={mergeAll} disabled={merging}
+          style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"12px",cursor:merging?"not-allowed":"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",opacity:merging?0.7:1,marginBottom:8}}>
+          {merging?"⟳ MERGING... "+progress+"%":"⚡ MERGE IN SEQUENCE → SAVE TO TIMELINE"}
+        </button>
+      )}
+      {merging&&(
+        <div style={{height:4,background:"#111",marginBottom:8}}>
+          <div style={{width:progress+"%",height:"100%",background:"linear-gradient(90deg,"+GOLDDIM+","+GOLD+")",transition:"width .3s"}}/>
+        </div>
+      )}
+      {mergeLog.length>0&&(
+        <div style={{background:"#000",border:"1px solid "+GOLDDIM,padding:10,maxHeight:100,overflowY:"auto",marginBottom:8}}>
+          {mergeLog.map((l,i)=>(
+            <div key={i} style={{color:i===mergeLog.length-1?"#22c55e":DIM,fontSize:10,lineHeight:1.7}}>
+              {i===mergeLog.length-1?"▶ ":"  "}{l}
+            </div>
+          ))}
+        </div>
+      )}
+      {mergedUrl&&(
+        <div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px"}}>
+          <div style={{color:"#22c55e",fontWeight:900,fontSize:11,letterSpacing:2,marginBottom:6}}>✓ MERGED FILM SAVED TO MEDIA LIBRARY — READY FOR TIMELINE</div>
+          <a href={mergedUrl} download="MandaStrong_Merged.webm"
+            style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none"}}>⬇ DOWNLOAD MERGED FILM</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function P11({ mediaLib, setMediaLib }) {
   const fileRef = useRef(null);
   const onFiles = files => {
@@ -3249,6 +3444,13 @@ function P11({ mediaLib, setMediaLib }) {
           </div>
         )}
         <input ref={fileRef} type="file" multiple accept="video/*,audio/*,image/*" onChange={e=>onFiles(e.target.files)} style={{display:"none"}}/>
+      </div>
+      <div style={{marginTop:20}}>
+        <div style={{background:"linear-gradient(135deg,#0a0500,#1a0a00)",border:"2px solid "+GOLD,padding:16,marginBottom:12}}>
+          <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:6}}>✦ MERGE VIDEOS — COMBINE & ORDER BEFORE TIMELINE</div>
+          <div style={{color:DIM,fontSize:11,marginBottom:12,lineHeight:1.7}}>Upload 2 or more videos. Drag to reorder. Hit MERGE IN SEQUENCE to combine them into one film ready for the timeline.</div>
+          <MergeVideos onSave={a=>{setMediaLib(p=>[...p,a]);}}/>
+        </div>
       </div>
     </div>
   );
@@ -3330,8 +3532,26 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
             onDrop={e=>{e.preventDefault();const id=e.dataTransfer.getData("assetId");const a=mediaLib.find(x=>String(x.id)===id);if(a)addToTrack(idx,a);}}
             style={{background:"#0a0a0a",border:"1px dashed "+GOLDDIM,minHeight:42,padding:6,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
             {(timeline[idx]||[]).map((a,i)=>(
-              <div key={i} style={{background:GOLDDIM,padding:"3px 10px",fontSize:12,color:"#000",fontWeight:900,display:"flex",alignItems:"center",gap:5}}>
-                {a.name.slice(0,12)}
+              <div key={i} draggable
+                onDragStart={e=>{e.dataTransfer.setData("trackIdx",String(idx));e.dataTransfer.setData("clipIdx",String(i));}}
+                onDragOver={e=>e.preventDefault()}
+                onDrop={e=>{
+                  e.preventDefault();
+                  const fromTrack=Number(e.dataTransfer.getData("trackIdx"));
+                  const fromClip=Number(e.dataTransfer.getData("clipIdx"));
+                  if(fromTrack===idx&&fromClip!==i){
+                    setTimeline(p=>{
+                      const arr=[...(p[idx]||[])];
+                      const moved=arr.splice(fromClip,1)[0];
+                      arr.splice(i,0,moved);
+                      return{...p,[idx]:arr};
+                    });
+                  }
+                }}
+                style={{background:GOLDDIM,padding:"3px 10px",fontSize:12,color:"#000",fontWeight:900,display:"flex",alignItems:"center",gap:5,cursor:"grab",userSelect:"none",border:"2px solid transparent"}}
+                onMouseEnter={e=>{e.currentTarget.style.border="2px solid #000";}}
+                onMouseLeave={e=>{e.currentTarget.style.border="2px solid transparent";}}>
+                ⣿ {a.name.slice(0,12)}
                 <button onClick={()=>setTimeline(p=>({...p,[idx]:p[idx].filter((_,j)=>j!==i)}))}
                   style={{background:"none",border:"none",color:"#000",cursor:"pointer",fontSize:11,padding:0}}>✕</button>
               </div>
