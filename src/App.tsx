@@ -2773,10 +2773,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
             <button onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
               📷 {refImages.length===0?"ADD PHOTOS (UP TO 6)":"ADD MORE PHOTOS — "+refImages.length+"/6 LOADED"}
             </button>
-            <a href="https://photos.google.com" target="_blank" rel="noopener noreferrer"
-              style={{display:"block",background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:GOLDDIM,padding:"8px",textAlign:"center",fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none",fontFamily:"'Rajdhani',sans-serif",marginTop:4}}>
-              🌐 CHROMEBOOK USERS → OPEN GOOGLE PHOTOS → download photo → then Add Photos above
-            </a>
             <div style={{color:GOLDDIM,fontSize:9,marginTop:5,letterSpacing:1,textAlign:"center"}}>1st photo = BACKGROUND · others = foreground layers · guarantees photorealistic output</div>
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:12,marginBottom:12}}>
