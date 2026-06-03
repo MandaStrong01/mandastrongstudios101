@@ -2783,16 +2783,15 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
                 e.currentTarget.style.background="transparent";
                 e.currentTarget.style.boxShadow="none";
                 if(refImages.length>=6){alert("Max 6 photos/videos");return;}
-                const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/")||f.type.startsWith("video/")).slice(0,6-refImages.length);
-                if(files.length===0){alert("Images and videos only — JPG PNG MP4 MOV");return;}
+                const files=Array.from(e.dataTransfer.files).slice(0,6-refImages.length);
                 setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               }}
               style={{border:"2px dashed "+GOLDDIM,padding:"16px 8px",textAlign:"center",marginBottom:6,transition:"border 0.15s, background 0.15s, box-shadow 0.15s",cursor:"copy",background:"transparent"}}>
               <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,pointerEvents:"none"}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
               <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · up to 6 files · drop zone lights up gold when ready</div>
             </div>
-            <input ref={realityPhotoRef} type="file" accept="image/*,video/*" multiple style={{display:"none"}} onChange={e=>{
-              const files=Array.from(e.target.files||[]).filter(f=>f.type.startsWith("image/")||f.type.startsWith("video/")).slice(0,6-refImages.length);
+            <input ref={realityPhotoRef} type="file" accept="*/*" multiple style={{display:"none"}} onChange={e=>{
+              const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
             }}/>
