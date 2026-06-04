@@ -2773,25 +2773,21 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
               </div>
             )}
             <div
-              onDragEnter={e=>{e.preventDefault();e.stopPropagation();e.currentTarget.setAttribute("data-drag","1");e.currentTarget.style.border="2px dashed "+GOLD;e.currentTarget.style.background="rgba(232,201,109,0.12)";e.currentTarget.style.boxShadow="0 0 18px "+GOLD+"88";}}
-              onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
-              onDragLeave={e=>{e.preventDefault();e.stopPropagation();e.currentTarget.removeAttribute("data-drag");e.currentTarget.style.border="2px dashed "+GOLDDIM;e.currentTarget.style.background="transparent";e.currentTarget.style.boxShadow="none";}}
+              onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="rgba(232,201,109,0.08)";}}
+              onDragLeave={e=>{e.currentTarget.style.borderColor="";e.currentTarget.style.background="";}}
               onDrop={e=>{
-                e.preventDefault();e.stopPropagation();
-                e.currentTarget.removeAttribute("data-drag");
-                e.currentTarget.style.border="2px dashed "+GOLDDIM;
-                e.currentTarget.style.background="transparent";
-                e.currentTarget.style.boxShadow="none";
-                if(refImages.length>=6){alert("Max 6 photos/videos");return;}
-                const files=Array.from(e.dataTransfer.files).slice(0,6-refImages.length);
+                e.preventDefault();
+                e.currentTarget.style.borderColor="";e.currentTarget.style.background="";
+                if(refImages.length>=6){alert("Max 6 photos");return;}
+                const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/")||f.type.startsWith("video/")).slice(0,6-refImages.length);
                 setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               }}
-              style={{border:"2px dashed "+GOLDDIM,padding:"16px 8px",textAlign:"center",marginBottom:6,transition:"border 0.15s, background 0.15s, box-shadow 0.15s",cursor:"copy",background:"transparent"}}>
-              <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,pointerEvents:"none"}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
-              <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · up to 6 files · drop zone lights up gold when ready</div>
+              style={{border:"2px dashed "+GOLDDIM,padding:"12px 8px",textAlign:"center",marginBottom:6,transition:"all 0.2s"}}>
+              <div style={{color:GOLDDIM,fontSize:10,fontWeight:900,letterSpacing:2}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
+              <div style={{color:DIM,fontSize:9,marginTop:2}}>JPG · PNG · MP4 · MOV · up to 6 files</div>
             </div>
-            <input ref={realityPhotoRef} type="file" accept="*/*" multiple style={{display:"none"}} onChange={e=>{
-              const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
+            <input ref={realityPhotoRef} type="file" accept="image/*,video/*" multiple style={{display:"none"}} onChange={e=>{
+              const files=Array.from(e.target.files||[]).filter(f=>f.type.startsWith("image/")||f.type.startsWith("video/")).slice(0,6-refImages.length);
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
             }}/>
