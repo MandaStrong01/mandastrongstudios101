@@ -1601,6 +1601,43 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     const pr=prompt.toLowerCase();
     const styleId=renderStyle||"photorealistic";
 
+    // ══════════════════════════════════════════════
+    // CLAUDE SCENE INTELLIGENCE — AI reads your prompt
+    // ══════════════════════════════════════════════
+    let claudeScene=null;
+    try{
+      addLog("Claude analysing scene...");
+      const sceneRes=await proxyFetch({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:800,
+        system:`You are a cinematic scene renderer for MandaStrong Studio. Read the user's scene description and return ONLY a JSON object with these exact keys:
+{
+  "sky": "hex colour for sky/background e.g. #1a0a2e",
+  "horizon": "hex colour for horizon glow",
+  "ground": "hex colour for ground/floor",
+  "light": "hex colour for main light source",
+  "mood": "one word: dawn|day|dusk|night|interior|space",
+  "elements": ["list","of","visual","elements"],
+  "people": true,
+  "personCount": 1,
+  "personDesc": "brief description of people",
+  "cameraAngle": "wide|medium|closeup|aerial|low",
+  "timeOfDay": "dawn|morning|noon|afternoon|dusk|night",
+  "location": "school|park|office|street|beach|space|cave|forest|stadium",
+  "era": "ancient|victorian|modern|futuristic",
+  "grade": "warm|cool|neutral|noir|teal-orange|gold-black"
+}
+Return ONLY the JSON. No markdown. No explanation.`,
+        messages:[{role:"user",content:prompt}]
+      });
+      if(sceneRes&&sceneRes.content&&sceneRes.content[0]){
+        const raw=sceneRes.content[0].text.replace(/```json|```/g,"").trim();
+        claudeScene=JSON.parse(raw);
+        addLog("\u2713 Claude scene designed: "+(claudeScene.location||"")+" "+(claudeScene.timeOfDay||"")+" "+(claudeScene.mood||""));
+      }
+    }catch(e){addLog("Scene design: using built-in intelligence");}
+    setProgress(20);
+
     // SCENE INTELLIGENCE — comprehensive prompt reading
     const scene={
       // TIME OF DAY
@@ -1748,8 +1785,37 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     };
     const grade=grades[styleId]||grades.photorealistic;
 
+    // Apply Claude's scene design if available
+    const skyCol=claudeScene?.sky||null;
+    const horizonCol=claudeScene?.horizon||null;
+    const groundCol=claudeScene?.ground||null;
+    const lightCol=claudeScene?.light||null;
+    const scenePersonDesc=claudeScene?.personDesc||null;
+    const scenePersonCount=claudeScene?.personCount||0;
+    // Override scene flags with Claude's intelligence
+    if(claudeScene){
+      if(claudeScene.people) scene.hasPerson=true;
+      if(claudeScene.personCount>1) scene.hasMultiplePeople=true;
+      if(claudeScene.location==="school") scene.isClassroom=true;
+      if(claudeScene.location==="space") scene.isSpace=true;
+      if(claudeScene.location==="beach"||claudeScene.location==="ocean") scene.isOcean=true;
+      if(claudeScene.location==="forest") scene.isForest=true;
+      if(claudeScene.location==="street") scene.isCity=true;
+      if(claudeScene.mood==="night") scene.isNight=true;
+      if(claudeScene.mood==="dawn") scene.isGolden=true;
+      if(claudeScene.era==="ancient") scene.isAncient=true;
+      if(claudeScene.era==="futuristic") scene.isFuture=true;
+    }
+
     addLog("Scene analysed: "+Object.keys(scene).filter(k=>scene[k]).join(", ").slice(0,80));
-    setProgress(15);
+    setProgress(20);
+
+    // Helper to parse hex to rgb
+    const hexRgb=(hex)=>{
+      if(!hex) return null;
+      const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+      return {r,g,b};
+    };
 
     // ════════════════════════════════════════════════════════════
     // THE RENDERER — every frame, every layer
@@ -1803,7 +1869,21 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
 
       // ─────────────────────────────────────────────────────────
       // LAYER 1: SKY / BACKGROUND
+      // Claude-designed colours override defaults when available
       // ─────────────────────────────────────────────────────────
+
+      // If Claude provided sky colour, paint it first as base
+      if(skyCol){
+        const sc=hexRgb(skyCol);
+        if(sc){
+          const skyG=ctx.createLinearGradient(0,0,0,H);
+          skyG.addColorStop(0,`rgb(${sc.r},${sc.g},${sc.b})`);
+          if(horizonCol){const hc=hexRgb(horizonCol);if(hc)skyG.addColorStop(0.7,`rgb(${hc.r},${hc.g},${hc.b})`);}
+          if(groundCol){const gc=hexRgb(groundCol);if(gc)skyG.addColorStop(1,`rgb(${gc.r},${gc.g},${gc.b})`);}
+          ctx.fillStyle=skyG;ctx.fillRect(0,0,W,H);
+        }
+      }
+
       if(scene.isSpace){
         // Deep space with layered nebulae and 400+ stars
         const sky=ctx.createLinearGradient(0,0,W,H);
@@ -2388,8 +2468,16 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
             headG.addColorStop(1,"rgba("+skinShadow[0]+","+skinShadow[1]+","+skinShadow[2]+",1)");
             ctx.fillStyle=headG;
             ctx.beginPath();ctx.ellipse(fx+sway,fy-H*0.13,H*0.034*(1+breath),H*0.044*(1+breath),0,0,Math.PI*2);ctx.fill();
-            // Hair
-            const hairCol=isElderly?[140,140,135]:[35,22,12];
+            // Hair — use Claude's person description
+            let hairCol=isElderly?[140,140,135]:[35,22,12];
+            if(scenePersonDesc){
+              const pd=scenePersonDesc.toLowerCase();
+              if(/blonde|blond/.test(pd)) hairCol=[195,165,90];
+              else if(/red hair|copper|auburn/.test(pd)) hairCol=[160,60,30];
+              else if(/white hair|grey hair/.test(pd)) hairCol=[200,198,195];
+              else if(/dark hair|black hair/.test(pd)) hairCol=[18,12,8];
+              else if(/brown hair/.test(pd)) hairCol=[80,50,25];
+            }
             const hairG=ctx.createRadialGradient(fx+sway,fy-H*0.16,0,fx+sway,fy-H*0.155,H*0.048);
             hairG.addColorStop(0,"rgba("+hairCol[0]+","+hairCol[1]+","+hairCol[2]+",0.95)");
             hairG.addColorStop(1,"rgba("+(hairCol[0]-15)+","+(hairCol[1]-10)+","+(hairCol[2]-6)+",0.85)");
@@ -2406,8 +2494,21 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
             // Mouth
             ctx.fillStyle="rgba(140,75,60,0.7)";
             ctx.fillRect(fx-H*0.008+sway,fy-H*0.108,H*0.016,H*0.003);
-            // Torso — clothing
-            const clothCol=isElderly?[60,55,50]:[35,22,12];
+            // Torso — clothing — use Claude's person description for colours
+            let clothCol=isElderly?[60,55,50]:[35,22,12];
+            if(scenePersonDesc){
+              const pd=scenePersonDesc.toLowerCase();
+              if(/blue/.test(pd)) clothCol=[30,60,140];
+              else if(/red/.test(pd)) clothCol=[160,30,30];
+              else if(/green/.test(pd)) clothCol=[30,100,50];
+              else if(/white/.test(pd)) clothCol=[220,215,210];
+              else if(/grey|gray/.test(pd)) clothCol=[100,100,100];
+              else if(/black/.test(pd)) clothCol=[18,15,15];
+              else if(/brown/.test(pd)) clothCol=[90,55,30];
+              else if(/yellow/.test(pd)) clothCol=[200,180,30];
+              else if(/denim|jeans/.test(pd)) clothCol=[45,70,130];
+              else if(/suit|formal/.test(pd)) clothCol=[40,40,50];
+            }
             const tg=ctx.createLinearGradient(fx-H*0.035+sway,fy-H*0.09,fx+H*0.035+sway,fy+H*0.08);
             tg.addColorStop(0,"rgba("+clothCol[0]+","+clothCol[1]+","+clothCol[2]+",0.97)");
             tg.addColorStop(1,"rgba("+(clothCol[0]-15)+","+(clothCol[1]-10)+","+(clothCol[2]-6)+",0.97)");
