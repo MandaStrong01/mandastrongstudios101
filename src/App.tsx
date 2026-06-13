@@ -1117,7 +1117,7 @@ function MusicVideoStudio({ onClose, onSave }) {
                   </div>
                 ):(
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
-                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
                       style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                       📷 UPLOAD PHOTO
                     </button>
@@ -1844,7 +1844,7 @@ Write the drawFrame body now.`}]
               <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,pointerEvents:"none"}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
               <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · up to 6 files · drop zone lights up gold when ready</div>
             </div>
-            <input ref={realityPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
+            <input ref={realityPhotoRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" multiple style={{display:"none"}} onChange={e=>{
               const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
@@ -1874,7 +1874,7 @@ Write the drawFrame body now.`}]
               </div>
             )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:6}}>
-              <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefMedia(URL.createObjectURL(f));setRefMediaType(f.type.startsWith("video")?"video":"image");const reader=new FileReader();reader.onload=ev=>setRefDataUrl(ev.target.result);reader.readAsDataURL(f);};i.click();}}
+              <button onClick={()=>{const i=document.createElement("input");i.type="file";i.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";i.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;setRefMedia(URL.createObjectURL(f));setRefMediaType(f.type.startsWith("video")?"video":"image");const reader=new FileReader();reader.onload=ev=>setRefDataUrl(ev.target.result);reader.readAsDataURL(f);};i.click();}}
                 style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                 📷 UPLOAD PHOTO
               </button>
@@ -2166,7 +2166,7 @@ function P3() {
               {/* Upload button */}
               {!uploads[i]?(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  <button onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*";inp2.onchange=e=>handleFile(i,e);inp2.click();}}
+                  <button onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp2.onchange=e=>handleFile(i,e);inp2.click();}}
                     style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
                     📷 PHOTO
                   </button>
@@ -3584,51 +3584,48 @@ function P23({ go }) {
   useEffect(()=>{
     if(bgRef.current){bgRef.current.muted=true;bgRef.current.defaultMuted=true;bgRef.current.play().catch(()=>{});}
   },[]);
+  const exitApp = () => {
+    try{localStorage.removeItem("ms_user");}catch{}
+    window.location.reload();
+  };
   return(
-    <div style={{...Sp,padding:0,background:"#000"}}>
+    <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
+      <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
+        style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",objectFit:"cover",zIndex:0,opacity:0.35}}
+        onError={e=>{e.currentTarget.style.display="none";}}>
+        <source src="/background.mp4" type="video/mp4"/>
+        <source src="background.mp4" type="video/mp4"/>
+      </video>
+      <div style={{position:"relative",zIndex:1,padding:"50px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
-          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:20}}>THAT\'S ALL FOLKS</h1>
-          <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-            style={{width:"100%",maxHeight:300,objectFit:"cover",display:"block",border:"1px solid "+GOLD,marginBottom:20,boxShadow:"0 0 30px "+GOLD+"44"}}
-            onError={e=>{e.currentTarget.style.display="none";}}>
-            <source src="/background.mp4" type="video/mp4"/>
-            <source src="background.mp4" type="video/mp4"/>
-          </video>
-          <div style={{color:WHITE,fontSize:14,letterSpacing:3,marginBottom:28}}>THANK YOU FOR CREATING WITH US</div>
+          <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:28}}>THAT'S ALL FOLKS</h1>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
-          <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500",border:"2px solid "+GOLD}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ THANK YOU ✦</div>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>I am Amanda Woolley — author, creative producer, and founder of MandaStrong Studio.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>This platform was built for <strong style={{color:GOLD}}>you</strong> — the creator. Not just the ones here today, but every creator who comes after. The ones who have not yet found their voice. The ones with a story the world needs to hear but no studio budget to tell it.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>You now have 600+ AI tools, a full cinema production pipeline, 54 voice characters, and a render engine that outputs in 4K. The technology once locked inside major studios now lives in your browser. What you do with it is entirely yours.</p>
-            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>To every creator using this platform today, and every single one who will discover it in the future — this was made for you. Keep creating. The world needs your stories. — <strong style={{color:GOLD}}>Amanda</strong></p>
+          <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500ee",border:"2px solid "+GOLD}}>
+            <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ A SPECIAL THANK YOU ✦</div>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px",fontStyle:"italic"}}>To all current and future creators, dreamers, and storytellers...</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>Your creativity and passion inspire positive change in the world. Through your films and stories, you have the power to educate, inspire, and bring awareness to critical issues like bullying prevention, social skills development, and humanity's collective growth.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:"0 0 12px"}}>Every piece of content you create has the potential to touch hearts, change minds, and make our world a better place. Thank you for being part of this mission to combine creative expression with meaningful impact.</p>
+            <p style={{color:WHITE,fontSize:14,lineHeight:2,margin:0}}>Together, we are building a community of creators who use their talents to spread kindness, understanding, and hope. — <strong style={{color:GOLD}}>Amanda</strong></p>
           </div>
-          <button onClick={()=>setHowOpen(o=>!o)} style={{width:"100%",background:howOpen?"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")":"#050500",border:"2px solid "+GOLD,color:howOpen?"#000":GOLD,padding:"18px 24px",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:900,letterSpacing:4,marginBottom:howOpen?0:28,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 0 30px "+GOLD+"44"}}>
+          <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#030300ee",border:"1px solid "+GOLDDIM}}>
+            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:12,textAlign:"center"}}>✦ OUR MISSION ✦</div>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>MandaStrong Studio was built on one belief: <strong style={{color:GOLD}}>every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
+            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>All proceeds from <strong style={{color:GOLD}}>MandaStrong1.Etsy.com</strong> are donated directly to humanitarian causes — veterans mental health, anti-bullying programmes in schools, and children in need.</p>
+          </div>
+          <button onClick={()=>setHowOpen(o=>!o)} style={{width:"100%",background:howOpen?"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")":"#050500ee",border:"2px solid "+GOLD,color:howOpen?"#000":GOLD,padding:"18px 24px",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:900,letterSpacing:4,marginBottom:howOpen?0:28,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 0 30px "+GOLD+"44"}}>
             <span>📖 MANDASTRONG STUDIO HOW TO USE GUIDE</span>
             <span style={{fontSize:18}}>{howOpen?"▲":"▼"}</span>
           </button>
-          {howOpen&&<div style={{background:"#030200",border:"2px solid "+GOLD,borderTop:"none",marginBottom:28}}><HowToGuide/></div>}
-          <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",margin:"28px 0"}}/>
-          <div style={{...Card(),textAlign:"left",marginBottom:24,background:"#030300",border:"1px solid "+GOLDDIM}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:3,marginBottom:12,textAlign:"center"}}>✦ OUR MISSION ✦</div>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>MandaStrong Studio was built on one belief: <strong style={{color:GOLD}}>every person deserves the tools to tell their story.</strong> Not just the wealthy. Not just the technically gifted. Everyone.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:"0 0 10px"}}>We believe the next great filmmaker is not in Hollywood. They are in a bedroom somewhere, with a story the world needs to hear and no way to tell it. Until now.</p>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>Every Etsy purchase from MandaStrong1.Etsy.com funds anti-bullying programmes in schools and veterans mental health initiatives. When you create here, you are part of something bigger than a film.</p>
-          </div>
-          <div style={{...Card(),marginBottom:16,background:"#0a0600",border:"1px solid "+GOLDDIM,padding:"14px 20px",textAlign:"center"}}>
-            <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>All proceeds from <strong style={{color:GOLD}}>MandaStrong1.Etsy.com</strong> are donated directly to humanitarian causes — veterans mental health, anti-bullying programmes in schools, and children in need.</p>
-          </div>
-          <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noopener noreferrer"
-            style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",color:"#000",padding:"20px 24px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:14,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif",boxShadow:"0 0 30px "+GOLD+"44",marginBottom:28}}>
-            🛍 VISIT MANDASTRONG1.ETSY.COM
-          </a>
+          {howOpen&&<div style={{background:"#030200ee",border:"2px solid "+GOLD,borderTop:"none",marginBottom:28}}><HowToGuide/></div>}
+          <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noreferrer" style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",color:"#000",padding:"16px 24px",fontWeight:900,fontSize:14,letterSpacing:3,textDecoration:"none",marginBottom:28,fontFamily:"'Cinzel',serif"}}>📚 HUMANITY FOR FUTURE AI — MANDASTRONG1.ETSY.COM</a>
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
             <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
-            <button onClick={()=>go(1)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>EXIT APP</button>
+            <button onClick={exitApp} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🚪 EXIT APP</button>
           </div>
         </div>
       </div>
+    </div>
   );
 }
 
@@ -3636,8 +3633,13 @@ export default function App() {
   const [page,setPage]=useState(1);
   const [menu,setMenu]=useState(false);
   useEffect(()=>{
+    // Fonts
+    const link=document.createElement("link");
+    link.rel="stylesheet";
+    link.href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;600;700;800;900&display=swap";
+    document.head.appendChild(link);
     // Viewport — responsive for all devices
-    let vp:any=document.querySelector("meta[name=viewport]");
+    let vp=document.querySelector("meta[name=viewport]");
     if(!vp){vp=document.createElement("meta");vp.name="viewport";document.head.appendChild(vp);}
     // Set viewport based on device type
     const hua=navigator.userAgent.toLowerCase();
@@ -3652,12 +3654,12 @@ export default function App() {
     }
     // Global responsive + Bolt badge suppression
     const style=document.createElement("style");
-    style.textContent="*{box-sizing:border-box!important;}body,html{margin:0;padding:0;width:100%;overflow-x:hidden;}[data-bolt-badge],a[href*='bolt.new'],.bolt-badge,[class*='bolt'],[id*='bolt']{display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;}@media(max-width:900px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr 1fr!important;}}@media(max-width:600px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr!important;}}";
+    style.textContent="*{box-sizing:border-box!important;}body,html{margin:0;padding:0;width:100%;overflow-x:hidden;}[data-bolt-badge],a[href*=\'bolt.new\'],.bolt-badge,[class*=\'bolt\'],[id*=\'bolt\']{display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;}@media(max-width:900px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr 1fr!important;}}@media(max-width:600px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr!important;}}";
     document.head.appendChild(style);
     // PWA install prompt capture
-    const handleInstall=(e:any)=>{e.preventDefault();(window as any).deferredInstallPrompt=e;};
+    const handleInstall=(e)=>{e.preventDefault();window.deferredInstallPrompt=e;};
     window.addEventListener("beforeinstallprompt",handleInstall);
-    return()=>{ window.removeEventListener("beforeinstallprompt",handleInstall); };
+    return()=>{try{document.head.removeChild(link);}catch{} window.removeEventListener("beforeinstallprompt",handleInstall);};
   },[]);
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_user")||'{"name":"Guest","plan":"Guest","isAdmin":false}');}catch{return {name:"Guest",plan:"Guest",isAdmin:false};}});
   const [mediaLib,setMediaLib]=useState([]);
