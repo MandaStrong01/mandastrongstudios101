@@ -19,6 +19,87 @@ async function proxyFetch(body){
 const saveClipToDB=async(id,blob,name,type)=>{try{const db=await openDB();const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put({id,blob,name,type});await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=j;});}catch(e){console.warn("DB save failed",e);}};
 const loadClipFromDB=async(id)=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).get(id);req.onsuccess=()=>res(req.result);req.onerror=rej;});}catch(e){return null;}};
 const getAllClipsFromDB=async()=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).getAll();req.onsuccess=()=>res(req.result||[]);req.onerror=rej;});}catch(e){return[];}};
+const deleteClipFromDB=async(id)=>{try{const db=await openDB();const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).delete(id);await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=j;});}catch(e){}};
+
+// ── Background storage manager — prevents the save-crash on low-memory machines ──
+// Checks how full browser storage is, and auto-prunes the oldest clips when space runs low.
+const getStorageStatus=async()=>{
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const e=await navigator.storage.estimate();
+      const used=e.usage||0,quota=e.quota||1;
+      return {used,quota,pct:used/quota};
+    }
+  }catch(e){}
+  return {used:0,quota:1,pct:0};
+};
+// Remove oldest clips until we're back under the safe threshold (keeps render_final + newest).
+const autoPruneClips=async(keepNewest)=>{
+  try{
+    const all=await getAllClipsFromDB();
+    if(all.length<=keepNewest)return 0;
+    // Oldest first by timestamp embedded in id (Date.now-based ids sort correctly as strings of similar length)
+    const sortable=all.filter(c=>c.id!=="render_final");
+    sortable.sort((a,b)=>{
+      const na=parseInt(String(a.id).replace(/\D/g,""))||0;
+      const nb=parseInt(String(b.id).replace(/\D/g,""))||0;
+      return na-nb;
+    });
+    const removeCount=Math.max(0,sortable.length-keepNewest);
+    let removed=0;
+    for(let i=0;i<removeCount;i++){await deleteClipFromDB(sortable[i].id);removed++;}
+    return removed;
+  }catch(e){return 0;}
+};
+// Guarded save — frees space first if storage is nearly full, then saves. Never silently crashes.
+const safeSaveClipToDB=async(id,blob,name,type)=>{
+  try{
+    const s=await getStorageStatus();
+    if(s.pct>0.8){ await autoPruneClips(8); }
+    await saveClipToDB(id,blob,name,type);
+    return true;
+  }catch(e){
+    // If it still failed, prune hard and retry once
+    try{ await autoPruneClips(4); await saveClipToDB(id,blob,name,type); return true; }
+    catch(e2){ return false; }
+  }
+};
+
+// ── BACKGROUND STORAGE GUARD — prevents the save-crash automatically ──
+// Checks browser storage; when it's getting full it quietly removes the
+// oldest clips so a new save never runs out of memory. Runs silently.
+const getStoragePct=async()=>{
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const e=await navigator.storage.estimate();
+      if(e.quota>0)return (e.usage/e.quota);
+    }
+  }catch(e){}
+  return 0;
+};
+const autoFreeStorage=async()=>{
+  try{
+    let pct=await getStoragePct();
+    // If over 75% full, drop oldest clips until under 60% (keeps recent work)
+    if(pct<0.75)return {freed:0,pct};
+    const clips=await getAllClipsFromDB();
+    // oldest first — ids that start with a timestamp sort naturally; fall back to insertion order
+    const sorted=[...clips].sort((a,b)=>{
+      const an=parseInt(String(a.id).replace(/\D/g,""))||0;
+      const bn=parseInt(String(b.id).replace(/\D/g,""))||0;
+      return an-bn;
+    });
+    let freed=0;
+    for(const c of sorted){
+      if(c.id==="render_final")continue; // never delete the finished film
+      await deleteClipFromDB(c.id);
+      freed++;
+      pct=await getStoragePct();
+      if(pct<0.60)break;
+    }
+    return {freed,pct};
+  }catch(e){return {freed:0,pct:0};}
+};
 
 const GOLD = "#e8c96d";
 const GOLDDIM = "#a07820";
@@ -27,7 +108,7 @@ const BLACK = "#000000";
 const BG4 = "#080808";
 const WHITE = "#d4c9a8";
 const DIM = "#aaaaaa";
-const TOTAL = 23;
+const TOTAL = 24;
 
 const STRIPE = {
   basic:"https://buy.stripe.com/cNi8wRe8a9ZtcZh7YeafS05",
@@ -136,7 +217,7 @@ const IMAGE_T = ["Text to Image","Prompt to Image","Image to Image","Image Upsca
 const VIDEO_T = ["Text to Video","Image to Video","Video to Video","AI Video Creator","AI Film Generator","Video Upscaler","AI Video Generator 4K","Set to Video","Video Colorizer","Color Grading Pro","Fast Look Generator","Film Restoration","Time Lapse Creator","Video Trimmer","Background Remover","Digital Human Video","Rotoscope Video","Animation Creator","Puppet Animator","Motion Capture","Character Animator","Video Stabilizer","Video Compressor","Cinematic LUT","Black & White Film","Film Texture","VHS Effect","Glitch Effect","Quick Film Creator","Opening Slate","Time Freeze","Bullet Time Effect","Rain Simulation","Snow Simulation","Smoke Generator","Fire Simulation","Particle System","AI Progressive Video","4K Upscaling"];
 const MOTION = ["AI 8K Upscaling","AI 4K Upscaling","Video Super Resolution","Frame Interpolation","Video Denoiser","Noise Reduction","Grain Remover","Artifact Remover","Scratch Remover","Video Sharpener","Clarity Booster","Detail Enhancer","Edge Enhancement","Texture Boost","White Balance AI","Color Correction","Auto Color Balance","Color Match Pro","Color Grading AI","Cinematic Color Grade","Film Stock Emulation","LUT Generator","Tone Mapping Pro","HDR Enhancement","Deep HDR Boost","Dynamic Range Expansion","Shadow Recovery","Highlight Recovery","Black Point Calibration","Gamma Correction","Contrast Enhancer","Brightness Optimizer","Saturation Booster","Smart Saturation","Face Enhancement","Face Retouch","Eye Enhancer","Teeth Whitener","Skin Tone Enhancer","Background Enhancer","Sky Enhancer","Landscape Enhancer","Night Video Enhancer","Low Light Clarity","Motion Stabilization","Shake Remover","Rolling Shutter Fix"];
 
-const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Grok"},{p:22,l:"Community Hub"},{p:23,l:"That's All Folks"}];
+const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Grok"},{p:22,l:"Community Hub"},{p:24,l:"Character Studio"},{p:23,l:"That's All Folks"}];
 
 function ProjectHistoryModal({ onClose, onResume }) {
   const [history,setHistory]=useState([]);
@@ -951,7 +1032,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       const fn=(config.title||"MusicVideo")+"_"+config.artist+".webm";
       try{
         const clipId="mv_"+Date.now();
-        await saveClipToDB(clipId,blob,fn,"video/webm");
+        await safeSaveClipToDB(clipId,blob,fn,"video/webm");
         addLog("✓ Saved");
         if(onSave)onSave({id:clipId,name:fn,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],fn,{type:"video/webm"}),dbId:clipId});
       }catch(e){}
@@ -1579,6 +1660,8 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const generateVideo=async()=>{
     if(!prompt.trim()){alert("Describe your scene first");return;}
     setGenerating(true);setProgress(0);setLog([]);setVideoUrl("");setSaved(false);
+    // Background storage guard — silently frees space so save never crashes
+    try{const r=await autoFreeStorage();if(r.freed>0)addLog("Storage optimised — cleared "+r.freed+" old clip(s) to keep things running smooth");}catch(e){}
     addLog("CinemaForge Engine — reading your scene...");
     setProgress(5);
 
@@ -1608,7 +1691,10 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       setProgress(12);
       const hasPhotos=loadedRefImages.length>0;
       const photoNote=hasPhotos?"The user has uploaded "+loadedRefImages.length+" reference photo(s). The main photo will be drawn as the base layer already — your drawFrame should add atmosphere, lighting, overlays, and cinematic elements ON TOP of the photo base. Do NOT try to redraw the background from scratch.":"No reference photos. You must paint the entire scene from scratch using canvas drawing primitives — sky, ground, environment, people, objects, lighting. Make it look as photorealistic as possible using gradients, layering, and detail.";
+      const composeController=new AbortController();
+      const composeTimeout=setTimeout(()=>composeController.abort(),45000);
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
+        signal:composeController.signal,
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           model:"claude-sonnet-4-20250514",
@@ -1643,6 +1729,7 @@ Return ONLY the function body code. No markdown. No function wrapper. No explana
 Write the drawFrame body now.`}]
         })
       });
+      clearTimeout(composeTimeout);
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
       // Strip markdown fences if present
@@ -1761,6 +1848,15 @@ Write the drawFrame body now.`}]
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
+    // AUTO-SAVE the finished clip immediately so it is never lost on crash or navigation
+    try{
+      const autoId="scene_"+Date.now();
+      const autoName=(title||"Scene")+"_"+duration+"s.webm";
+      await safeSaveClipToDB(autoId,blob,autoName,"video/webm");
+      if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
+      setSaved(true);
+      addLog("\u2713 Auto-saved to library");
+    }catch(e){addLog("Auto-save note: "+e.message);}
     setProgress(100);
     addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
     setGenerating(false);
@@ -2407,7 +2503,7 @@ function MergeVideos({ onSave }) {
       const fn = "MandaStrong_Merged_"+Date.now()+".webm";
       try {
         const clipId = "merge_"+Date.now();
-        await saveClipToDB(clipId, blob, fn, "video/webm");
+        await safeSaveClipToDB(clipId, blob, fn, "video/webm");
         if(onSave) onSave({id:clipId, name:fn, type:"video/webm", url:URL.createObjectURL(blob), file:new File([blob],fn,{type:"video/webm"}), dbId:clipId});
         log("✓ Saved to media library — ready for timeline");
       } catch(e) {}
@@ -3578,6 +3674,118 @@ function HowToGuide() {
   );
 }
 
+function P24CharacterStudio({ onSave }) {
+  const [chars,setChars]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_characters")||"[]");}catch{return [];}});
+  const [name,setName]=useState("");
+  const [voice,setVoice]=useState("james");
+  const [notes,setNotes]=useState("");
+  const [photo,setPhoto]=useState(null);
+  const [photoName,setPhotoName]=useState("");
+  const [savedNote,setSavedNote]=useState(false);
+  const fileRef=useRef(null);
+
+  const persist=(list)=>{
+    setChars(list);
+    try{localStorage.setItem("ms_characters",JSON.stringify(list));}catch(e){alert("Storage full — remove a character photo and try again.");}
+  };
+
+  const handlePhoto=(e)=>{
+    const f=e.target.files&&e.target.files[0];
+    if(!f)return;
+    setPhotoName(f.name);
+    const reader=new FileReader();
+    reader.onload=ev=>setPhoto(ev.target.result);
+    reader.readAsDataURL(f);
+  };
+
+  const addChar=()=>{
+    if(!name.trim()){alert("Give your character a name first.");return;}
+    const c={id:Date.now()+Math.random(),name:name.trim(),voice,notes:notes.trim(),photo,photoName,date:new Date().toLocaleDateString()};
+    persist([...chars,c]);
+    setName("");setNotes("");setPhoto(null);setPhotoName("");setVoice("james");
+    setSavedNote(true);setTimeout(()=>setSavedNote(false),2500);
+  };
+
+  const removeChar=(id)=>persist(chars.filter(c=>c.id!==id));
+
+  const useInScene=(c)=>{
+    if(onSave&&c.photo){
+      onSave({id:"char_"+c.id,name:c.name+"_reference.png",type:"image/png",url:c.photo});
+      alert("✓ "+c.name+" reference image sent to your Media Library — upload it on Page 8 to keep this character consistent.");
+    }else{
+      alert(c.photo?"Saved.":"This character has no reference photo to reuse.");
+    }
+  };
+
+  const inp={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
+
+  return (
+    <div style={{...Sp,padding:30}}>
+      <div style={{maxWidth:1000,margin:"0 auto"}}>
+        <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>CONSISTENCY ENGINE</div>
+        <h1 style={{...H1,fontSize:26,marginBottom:6}}>CHARACTER STUDIO</h1>
+        <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.7}}>Create reusable characters with a reference photo and an assigned voice. Send a character's reference image to your Media Library, then upload it on Page 8 so the same face appears across every scene — consistent characters all the way through your film.</div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+          {/* Create panel */}
+          <div style={{...Card(),border:"2px solid "+GOLD}}>
+            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>✦ CREATE A CHARACTER</div>
+            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>CHARACTER NAME</div>
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Doxy, Ethan, Lily..." style={{...inp,marginBottom:12}}/>
+            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>REFERENCE PHOTO</div>
+            {photo?(
+              <div style={{position:"relative",marginBottom:12}}>
+                <img src={photo} alt="ref" style={{width:"100%",height:160,objectFit:"cover",border:"1px solid "+GOLD}}/>
+                <button onClick={()=>{setPhoto(null);setPhotoName("");}} style={{position:"absolute",top:5,right:5,background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:900}}>✕</button>
+              </div>
+            ):(
+              <button onClick={()=>fileRef.current&&fileRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:12}}>📷 UPLOAD CHARACTER PHOTO</button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" capture="environment" style={{display:"none"}} onChange={handlePhoto}/>
+            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>ASSIGNED VOICE</div>
+            <select value={voice} onChange={e=>setVoice(e.target.value)} style={{...inp,marginBottom:12,cursor:"pointer"}}>
+              {VOICE_CHARACTERS.map(v=><option key={v.id} value={v.id} style={{background:"#000"}}>{v.name} — {v.origin} {v.gender} · {v.style}</option>)}
+            </select>
+            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>NOTES (appearance, age, wardrobe)</div>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. 17, dark hair, blue t-shirt..." style={{...inp,height:70,resize:"none",lineHeight:1.6,marginBottom:14}}/>
+            <button onClick={addChar} style={{...G("gold",false),width:"100%",padding:"14px",fontSize:13,letterSpacing:2}}>+ SAVE CHARACTER</button>
+            {savedNote&&<div style={{marginTop:10,background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ CHARACTER SAVED</div>}
+          </div>
+
+          {/* Library panel */}
+          <div>
+            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>YOUR CHARACTERS — {chars.length}</div>
+            {chars.length===0?(
+              <div style={{...Card(),textAlign:"center",padding:"40px 20px",color:GOLDDIM}}>
+                <div style={{fontSize:34,marginBottom:10}}>🎭</div>
+                <div style={{fontSize:12,letterSpacing:2}}>No characters yet.</div>
+                <div style={{fontSize:11,color:DIM,marginTop:6,lineHeight:1.6}}>Create one on the left to keep<br/>faces consistent across your film.</div>
+              </div>
+            ):(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {chars.map(c=>(
+                  <div key={c.id} style={{...Card(),display:"flex",gap:12,alignItems:"center",padding:12}}>
+                    {c.photo?<img src={c.photo} alt={c.name} style={{width:64,height:64,objectFit:"cover",border:"1px solid "+GOLD,flexShrink:0}}/>:<div style={{width:64,height:64,background:"#000",border:"1px solid "+GOLDDIM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🎭</div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{color:GOLD,fontWeight:900,fontSize:15,letterSpacing:1}}>{c.name}</div>
+                      <div style={{color:WHITE,fontSize:11,marginTop:2}}>🎙 {VOICE_CHARACTERS.find(v=>v.id===c.voice)?.name||c.voice}</div>
+                      {c.notes&&<div style={{color:DIM,fontSize:11,marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</div>}
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
+                      <button onClick={()=>useInScene(c)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"6px 12px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>→ USE IN SCENE</button>
+                      <button onClick={()=>removeChar(c.id)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 12px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕ DELETE</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function P23({ go }) {
   const bgRef = useRef(null);
   const [howOpen, setHowOpen] = useState(false);
@@ -3593,8 +3801,8 @@ function P23({ go }) {
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
         style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",objectFit:"cover",zIndex:0,opacity:0.35}}
         onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="/background.mp4" type="video/mp4"/>
-        <source src="background.mp4" type="video/mp4"/>
+        <source src="/thatsallfolks.mp4" type="video/mp4"/>
+        <source src="thatsallfolks.mp4" type="video/mp4"/>
       </video>
       <div style={{position:"relative",zIndex:1,padding:"50px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
@@ -3674,6 +3882,7 @@ export default function App() {
 
   useEffect(()=>{
     const restore=async()=>{
+      try{await autoFreeStorage();}catch(e){}
       try{const t=JSON.parse(localStorage.getItem("ms_timeline")||"{}");if(Object.keys(t).length>0)setTimeline(t);}catch(e){}
       try{
         const dbClips=await getAllClipsFromDB();
@@ -3691,7 +3900,7 @@ export default function App() {
 
   const saveAsset=async(a)=>{
     if(a.file instanceof File||a.file instanceof Blob){
-      try{const blob=a.file;const dbId=a.id||("asset_"+Date.now());await saveClipToDB(dbId,blob,a.name||"asset",a.type||"video/webm");setMediaLib(p=>[...p,{...a,dbId}]);}
+      try{const blob=a.file;const dbId=a.id||("asset_"+Date.now());await safeSaveClipToDB(dbId,blob,a.name||"asset",a.type||"video/webm");setMediaLib(p=>[...p,{...a,dbId}]);}
       catch(e){setMediaLib(p=>[...p,a]);}
     }else{setMediaLib(p=>[...p,a]);}
   };
@@ -3746,6 +3955,7 @@ export default function App() {
       case 21: return <P21/>;
       case 22: return <P22/>;
       case 23: return <P23 go={go}/>;
+      case 24: return <P24CharacterStudio onSave={saveAsset}/>;
       default: return <P1 go={go}/>;
     }
   };
