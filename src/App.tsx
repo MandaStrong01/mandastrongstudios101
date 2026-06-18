@@ -1760,7 +1760,7 @@ Write the drawFrame body now.`}]
     // ── STEP 2: Set up canvas + MediaRecorder ──
     const canvas=canvasRef.current;
     if(!canvas){setGenerating(false);addLog("Canvas error");return;}
-    canvas.width=1920;canvas.height=1080;
+    canvas.width=1280;canvas.height=720;
     const ctx=canvas.getContext("2d");
 
     // Build the drawFrame function — wraps AI code + photo base layer
@@ -1803,15 +1803,15 @@ Write the drawFrame body now.`}]
     }
 
     // Test render frame 0
-    try{drawFrame(ctx,1920,1080,0,0,loadedRefImages);}catch(e){addLog("Frame test warning: "+e.message);}
+    try{drawFrame(ctx,1280,720,0,0,loadedRefImages);}catch(e){addLog("Frame test warning: "+e.message);}
     await new Promise(r=>setTimeout(r,100));
     setProgress(32);
 
     // ── STEP 3: Render all frames ──
-    const fps=24;const totalFrames=duration*fps;
+    const fps=20;const totalFrames=duration*fps;
     const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
     const stream=canvas.captureStream(fps);
-    const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:18000000});
+    const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6000000});
     const chunks=[];
     recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     recorder.start(Math.round(1000/fps));
@@ -1823,16 +1823,16 @@ Write the drawFrame body now.`}]
       const tick=()=>{
         if(frame>=totalFrames){resolve(null);return;}
         const t=frame/totalFrames;const sec=frame/fps;
-        ctx.clearRect(0,0,1920,1080);
-        try{drawFrame(ctx,1920,1080,t,sec,loadedRefImages);}catch(e){ctx.fillStyle="#050200";ctx.fillRect(0,0,1920,1080);}
+        ctx.clearRect(0,0,1280,720);
+        try{drawFrame(ctx,1280,720,t,sec,loadedRefImages);}catch(e){ctx.fillStyle="#050200";ctx.fillRect(0,0,1280,720);}
         // Consistent post-processing on every frame
-        const vig=ctx.createRadialGradient(960,540,120,960,540,980);
+        const vig=ctx.createRadialGradient(640,360,80,640,360,650);
         vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.8)");
-        ctx.fillStyle=vig;ctx.fillRect(0,0,1920,1080);
-        ctx.fillStyle="#000";ctx.fillRect(0,0,1920,76);ctx.fillRect(0,1004,1920,76);
-        for(let g=0;g<30;g++){const gv=Math.random()>0.5?160:20;ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.008)";ctx.fillRect(Math.random()*1920,Math.random()*1080,1.2,1.2);}
-        if(t<0.05){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.05)+")";ctx.fillRect(0,0,1920,1080);}
-        if(t>0.92){ctx.fillStyle="rgba(0,0,0,"+((t-0.92)/0.08)+")";ctx.fillRect(0,0,1920,1080);}
+        ctx.fillStyle=vig;ctx.fillRect(0,0,1280,720);
+        ctx.fillStyle="#000";ctx.fillRect(0,0,1280,50);ctx.fillRect(0,670,1280,50);
+        for(let g=0;g<20;g++){const gv=Math.random()>0.5?160:20;ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.008)";ctx.fillRect(Math.random()*1280,Math.random()*720,1.2,1.2);}
+        if(t<0.05){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.05)+")";ctx.fillRect(0,0,1280,720);}
+        if(t>0.92){ctx.fillStyle="rgba(0,0,0,"+((t-0.92)/0.08)+")";ctx.fillRect(0,0,1280,720);}
         setProgress(35+Math.round((frame/totalFrames)*60));
         if(frame%(fps*5)===0)addLog("  "+Math.round(sec)+"s / "+duration+"s rendered");
         frame++;
