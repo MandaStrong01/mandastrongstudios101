@@ -1841,10 +1841,17 @@ Write the drawFrame body now.`}]
       requestAnimationFrame(tick);
     });
 
-    recorder.stop();
-    await new Promise(r=>setTimeout(r,800));
     setProgress(97);
     addLog("Encoding...");
+    // Wait for the recorder to actually finish flushing its data before building the blob.
+    // A fixed delay can fire before the final chunk arrives on slower machines, which hangs at 97%.
+    await new Promise(resolve=>{
+      let done=false;
+      recorder.onstop=()=>{ if(!done){done=true;resolve(null);} };
+      recorder.stop();
+      // Safety net: never wait forever
+      setTimeout(()=>{ if(!done){done=true;resolve(null);} },4000);
+    });
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
@@ -3973,4 +3980,3 @@ export default function App() {
     </div>
   );
 }
-
