@@ -158,12 +158,15 @@ function speakText(voiceId, txt, onStart, onEnd) {
     .replace(/—/g,", ")
     .replace(/[*\/]/g," ")
     .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
-    .slice(0,200000);
+    .slice(0,5000);
   const doSpeak = () => {
     const allVoices = window.speechSynthesis.getVoices();
     const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
       ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
-    // Pick the voice once, reuse for every chunk
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.pitch = voiceChar ? voiceChar.pitch : 1.0;
+    utt.rate  = voiceChar ? voiceChar.rate  : 0.85;
+    utt.volume = 1.0;
     const assignedName = VOICE_ASSIGNMENTS[voiceId];
     let picked = null;
     if(assignedName) picked = allVoices.find(v=>v.name===assignedName);
@@ -191,36 +194,12 @@ function speakText(voiceId, txt, onStart, onEnd) {
     }
     if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
     if(!picked && allVoices.length) picked = allVoices[0];
-
-    const pitch = voiceChar ? voiceChar.pitch : 1.0;
-    const rate  = voiceChar ? voiceChar.rate  : 0.85;
-
-    // Split into sentence-sized chunks so the browser speech engine never cuts out
-    // on long narration (it silently dies on a single very long utterance).
-    const sentences = clean.match(/[^.!?]+[.!?]+|\s*\S[^.!?]*$/g) || [clean];
-    const chunks = [];
-    let buf = "";
-    for(const s of sentences){
-      if((buf + s).length > 220){ if(buf) chunks.push(buf); buf = s; }
-      else { buf += s; }
-    }
-    if(buf) chunks.push(buf);
-    if(!chunks.length) chunks.push(clean);
-
-    let idx = 0;
-    let started = false;
-    const speakNext = () => {
-      if(idx >= chunks.length){ currentUtterance = null; if(onEnd) onEnd(); return; }
-      const utt = new SpeechSynthesisUtterance(chunks[idx]);
-      utt.pitch = pitch; utt.rate = rate; utt.volume = 1.0;
-      if(picked) utt.voice = picked;
-      utt.lang = "en-GB";
-      utt.onstart = ()=>{ currentUtterance = utt; if(!started){ started = true; if(onStart) onStart(); } };
-      utt.onend = ()=>{ idx++; speakNext(); };
-      utt.onerror = ()=>{ idx++; speakNext(); };
-      window.speechSynthesis.speak(utt);
-    };
-    speakNext();
+    if(picked) utt.voice = picked;
+    utt.lang = "en-GB";
+    utt.onstart  = ()=>{ currentUtterance=utt; if(onStart) onStart(); };
+    utt.onend    = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
+    utt.onerror  = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
+    window.speechSynthesis.speak(utt);
   };
   if(window.speechSynthesis.getVoices().length===0){
     window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
@@ -1862,17 +1841,10 @@ Write the drawFrame body now.`}]
       requestAnimationFrame(tick);
     });
 
+    recorder.stop();
+    await new Promise(r=>setTimeout(r,800));
     setProgress(97);
     addLog("Encoding...");
-    // Wait for the recorder to actually finish flushing its data before building the blob.
-    // A fixed delay can fire before the final chunk arrives on slower machines, which hangs at 97%.
-    await new Promise(resolve=>{
-      let done=false;
-      recorder.onstop=()=>{ if(!done){done=true;resolve(null);} };
-      recorder.stop();
-      // Safety net: never wait forever
-      setTimeout(()=>{ if(!done){done=true;resolve(null);} },4000);
-    });
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
@@ -3827,11 +3799,11 @@ function P23({ go }) {
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-        style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",margin:"0 auto"}}>
+        style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",objectFit:"cover",zIndex:0,opacity:0.35}}>
         <source src="/thatsallfolks.mp4" type="video/mp4"/>
         <source src="thatsallfolks.mp4" type="video/mp4"/>
       </video>
-      <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
+      <div style={{position:"relative",zIndex:1,padding:"50px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:28}}>THAT'S ALL FOLKS</h1>
@@ -4001,3 +3973,4 @@ export default function App() {
     </div>
   );
 }
+
