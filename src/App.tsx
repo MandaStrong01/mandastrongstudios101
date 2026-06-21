@@ -3827,11 +3827,11 @@ function P23({ go }) {
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-        style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",objectFit:"cover",zIndex:0,opacity:0.35}}>
+        style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",margin:"0 auto"}}>
         <source src="/thatsallfolks.mp4" type="video/mp4"/>
         <source src="thatsallfolks.mp4" type="video/mp4"/>
       </video>
-      <div style={{position:"relative",zIndex:1,padding:"50px 24px 80px"}}>
+      <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:28}}>THAT'S ALL FOLKS</h1>
