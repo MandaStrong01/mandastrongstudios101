@@ -158,15 +158,12 @@ function speakText(voiceId, txt, onStart, onEnd) {
     .replace(/—/g,", ")
     .replace(/[*\/]/g," ")
     .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
-    .slice(0,5000);
+    .slice(0,200000);
   const doSpeak = () => {
     const allVoices = window.speechSynthesis.getVoices();
     const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
       ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.pitch = voiceChar ? voiceChar.pitch : 1.0;
-    utt.rate  = voiceChar ? voiceChar.rate  : 0.85;
-    utt.volume = 1.0;
+    // Pick the voice once, reuse for every chunk
     const assignedName = VOICE_ASSIGNMENTS[voiceId];
     let picked = null;
     if(assignedName) picked = allVoices.find(v=>v.name===assignedName);
@@ -194,12 +191,36 @@ function speakText(voiceId, txt, onStart, onEnd) {
     }
     if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
     if(!picked && allVoices.length) picked = allVoices[0];
-    if(picked) utt.voice = picked;
-    utt.lang = "en-GB";
-    utt.onstart  = ()=>{ currentUtterance=utt; if(onStart) onStart(); };
-    utt.onend    = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
-    utt.onerror  = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
-    window.speechSynthesis.speak(utt);
+
+    const pitch = voiceChar ? voiceChar.pitch : 1.0;
+    const rate  = voiceChar ? voiceChar.rate  : 0.85;
+
+    // Split into sentence-sized chunks so the browser speech engine never cuts out
+    // on long narration (it silently dies on a single very long utterance).
+    const sentences = clean.match(/[^.!?]+[.!?]+|\s*\S[^.!?]*$/g) || [clean];
+    const chunks = [];
+    let buf = "";
+    for(const s of sentences){
+      if((buf + s).length > 220){ if(buf) chunks.push(buf); buf = s; }
+      else { buf += s; }
+    }
+    if(buf) chunks.push(buf);
+    if(!chunks.length) chunks.push(clean);
+
+    let idx = 0;
+    let started = false;
+    const speakNext = () => {
+      if(idx >= chunks.length){ currentUtterance = null; if(onEnd) onEnd(); return; }
+      const utt = new SpeechSynthesisUtterance(chunks[idx]);
+      utt.pitch = pitch; utt.rate = rate; utt.volume = 1.0;
+      if(picked) utt.voice = picked;
+      utt.lang = "en-GB";
+      utt.onstart = ()=>{ currentUtterance = utt; if(!started){ started = true; if(onStart) onStart(); } };
+      utt.onend = ()=>{ idx++; speakNext(); };
+      utt.onerror = ()=>{ idx++; speakNext(); };
+      window.speechSynthesis.speak(utt);
+    };
+    speakNext();
   };
   if(window.speechSynthesis.getVoices().length===0){
     window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
