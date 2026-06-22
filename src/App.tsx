@@ -1597,47 +1597,28 @@ function P6Voice({ onSave, setMediaLib }) {
           <button onClick={async()=>{
             if(loading||!text.trim())return;
             setSavedToLib(false);
-            // Start audio capture from the default output destination
-            let recorder=null; let recChunks=[];
-            try{
-              // Use AudioContext destination capture if available
-              const stream=await navigator.mediaDevices.getUserMedia({audio:true}).catch(()=>null);
-              if(stream){
-                const mimeType=MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")?"audio/ogg;codecs=opus":MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";
-                recorder=new MediaRecorder(stream,{mimeType});
-                recorder.ondataavailable=e=>{if(e.data&&e.data.size>0)recChunks.push(e.data);};
-                recorder.start(100);
-              }
-            }catch(e){ recorder=null; }
-            // Speak the narration
-            await new Promise(resolve=>{
-              speakText(selVoice, text, ()=>setSpeaking(true), ()=>{ setSpeaking(false); resolve(null); });
-            });
-            // Stop recording and save
-            if(recorder&&recorder.state!=="inactive"){
-              recorder.stop();
-              await new Promise(r=>{recorder.onstop=r;});
-              const blob=new Blob(recChunks,{type:"audio/webm"});
-              const clipName="Narration - "+selected.name+" - "+new Date().toLocaleTimeString();
-              const clipId="narr_"+Date.now();
-              await safeSaveClipToDB(clipId,blob,clipName,"audio/webm");
-              const asset={id:clipId,name:clipName,type:"audio/webm",url:URL.createObjectURL(blob),file:new File([blob],clipName+".webm",{type:"audio/webm"}),dbId:clipId};
-              if(onSave)onSave(asset);
-              if(setMediaLib)setMediaLib(p=>[...p,asset]);
-              setSavedToLib(true);
-              setTimeout(()=>setSavedToLib(false),3000);
-            } else {
-              // Fallback — save text asset if mic not available
-              const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};
-              if(onSave)onSave(asset);
-              if(setMediaLib)setMediaLib(p=>[...p,asset]);
-              setSavedToLib(true);
-              setTimeout(()=>setSavedToLib(false),2500);
-            }
+            // Speak the narration through speakers
+            speakText(selVoice, text, ()=>setSpeaking(true), ()=>setSpeaking(false));
+            // Save as narration text asset — render engine speaks it live during render
+            const asset={
+              id:"narr_"+Date.now(),
+              name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),
+              type:"narration",
+              text:text,
+              voice:selVoice,
+              pitch:selected.pitch,
+              rate:selected.rate,
+              date:new Date().toISOString()
+            };
+            await safeSaveClipToDB(asset.id,new Blob([text],{type:"text/plain"}),asset.name,"narration");
+            if(onSave)onSave(asset);
+            if(setMediaLib)setMediaLib(p=>[...p,asset]);
+            setSavedToLib(true);
+            setTimeout(()=>setSavedToLib(false),3000);
           }} disabled={loading||!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
-            {loading?"⟳ PREPARING...":speaking?"⏺ RECORDING & SPEAKING...":"✦ SPEAK & RECORD TO LIBRARY"}
+            {loading?"⟳ PREPARING...":speaking?"⏺ SPEAKING...":"✦ SPEAK & SAVE TO LIBRARY"}
           </button>
-          {savedToLib&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px",textAlign:"center",marginBottom:8}}><span style={{color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ AUDIO SAVED TO MEDIA LIBRARY</span></div>}
+          {savedToLib&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px",textAlign:"center",marginBottom:8}}><span style={{color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ NARRATION SAVED TO MEDIA LIBRARY</span></div>}
         </div>
       </div>
     </div>
@@ -2973,30 +2954,34 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const audioDest=audioCtx.createMediaStreamDestination();
       let audioSource=null,audioBuffer=null;
+      let liveNarration=false;
       if(audioAsset){
-        try{
-          let audioBlob=null;
-          // Always try IndexedDB first — blob URLs expire on page reload
-          const dbId=audioAsset.dbId||audioAsset.id;
-          if(dbId){
-            const stored=await loadClipFromDB(dbId);
-            if(stored&&stored.blob) audioBlob=stored.blob;
-          }
-          // Fall back to URL if no DB blob
-          if(!audioBlob&&audioAsset.url){
-            const resp=await fetch(audioAsset.url);
-            audioBlob=await resp.blob();
-          }
-          // Fall back to file object
-          if(!audioBlob&&audioAsset.file) audioBlob=audioAsset.file;
-          if(audioBlob){
-            const arrayBuf=await audioBlob.arrayBuffer();
-            audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
-            log("✓ Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
-          } else {
-            log("Audio asset found but no data — video only");
-          }
-        }catch(e){log("Audio load failed: "+e.message+" — video only");}
+        // If it's a text narration asset, speak it live via Web Speech API during render
+        if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
+          liveNarration=true;
+          log("✓ Narration ready — will speak live during render");
+        } else {
+          try{
+            let audioBlob=null;
+            const dbId=audioAsset.dbId||audioAsset.id;
+            if(dbId){
+              const stored=await loadClipFromDB(dbId);
+              if(stored&&stored.blob) audioBlob=stored.blob;
+            }
+            if(!audioBlob&&audioAsset.url){
+              const resp=await fetch(audioAsset.url);
+              audioBlob=await resp.blob();
+            }
+            if(!audioBlob&&audioAsset.file) audioBlob=audioAsset.file;
+            if(audioBlob){
+              const arrayBuf=await audioBlob.arrayBuffer();
+              audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
+              log("✓ Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+            } else {
+              log("Audio asset found but no data — video only");
+            }
+          }catch(e){log("Audio load failed: "+e.message+" — video only");}
+        }
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
       const videoStream=canvas.captureStream(fps);
@@ -3013,6 +2998,12 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       await new Promise(r=>setTimeout(r,200));
       recorder.start(100);
       if(audioSource)audioSource.start(0);
+      // Speak live narration text through speakers during render
+      if(liveNarration&&audioAsset?.text){
+        const vc=typeof VOICE_CHARACTERS!=="undefined"?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
+        speakText(audioAsset.voice||"blaze",audioAsset.text,null,null);
+        log("✓ Speaking narration live: "+(audioAsset.voice||"blaze"));
+      }
       log("Recording started...");
       setProgress(5);
       // Helper: render a scene directly to canvas using Claude
