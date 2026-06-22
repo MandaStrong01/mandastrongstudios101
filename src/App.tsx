@@ -154,10 +154,11 @@ function speakText(voiceId, txt, onStart, onEnd) {
   window.speechSynthesis.cancel();
   currentUtterance = null;
   const clean = txt
-    .replace(/\.\.\.|\.{3}/g," ... ")
+    .replace(/\.\.\.|\.{3}/g,", ")
+    .replace(/…/g,", ")
     .replace(/—/g,", ")
     .replace(/[*\/]/g," ")
-    .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
+    .replace(/([.!?])\s+([A-Z])/g,"$1 $2")
     .slice(0,200000);
   const doSpeak = () => {
     const allVoices = window.speechSynthesis.getVoices();
@@ -214,7 +215,7 @@ function speakText(voiceId, txt, onStart, onEnd) {
       const utt = new SpeechSynthesisUtterance(chunks[idx]);
       utt.pitch = pitch; utt.rate = rate; utt.volume = 1.0;
       if(picked) utt.voice = picked;
-      utt.lang = "en-GB";
+      utt.lang = picked ? picked.lang : "en-US";
       utt.onstart = ()=>{ currentUtterance = utt; if(!started){ started = true; if(onStart) onStart(); } };
       utt.onend = ()=>{ idx++; speakNext(); };
       utt.onerror = ()=>{ idx++; speakNext(); };
