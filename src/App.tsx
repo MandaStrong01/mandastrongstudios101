@@ -2972,20 +2972,30 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const audioDest=audioCtx.createMediaStreamDestination();
       let audioSource=null,audioBuffer=null;
-      if(audioAsset&&(audioAsset.url||audioAsset.dbId||audioAsset.id)){
+      if(audioAsset){
         try{
-          let audioUrl=audioAsset.url;
-          if(!audioUrl&&(audioAsset.dbId||audioAsset.id)){
-            const stored=await loadClipFromDB(audioAsset.dbId||audioAsset.id);
-            if(stored&&stored.blob) audioUrl=URL.createObjectURL(stored.blob);
+          let audioBlob=null;
+          // Always try IndexedDB first — blob URLs expire on page reload
+          const dbId=audioAsset.dbId||audioAsset.id;
+          if(dbId){
+            const stored=await loadClipFromDB(dbId);
+            if(stored&&stored.blob) audioBlob=stored.blob;
           }
-          if(audioUrl){
-            const resp=await fetch(audioUrl);
-            const arrayBuf=await resp.arrayBuffer();
+          // Fall back to URL if no DB blob
+          if(!audioBlob&&audioAsset.url){
+            const resp=await fetch(audioAsset.url);
+            audioBlob=await resp.blob();
+          }
+          // Fall back to file object
+          if(!audioBlob&&audioAsset.file) audioBlob=audioAsset.file;
+          if(audioBlob){
+            const arrayBuf=await audioBlob.arrayBuffer();
             audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
-            log("Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+            log("✓ Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+          } else {
+            log("Audio asset found but no data — video only");
           }
-        }catch(e){log("Audio load failed — video only");}
+        }catch(e){log("Audio load failed: "+e.message+" — video only");}
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
       const videoStream=canvas.captureStream(fps);
@@ -3315,7 +3325,20 @@ function P17({ go, rendered, mediaLib }) {
   const [isPlaying,setIsPlaying]=useState(false);
   const [currentTime,setCurrentTime]=useState(0);
   const [duration,setDuration]=useState(0);
-  const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
+  const [vs,setVs]=useState("");
+  useEffect(()=>{
+    // Try rendered prop first, then IndexedDB render_final, then latest video in mediaLib
+    if(rendered?.url){setVs(rendered.url);return;}
+    loadClipFromDB("render_final").then(r=>{
+      if(r?.blob){setVs(URL.createObjectURL(r.blob));return;}
+      // Fall back to latest video in mediaLib
+      const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
+      if(latest?.url) setVs(latest.url);
+    }).catch(()=>{
+      const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
+      if(latest?.url) setVs(latest.url);
+    });
+  },[rendered,mediaLib]);
   const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");};
   const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
   return (
