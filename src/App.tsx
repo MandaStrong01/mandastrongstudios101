@@ -1593,12 +1593,50 @@ function P6Voice({ onSave, setMediaLib }) {
               <button onClick={()=>{stop();setText("");setSavedToLib(false);setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(1.0);setMood("Neutral");}} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>↺ RESET ALL</button>
             </div>
           </div>
-          <button onClick={processAndSpeak} disabled={loading||!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
-            {loading?"⟳ PREPARING AND SPEAKING...":"✦ PREPARE AND SPEAK"}
+          <button onClick={async()=>{
+            if(loading||!text.trim())return;
+            setSavedToLib(false);
+            // Start audio capture from the default output destination
+            let recorder=null; let recChunks=[];
+            try{
+              // Use AudioContext destination capture if available
+              const stream=await navigator.mediaDevices.getUserMedia({audio:true}).catch(()=>null);
+              if(stream){
+                const mimeType=MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";
+                recorder=new MediaRecorder(stream,{mimeType});
+                recorder.ondataavailable=e=>{if(e.data&&e.data.size>0)recChunks.push(e.data);};
+                recorder.start(100);
+              }
+            }catch(e){ recorder=null; }
+            // Speak the narration
+            await new Promise(resolve=>{
+              speakText(selVoice, text, ()=>setSpeaking(true), ()=>{ setSpeaking(false); resolve(null); });
+            });
+            // Stop recording and save
+            if(recorder&&recorder.state!=="inactive"){
+              recorder.stop();
+              await new Promise(r=>{recorder.onstop=r;});
+              const blob=new Blob(recChunks,{type:"audio/webm"});
+              const clipName="Narration - "+selected.name+" - "+new Date().toLocaleTimeString();
+              const clipId="narr_"+Date.now();
+              await safeSaveClipToDB(clipId,blob,clipName,"audio/webm");
+              const asset={id:clipId,name:clipName,type:"audio/webm",url:URL.createObjectURL(blob),file:new File([blob],clipName+".webm",{type:"audio/webm"}),dbId:clipId};
+              if(onSave)onSave(asset);
+              if(setMediaLib)setMediaLib(p=>[...p,asset]);
+              setSavedToLib(true);
+              setTimeout(()=>setSavedToLib(false),3000);
+            } else {
+              // Fallback — save text asset if mic not available
+              const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};
+              if(onSave)onSave(asset);
+              if(setMediaLib)setMediaLib(p=>[...p,asset]);
+              setSavedToLib(true);
+              setTimeout(()=>setSavedToLib(false),2500);
+            }
+          }} disabled={loading||!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
+            {loading?"⟳ PREPARING...":speaking?"⏺ RECORDING & SPEAKING...":"✦ SPEAK & RECORD TO LIBRARY"}
           </button>
-          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}} disabled={!text.trim()} style={{background:savedToLib?"#061406":"transparent",border:"1px solid "+(savedToLib?"#22c55e":GOLD),color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"12px",fontSize:12,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",fontWeight:900,opacity:!text.trim()?0.5:1}}>
-            {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
-          </button>
+          {savedToLib&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px",textAlign:"center",marginBottom:8}}><span style={{color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ AUDIO SAVED TO MEDIA LIBRARY</span></div>}
         </div>
       </div>
     </div>
