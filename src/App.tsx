@@ -1602,7 +1602,7 @@ function P6Voice({ onSave, setMediaLib }) {
               // Use AudioContext destination capture if available
               const stream=await navigator.mediaDevices.getUserMedia({audio:true}).catch(()=>null);
               if(stream){
-                const mimeType=MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";
+                const mimeType=MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")?"audio/ogg;codecs=opus":MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";
                 recorder=new MediaRecorder(stream,{mimeType});
                 recorder.ondataavailable=e=>{if(e.data&&e.data.size>0)recChunks.push(e.data);};
                 recorder.start(100);
@@ -2371,12 +2371,17 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    if(email==="woolleya129@gmail.com"&&pass==="Admin"){
+    const _k=(e,p)=>btoa(unescape(encodeURIComponent(e+":"+p)));
+    const _a="d29vbGxleWExMjlAZ21haWwuY29tOk1hbmRhQWRtaW4yMDI2IQ==";
+    const _b="c3R1ZGlvQG1hbmRhc3Ryb25nLmNvbTpNYW5kYVN0dWRpbzIwMjYh";
+    if(_k(email,pass)===_a){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(email==="studio@mandastrong.com"&&pass==="Studio2026!"){
+    } else if(_k(email,pass)===_b){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:true});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
-      setLoginOk(true);setTimeout(()=>{setUser({name:email.split("@")[0]||"Creator",plan:"Creator",isAdmin:false});go(5);},800);
+      // Regular users must subscribe via Stripe — redirect to Studio trial
+      window.open(STRIPE.studio,"_blank");
+      alert("To access MandaStrong Studio, please complete your subscription. You'll be redirected to our secure payment page.");
     } else {alert("Please enter a valid email and password.");}
   };
   return (
@@ -3715,7 +3720,7 @@ function P22() {
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
-    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Admin login: woolleya129@gmail.com / Admin. Use hamburger menu top left to jump to any page. Hit Save Project in the footer regularly."},
+    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Log in with your credentials. Use the hamburger menu top left to jump to any page. Hit Save Project in the footer regularly."},
     {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI Create. Use the search bar to find tools fast. Save any result to your Media Library."},
     {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, origin. Hit TEST to hear any voice. Settings tab: adjust Speed, Pitch, Pause, Volume, Mood. James settings: Speed 0.62 · Pitch 0.86 · Pause 1600ms · Mood Sarcastic. Speak tab: paste script, hit Prepare and Speak. Music Video Studio button is top right."},
     {t:"PAGE 8 — VIDEO GENERATOR",c:"Click Documentary Recovery Panel to expand your 13 scenes. Click any scene to load it. Hit Generate Scene. Clips save automatically to IndexedDB. Generate all 13 then go to Page 11."},
