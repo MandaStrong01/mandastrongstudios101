@@ -2926,7 +2926,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   };
 
   const getAudioTrack=()=>{
-    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
+    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
     return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
   };
@@ -2967,12 +2967,19 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const audioDest=audioCtx.createMediaStreamDestination();
       let audioSource=null,audioBuffer=null;
-      if(audioAsset&&audioAsset.url){
+      if(audioAsset&&(audioAsset.url||audioAsset.dbId||audioAsset.id)){
         try{
-          const resp=await fetch(audioAsset.url);
-          const arrayBuf=await resp.arrayBuffer();
-          audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
-          log("Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+          let audioUrl=audioAsset.url;
+          if(!audioUrl&&(audioAsset.dbId||audioAsset.id)){
+            const stored=await loadClipFromDB(audioAsset.dbId||audioAsset.id);
+            if(stored&&stored.blob) audioUrl=URL.createObjectURL(stored.blob);
+          }
+          if(audioUrl){
+            const resp=await fetch(audioUrl);
+            const arrayBuf=await resp.arrayBuffer();
+            audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
+            log("Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+          }
         }catch(e){log("Audio load failed — video only");}
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
