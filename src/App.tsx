@@ -2371,12 +2371,11 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    const _k=(e,p)=>btoa(unescape(encodeURIComponent(e+":"+p)));
-    const _a="d29vbGxleWExMjlAZ21haWwuY29tOk1hbmRhQWRtaW4yMDI2IQ==";
-    const _b="c3R1ZGlvQG1hbmRhc3Ryb25nLmNvbTpNYW5kYVN0dWRpbzIwMjYh";
-    if(_k(email,pass)===_a){
+    const isAmanda=email==="woolleya129@gmail.com"&&pass==="MandaAdmin2026!";
+    const isStudio=email==="studio@mandastrong.com"&&pass==="MandaStudio2026!";
+    if(isAmanda){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(_k(email,pass)===_b){
+    } else if(isStudio){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:true});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
       // Regular users must subscribe via Stripe — redirect to Studio trial
