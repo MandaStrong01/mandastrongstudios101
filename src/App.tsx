@@ -2355,12 +2355,12 @@ function P4({ go, setUser }) {
   const login=()=>{
     const isAmanda=email==="woolleya129@gmail.com"&&pass==="MandaAdmin2026!";
     const isStudio=email==="studio@mandastrong.com"&&pass==="MandaStudio2026!";
+    const isTest=email==="test@mandastrong.com"&&pass==="Test2026";
     if(isAmanda){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(isStudio){
-      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:true});go(5);},800);
+    } else if(isStudio||isTest){
+      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:false});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
-      // Regular users must subscribe via Stripe — redirect to Studio trial
       window.open(STRIPE.studio,"_blank");
       alert("To access MandaStrong Studio, please complete your subscription. You'll be redirected to our secure payment page.");
     } else {alert("Please enter a valid email and password.");}
