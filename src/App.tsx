@@ -154,10 +154,11 @@ function speakText(voiceId, txt, onStart, onEnd) {
   window.speechSynthesis.cancel();
   currentUtterance = null;
   const clean = txt
-    .replace(/\.\.\.|\.{3}/g," ... ")
+    .replace(/\.\.\.|\.{3}/g,", ")
+    .replace(/…/g,", ")
     .replace(/—/g,", ")
     .replace(/[*\/]/g," ")
-    .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
+    .replace(/([.!?])\s+([A-Z])/g,"$1 $2")
     .slice(0,200000);
   const doSpeak = () => {
     const allVoices = window.speechSynthesis.getVoices();
@@ -214,7 +215,7 @@ function speakText(voiceId, txt, onStart, onEnd) {
       const utt = new SpeechSynthesisUtterance(chunks[idx]);
       utt.pitch = pitch; utt.rate = rate; utt.volume = 1.0;
       if(picked) utt.voice = picked;
-      utt.lang = "en-GB";
+      utt.lang = picked ? picked.lang : "en-US";
       utt.onstart = ()=>{ currentUtterance = utt; if(!started){ started = true; if(onStart) onStart(); } };
       utt.onend = ()=>{ idx++; speakNext(); };
       utt.onerror = ()=>{ idx++; speakNext(); };
@@ -1593,12 +1594,31 @@ function P6Voice({ onSave, setMediaLib }) {
               <button onClick={()=>{stop();setText("");setSavedToLib(false);setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(1.0);setMood("Neutral");}} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>↺ RESET ALL</button>
             </div>
           </div>
-          <button onClick={processAndSpeak} disabled={loading||!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
-            {loading?"⟳ PREPARING AND SPEAKING...":"✦ PREPARE AND SPEAK"}
+          <button onClick={async()=>{
+            if(loading||!text.trim())return;
+            setSavedToLib(false);
+            // Speak the narration through speakers
+            speakText(selVoice, text, ()=>setSpeaking(true), ()=>setSpeaking(false));
+            // Save as narration text asset — render engine speaks it live during render
+            const asset={
+              id:"narr_"+Date.now(),
+              name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),
+              type:"narration",
+              text:text,
+              voice:selVoice,
+              pitch:selected.pitch,
+              rate:selected.rate,
+              date:new Date().toISOString()
+            };
+            await safeSaveClipToDB(asset.id,new Blob([text],{type:"text/plain"}),asset.name,"narration");
+            if(onSave)onSave(asset);
+            if(setMediaLib)setMediaLib(p=>[...p,asset]);
+            setSavedToLib(true);
+            setTimeout(()=>setSavedToLib(false),3000);
+          }} disabled={loading||!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
+            {loading?"⟳ PREPARING...":speaking?"⏺ SPEAKING...":"✦ SPEAK & SAVE TO LIBRARY"}
           </button>
-          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}} disabled={!text.trim()} style={{background:savedToLib?"#061406":"transparent",border:"1px solid "+(savedToLib?"#22c55e":GOLD),color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"12px",fontSize:12,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",fontWeight:900,opacity:!text.trim()?0.5:1}}>
-            {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
-          </button>
+          {savedToLib&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px",textAlign:"center",marginBottom:8}}><span style={{color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ NARRATION SAVED TO MEDIA LIBRARY</span></div>}
         </div>
       </div>
     </div>
@@ -2333,12 +2353,16 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    if(email==="woolleya129@gmail.com"&&pass==="Admin"){
+    const isAmanda=email==="woolleya129@gmail.com"&&pass==="MandaAdmin2026!";
+    const isStudio=email==="studio@mandastrong.com"&&pass==="MandaStudio2026!";
+    if(isAmanda){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(email==="studio@mandastrong.com"&&pass==="Studio2026!"){
+    } else if(isStudio){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:true});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
-      setLoginOk(true);setTimeout(()=>{setUser({name:email.split("@")[0]||"Creator",plan:"Creator",isAdmin:false});go(5);},800);
+      // Regular users must subscribe via Stripe — redirect to Studio trial
+      window.open(STRIPE.studio,"_blank");
+      alert("To access MandaStrong Studio, please complete your subscription. You'll be redirected to our secure payment page.");
     } else {alert("Please enter a valid email and password.");}
   };
   return (
@@ -2718,6 +2742,7 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
             alert("✓ All tracks synced — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
           }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⚡ SYNC ALL TRACKS</button>
           <button onClick={()=>go(16)} style={{...G("gold",false)}}>→ RENDER</button>
+          <button onClick={()=>go(11)} style={{...G("out",true)}}>⬆ UPLOAD MEDIA</button>
           <button onClick={()=>setTimeline({})} style={{...G("out",true)}}>CLEAR ALL</button>
         </div>
       </div>
@@ -2888,7 +2913,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   };
 
   const getAudioTrack=()=>{
-    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
+    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
     return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
   };
@@ -2929,13 +2954,34 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const audioDest=audioCtx.createMediaStreamDestination();
       let audioSource=null,audioBuffer=null;
-      if(audioAsset&&audioAsset.url){
-        try{
-          const resp=await fetch(audioAsset.url);
-          const arrayBuf=await resp.arrayBuffer();
-          audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
-          log("Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
-        }catch(e){log("Audio load failed — video only");}
+      let liveNarration=false;
+      if(audioAsset){
+        // If it's a text narration asset, speak it live via Web Speech API during render
+        if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
+          liveNarration=true;
+          log("✓ Narration ready — will speak live during render");
+        } else {
+          try{
+            let audioBlob=null;
+            const dbId=audioAsset.dbId||audioAsset.id;
+            if(dbId){
+              const stored=await loadClipFromDB(dbId);
+              if(stored&&stored.blob) audioBlob=stored.blob;
+            }
+            if(!audioBlob&&audioAsset.url){
+              const resp=await fetch(audioAsset.url);
+              audioBlob=await resp.blob();
+            }
+            if(!audioBlob&&audioAsset.file) audioBlob=audioAsset.file;
+            if(audioBlob){
+              const arrayBuf=await audioBlob.arrayBuffer();
+              audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
+              log("✓ Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+            } else {
+              log("Audio asset found but no data — video only");
+            }
+          }catch(e){log("Audio load failed: "+e.message+" — video only");}
+        }
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
       const videoStream=canvas.captureStream(fps);
@@ -2952,6 +2998,12 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       await new Promise(r=>setTimeout(r,200));
       recorder.start(100);
       if(audioSource)audioSource.start(0);
+      // Speak live narration text through speakers during render
+      if(liveNarration&&audioAsset?.text){
+        const vc=typeof VOICE_CHARACTERS!=="undefined"?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
+        speakText(audioAsset.voice||"blaze",audioAsset.text,null,null);
+        log("✓ Speaking narration live: "+(audioAsset.voice||"blaze"));
+      }
       log("Recording started...");
       setProgress(5);
       // Helper: render a scene directly to canvas using Claude
@@ -3265,7 +3317,20 @@ function P17({ go, rendered, mediaLib }) {
   const [isPlaying,setIsPlaying]=useState(false);
   const [currentTime,setCurrentTime]=useState(0);
   const [duration,setDuration]=useState(0);
-  const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
+  const [vs,setVs]=useState("");
+  useEffect(()=>{
+    // Try rendered prop first, then IndexedDB render_final, then latest video in mediaLib
+    if(rendered?.url){setVs(rendered.url);return;}
+    loadClipFromDB("render_final").then(r=>{
+      if(r?.blob){setVs(URL.createObjectURL(r.blob));return;}
+      // Fall back to latest video in mediaLib
+      const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
+      if(latest?.url) setVs(latest.url);
+    }).catch(()=>{
+      const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
+      if(latest?.url) setVs(latest.url);
+    });
+  },[rendered,mediaLib]);
   const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");};
   const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
   return (
@@ -3669,7 +3734,7 @@ function P22() {
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
-    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Admin login: woolleya129@gmail.com / Admin. Use hamburger menu top left to jump to any page. Hit Save Project in the footer regularly."},
+    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Log in with your credentials. Use the hamburger menu top left to jump to any page. Hit Save Project in the footer regularly."},
     {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI Create. Use the search bar to find tools fast. Save any result to your Media Library."},
     {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, origin. Hit TEST to hear any voice. Settings tab: adjust Speed, Pitch, Pause, Volume, Mood. James settings: Speed 0.62 · Pitch 0.86 · Pause 1600ms · Mood Sarcastic. Speak tab: paste script, hit Prepare and Speak. Music Video Studio button is top right."},
     {t:"PAGE 8 — VIDEO GENERATOR",c:"Click Documentary Recovery Panel to expand your 13 scenes. Click any scene to load it. Hit Generate Scene. Clips save automatically to IndexedDB. Generate all 13 then go to Page 11."},
@@ -3926,10 +3991,34 @@ export default function App() {
   },[]);
 
   const saveAsset=async(a)=>{
+    let asset=a;
     if(a.file instanceof File||a.file instanceof Blob){
-      try{const blob=a.file;const dbId=a.id||("asset_"+Date.now());await safeSaveClipToDB(dbId,blob,a.name||"asset",a.type||"video/webm");setMediaLib(p=>[...p,{...a,dbId}]);}
-      catch(e){setMediaLib(p=>[...p,a]);}
-    }else{setMediaLib(p=>[...p,a]);}
+      try{const blob=a.file;const dbId=a.id||("asset_"+Date.now());await safeSaveClipToDB(dbId,blob,a.name||"asset",a.type||"video/webm");asset={...a,dbId};}
+      catch(e){}
+    }
+    setMediaLib(p=>[...p,asset]);
+    // Auto-route to correct timeline track
+    const isAudio=asset.type&&(asset.type.startsWith("audio")||asset.type==="narration"||asset.type==="audio/narration");
+    const isVideo=asset.type&&(asset.type.startsWith("video")||asset.type==="video/webm");
+    if(isAudio||isVideo){
+      setTimeline(prev=>{
+        const updated={...prev};
+        if(isAudio){
+          const audioTrack=updated.audio||[];
+          // Only add if not already on the track
+          if(!audioTrack.find(x=>x.id===asset.id)){
+            updated.audio=[...audioTrack,asset];
+          }
+        } else if(isVideo){
+          const videoTrack=updated.video||[];
+          if(!videoTrack.find(x=>x.id===asset.id)){
+            updated.video=[...videoTrack,asset];
+          }
+        }
+        localStorage.setItem("ms_timeline",JSON.stringify(updated));
+        return updated;
+      });
+    }
   };
 
   const saveProject=()=>setShowSaveModal(true);
