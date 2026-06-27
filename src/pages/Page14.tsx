@@ -23,7 +23,7 @@ export default function Page14({ onNavigate }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<AIAsset | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(180);
+  const [duration, _setDuration] = useState(180);
   const [isPlaying, setIsPlaying] = useState(false);
   const [textContent, setTextContent] = useState('');
   const [fontSize, setFontSize] = useState(24);

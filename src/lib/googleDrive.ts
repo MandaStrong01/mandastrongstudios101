@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare const gapi: any;
+declare const google: any;
+
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/photoslibrary.readonly';
@@ -119,7 +123,7 @@ function createPicker(callback: (files: any[]) => void) {
   picker.setVisible(true);
 }
 
-export async function downloadGoogleDriveFile(fileId: string, fileName: string, mimeType: string): Promise<Blob> {
+export async function downloadGoogleDriveFile(fileId: string, _fileName: string, _mimeType: string): Promise<Blob> {
   if (!accessToken) {
     throw new Error('Not authenticated with Google Drive');
   }
