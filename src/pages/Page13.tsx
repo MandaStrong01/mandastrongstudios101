@@ -30,7 +30,7 @@ export default function Page13({ onNavigate }: PageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedAsset, setSelectedAsset] = useState<AIAsset | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, _setDuration] = useState(180);
+  const [duration, setDuration] = useState(180);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(100);
   const [audioType, setAudioType] = useState('music');
