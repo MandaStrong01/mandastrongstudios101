@@ -1004,7 +1004,8 @@ function MusicVideoStudio({ onClose, onSave }) {
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(Math.round(1000/fps));
       // Start audio at exact same moment as video recording — guarantees sync
-      if(audioSource) audioSource.start(audioCtx.currentTime);
+      if(audioSource&&audioCtx) audioSource.start(audioCtx.currentTime);
+      else if(audioSource) audioSource.start(0);
 
       // ── RENDER EVERY FRAME ──────────────────────────────────────
       const totalFrames=Math.max(fps*5, Math.round((totalDur||180)*fps));
@@ -4280,25 +4281,18 @@ export default function App() {
       catch(e){}
     }
     setMediaLib(p=>[...p,asset]);
-    // Auto-route to correct timeline track
+    // Auto-route to correct timeline track (0 = VIDEO TRACK, 1 = AUDIO TRACK)
     const isAudio=asset.type&&(asset.type.startsWith("audio")||asset.type==="narration"||asset.type==="audio/narration");
     const isVideo=asset.type&&(asset.type.startsWith("video")||asset.type==="video/webm");
     if(isAudio||isVideo){
       setTimeline(prev=>{
         const updated={...prev};
-        if(isAudio){
-          const audioTrack=updated.audio||[];
-          // Only add if not already on the track
-          if(!audioTrack.find(x=>x.id===asset.id)){
-            updated.audio=[...audioTrack,asset];
-          }
-        } else if(isVideo){
-          const videoTrack=updated.video||[];
-          if(!videoTrack.find(x=>x.id===asset.id)){
-            updated.video=[...videoTrack,asset];
-          }
+        const trackIdx=isAudio?1:0;
+        const track=updated[trackIdx]||[];
+        if(!track.find(x=>x.id===asset.id)){
+          updated[trackIdx]=[...track,asset];
         }
-        localStorage.setItem("ms_timeline",JSON.stringify(updated));
+        try{localStorage.setItem("ms_timeline",JSON.stringify(updated));}catch(e){}
         return updated;
       });
     }
