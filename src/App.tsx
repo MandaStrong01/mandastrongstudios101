@@ -1096,8 +1096,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       addLog("Cutting to final...");
       await new Promise(r=>setTimeout(r,600));
       if(audioSource){try{audioSource.stop(audioCtx?audioCtx.currentTime:0);}catch(e){}}
-      recorder.stop();
-      await new Promise(r=>{recorder.onstop=r;});
+      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,4000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob=new Blob(chunks,{type:mimeType});
       const url=URL.createObjectURL(blob);
       setVideoUrl(url); setVideoBlob(blob);
@@ -1359,7 +1358,7 @@ function MusicVideoStudio({ onClose, onSave }) {
             <div style={{display:"flex",flexDirection:"column",background:"#000",overflow:"hidden"}}>
               {/* Video player */}
               <div style={{position:"relative",background:"#000"}}>
-                <canvas ref={canvasRef} style={{display:"none"}}/>
+                <canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>
                 <video ref={videoRef} src={videoUrl} playsInline
                   style={{width:"100%",aspectRatio:"16/9",display:"block",background:"#000"}}
                   onTimeUpdate={()=>setCurrentTime(videoRef.current?.currentTime||0)}
@@ -1437,7 +1436,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           )}
 
           {/* Canvas for rendering (always hidden) */}
-          {!videoUrl&&<canvas ref={canvasRef} style={{display:"none"}}/>}
+          {!videoUrl&&<canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>}
         </div>
 
         {/* Bottom nav */}
@@ -2001,25 +2000,35 @@ Write the drawFrame body now.`}]
     // A fixed delay can fire before the final chunk arrives on slower machines, which hangs at 97%.
     await new Promise(resolve=>{
       let done=false;
-      recorder.onstop=()=>{ if(!done){done=true;resolve(null);} };
-      recorder.stop();
-      // Safety net: never wait forever
-      setTimeout(()=>{ if(!done){done=true;resolve(null);} },4000);
+      const finish=()=>{ if(!done){done=true;resolve(null);} };
+      // Arm the escape hatch FIRST — guaranteed exit even if stop() throws
+      setTimeout(finish,4000);
+      try{
+        recorder.onstop=finish;
+        if(recorder.state!=="inactive"){recorder.stop();}
+        else{finish();}
+      }catch(e){finish();}
     });
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
-    // AUTO-SAVE the finished clip immediately so it is never lost on crash or navigation
+    setProgress(100);
+    addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
+    // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
     try{
       const autoId="scene_"+Date.now();
       const autoName=(title||"Scene")+"_"+duration+"s.webm";
-      await safeSaveClipToDB(autoId,blob,autoName,"video/webm");
-      if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
-      setSaved(true);
-      addLog("\u2713 Auto-saved to library");
+      const saveResult=await Promise.race([
+        safeSaveClipToDB(autoId,blob,autoName,"video/webm"),
+        new Promise(r=>setTimeout(()=>r("timeout"),6000))
+      ]);
+      if(saveResult==="timeout"){addLog("Save is running in background — clip is ready above");}
+      else{
+        if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
+        setSaved(true);
+        addLog("\u2713 Auto-saved to library");
+      }
     }catch(e){addLog("Auto-save note: "+e.message);}
-    setProgress(100);
-    addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
     setGenerating(false);
   };
 
@@ -2036,7 +2045,7 @@ Write the drawFrame body now.`}]
 
   return (
     <div style={{minHeight:"100vh",background:"#000",color:WHITE,fontFamily:"'Rajdhani',sans-serif",paddingBottom:160}}>
-      <canvas ref={canvasRef} style={{display:"none"}}/>
+      <canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>
       <div style={{padding:"12px 20px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG ENGINE v2 · CINEMA-GRADE RENDERER</div>
@@ -2661,8 +2670,7 @@ function MergeVideos({ onSave }) {
 
       setProgress(95);
       log("Finalising merged film...");
-      recorder.stop();
-      await new Promise(r => { recorder.onstop = r; });
+      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,4000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob = new Blob(chunks, {type:mimeType});
       const url = URL.createObjectURL(blob);
       setMergedUrl(url);
@@ -3292,20 +3300,22 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       });}
       setProgress(92);log("Finalising...");
       if(audioSource){try{audioSource.stop();}catch(e){}}
-      recorder.stop();
-      await new Promise(r=>{recorder.onstop=r;});
+      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,5000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob=new Blob(chunks,{type:mimeType});
       const url=URL.createObjectURL(blob);
-      // Save final render to IndexedDB
-      try{
-        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
-        await saveClipToDB("render_final",blob,renderName,"video/webm");
-      }catch(e){}
       setRenderUrl(url);
       if(setRendered)setRendered({url,quality,format:"WebM",timestamp:new Date().toLocaleString()});
       setProgress(100);setDone(true);
       log("RENDER COMPLETE — "+(blob.size/1024/1024).toFixed(1)+"MB");
-      audioCtx.close();
+      // Save final render to IndexedDB — timeout-protected, never blocks completion
+      try{
+        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
+        await Promise.race([
+          saveClipToDB("render_final",blob,renderName,"video/webm"),
+          new Promise(r=>setTimeout(r,6000))
+        ]);
+      }catch(e){}
+      try{if(audioCtx)audioCtx.close();}catch(e){}
     }catch(e){log("Render error: "+e.message);}
     setRendering(false);
   };
@@ -3316,7 +3326,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
 
   return (
     <div style={{...Sp,padding:0}}>
-      <canvas ref={canvasRef} style={{display:"none"}}/>
+      <canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>
       <div style={{padding:"12px 24px",borderBottom:"1px solid "+GOLDDIM+"",background:"#020200",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700}}>PRODUCTION ENGINE — STAGE 6</div>
@@ -4126,23 +4136,19 @@ function P23({ go }) {
     v.loop=true;
     v.playsInline=true;
     v.preload="auto";
-    // Prevent jumping — use timeupdate to detect unexpected jumps and smooth them
-    let lastTime=0;
-    const onTimeUpdate=()=>{
-      if(v.currentTime<lastTime-1){v.currentTime=lastTime;} // prevent backward jump
-      lastTime=v.currentTime;
-    };
-    const tryPlay=()=>{v.play().catch(()=>{});}; 
-    tryPlay();
+    // Smooth playback: wait until the video is fully buffered before starting,
+    // then let the native loop handle itself. Only nudge play on stall/pause.
+    const tryPlay=()=>{v.play().catch(()=>{});};
+    if(v.readyState>=4){tryPlay();}
+    else{v.addEventListener("canplaythrough",tryPlay,{once:true});}
     v.addEventListener("pause",tryPlay);
-    v.addEventListener("ended",tryPlay);
     v.addEventListener("stalled",tryPlay);
-    v.addEventListener("timeupdate",onTimeUpdate);
+    v.addEventListener("waiting",tryPlay);
     return()=>{
+      v.removeEventListener("canplaythrough",tryPlay);
       v.removeEventListener("pause",tryPlay);
-      v.removeEventListener("ended",tryPlay);
       v.removeEventListener("stalled",tryPlay);
-      v.removeEventListener("timeupdate",onTimeUpdate);
+      v.removeEventListener("waiting",tryPlay);
     };
   },[]);
   const exitApp = () => {
