@@ -162,7 +162,7 @@ interface GrokChatProps {
   onNavigate?: (page: number) => void;
 }
 
-export default function GrokChat({ onNavigate }: GrokChatProps) {
+export default function GrokChat({ onNavigate: _onNavigate }: GrokChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ text: string; isUser: boolean; followUps?: string[] }>>([]);
   const [input, setInput] = useState('');

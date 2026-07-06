@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Sparkles, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Search } from 'lucide-react';
 import AIToolModal from './AIToolModal';
 import Footer from './Footer';
 import QuickAccess from './QuickAccess';
