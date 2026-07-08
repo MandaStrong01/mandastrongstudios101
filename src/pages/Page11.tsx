@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, File as FileIcon, Sparkles, Volume2, Maximize, Play, Pause, X, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, File, Sparkles, Volume2, Maximize, Play, Pause, X, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadFile } from '../lib/storage';
@@ -230,7 +230,7 @@ export default function Page11({ onNavigate }: PageProps) {
     setShowScriptModal(true);
   };
 
-  const handleScriptResponse = (_confirmed?: boolean) => {
+  const handleScriptResponse = () => {
     setShowScriptModal(false);
   };
 
@@ -513,7 +513,7 @@ export default function Page11({ onNavigate }: PageProps) {
                   </div>
                 ) : assets.length === 0 ? (
                   <div className="text-center py-8">
-                    <FileIcon className="w-12 h-12 mx-auto mb-2 text-slate-600" />
+                    <File className="w-12 h-12 mx-auto mb-2 text-slate-600" />
                     <p className="text-sm text-slate-400">No assets yet</p>
                   </div>
                 ) : (
@@ -529,7 +529,7 @@ export default function Page11({ onNavigate }: PageProps) {
                         >
                           <div className="flex items-center gap-2 mb-1">
                             {isMedia ? (
-                              <FileIcon className="w-4 h-4 text-purple-400" />
+                              <File className="w-4 h-4 text-purple-400" />
                             ) : (
                               <Sparkles className="w-4 h-4 text-purple-400" />
                             )}
@@ -581,7 +581,7 @@ export default function Page11({ onNavigate }: PageProps) {
                         </div>
                       ) : (
                         <div className="text-center p-8">
-                          <FileIcon className="w-16 h-16 mx-auto mb-4 text-purple-400" />
+                          <File className="w-16 h-16 mx-auto mb-4 text-purple-400" />
                           <h3 className="text-lg font-bold mb-2">{selectedAsset.file_name}</h3>
                           <p className="text-sm text-slate-400">{selectedAsset.file_type}</p>
                         </div>
@@ -597,7 +597,7 @@ export default function Page11({ onNavigate }: PageProps) {
                     )
                   ) : (
                     <div className="text-center">
-                      <FileIcon className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                      <File className="w-16 h-16 mx-auto mb-4 text-slate-600" />
                       <p className="text-slate-400">Select an asset to preview</p>
                     </div>
                   )}

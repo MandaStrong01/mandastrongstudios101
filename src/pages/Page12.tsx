@@ -62,7 +62,7 @@ export default function Page12({ onNavigate }: PageProps) {
 
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
-  const [_syncCount, setSyncCount] = useState(0);
+  const [syncCount, setSyncCount] = useState(0);
 
   // Upload
   const [uploading, setUploading] = useState(false);

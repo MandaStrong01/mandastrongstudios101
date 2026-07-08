@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Film, Wand2, Zap, Sparkles, Play, Pause, Layers3, Aperture, Camera, Clock, Wind, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Film, Wand2, Zap, Sparkles, Play, Pause, Layers3, Aperture, Camera, Move, Clock, Wind, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
@@ -23,7 +23,7 @@ export default function Page15({ onNavigate }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<AIAsset | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration] = useState(180);
+  const [duration, setDuration] = useState(180);
   const [isPlaying, setIsPlaying] = useState(false);
   const [animationStyle, setAnimationStyle] = useState('smooth');
   const [animationSpeed, setAnimationSpeed] = useState(50);

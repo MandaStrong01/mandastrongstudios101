@@ -58,7 +58,7 @@ export async function uploadFile(
     const timestamp = Date.now();
     const fileName = `${userId}/${timestamp}_${file.name}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('media-assets')
       .upload(fileName, optimizedFile, {
         cacheControl: '3600',

@@ -23,7 +23,7 @@ export default function Page16({ onNavigate }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<AIAsset | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration] = useState(180);
+  const [duration, setDuration] = useState(180);
   const [isPlaying, setIsPlaying] = useState(false);
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
