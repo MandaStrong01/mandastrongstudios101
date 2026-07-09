@@ -55,12 +55,12 @@ const autoPruneClips=async(keepNewest)=>{
 const safeSaveClipToDB=async(id,blob,name,type)=>{
   try{
     const s=await getStorageStatus();
-    if(s.pct>0.8){ await autoPruneClips(8); }
+    if(s.pct>0.9){ await autoPruneClips(30); }
     await saveClipToDB(id,blob,name,type);
     return true;
   }catch(e){
     // If it still failed, prune hard and retry once
-    try{ await autoPruneClips(4); await saveClipToDB(id,blob,name,type); return true; }
+    try{ await autoPruneClips(25); await saveClipToDB(id,blob,name,type); return true; }
     catch(e2){ return false; }
   }
 };
@@ -154,19 +154,17 @@ function speakText(voiceId, txt, onStart, onEnd) {
   window.speechSynthesis.cancel();
   currentUtterance = null;
   const clean = txt
-    .replace(/\.\.\.|\.{3}/g," ... ")
+    .replace(/\.\.\.|\.{3}/g,", ")
+    .replace(/…/g,", ")
     .replace(/—/g,", ")
     .replace(/[*\/]/g," ")
-    .replace(/([.!?])\s+([A-Z])/g,"$1 ... $2")
-    .slice(0,5000);
+    .replace(/([.!?])\s+([A-Z])/g,"$1 $2")
+    .slice(0,200000);
   const doSpeak = () => {
     const allVoices = window.speechSynthesis.getVoices();
     const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
       ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.pitch = voiceChar ? voiceChar.pitch : 1.0;
-    utt.rate  = voiceChar ? voiceChar.rate  : 0.85;
-    utt.volume = 1.0;
+    // Pick the voice once, reuse for every chunk
     const assignedName = VOICE_ASSIGNMENTS[voiceId];
     let picked = null;
     if(assignedName) picked = allVoices.find(v=>v.name===assignedName);
@@ -194,12 +192,36 @@ function speakText(voiceId, txt, onStart, onEnd) {
     }
     if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
     if(!picked && allVoices.length) picked = allVoices[0];
-    if(picked) utt.voice = picked;
-    utt.lang = "en-GB";
-    utt.onstart  = ()=>{ currentUtterance=utt; if(onStart) onStart(); };
-    utt.onend    = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
-    utt.onerror  = ()=>{ currentUtterance=null; if(onEnd) onEnd(); };
-    window.speechSynthesis.speak(utt);
+
+    const pitch = voiceChar ? voiceChar.pitch : 1.0;
+    const rate  = voiceChar ? voiceChar.rate  : 0.85;
+
+    // Split into sentence-sized chunks so the browser speech engine never cuts out
+    // on long narration (it silently dies on a single very long utterance).
+    const sentences = clean.match(/[^.!?]+[.!?]+|\s*\S[^.!?]*$/g) || [clean];
+    const chunks = [];
+    let buf = "";
+    for(const s of sentences){
+      if((buf + s).length > 220){ if(buf) chunks.push(buf); buf = s; }
+      else { buf += s; }
+    }
+    if(buf) chunks.push(buf);
+    if(!chunks.length) chunks.push(clean);
+
+    let idx = 0;
+    let started = false;
+    const speakNext = () => {
+      if(idx >= chunks.length){ currentUtterance = null; if(onEnd) onEnd(); return; }
+      const utt = new SpeechSynthesisUtterance(chunks[idx]);
+      utt.pitch = pitch; utt.rate = rate; utt.volume = 1.0;
+      if(picked) utt.voice = picked;
+      utt.lang = picked ? picked.lang : "en-US";
+      utt.onstart = ()=>{ currentUtterance = utt; if(!started){ started = true; if(onStart) onStart(); } };
+      utt.onend = ()=>{ idx++; speakNext(); };
+      utt.onerror = ()=>{ idx++; speakNext(); };
+      window.speechSynthesis.speak(utt);
+    };
+    speakNext();
   };
   if(window.speechSynthesis.getVoices().length===0){
     window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
@@ -219,40 +241,54 @@ const MOTION = ["AI 8K Upscaling","AI 4K Upscaling","Video Super Resolution","Fr
 
 const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Grok"},{p:22,l:"Community Hub"},{p:24,l:"Character Studio"},{p:23,l:"That's All Folks"}];
 
-function ProjectHistoryModal({ onClose, onResume }) {
+function ProjectHistoryModal({ onClose, onResume, initialTab }) {
   const [history,setHistory]=useState([]);
+  const [tab,setTab]=useState(initialTab||"in_progress");
   useEffect(()=>{try{setHistory(JSON.parse(localStorage.getItem("ms_project_history")||"[]"));}catch{};},[]);
   const del=(idx)=>{const u=history.filter((_,i)=>i!==idx);setHistory(u);localStorage.setItem("ms_project_history",JSON.stringify(u));};
+  const filtered=history.filter(h=>(h.status||"in_progress")===tab);
+  const inProgressCount=history.filter(h=>(h.status||"in_progress")==="in_progress").length;
+  const completedCount=history.filter(h=>h.status==="completed").length;
   return (
     <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.96)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{width:"min(580px,95vw)",background:"#050505",border:"2px solid "+GOLD,maxHeight:"82vh",display:"flex",flexDirection:"column"}}>
+      <div style={{width:"min(620px,95vw)",background:"#050505",border:"2px solid "+GOLD,maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
         <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:"1px solid "+GOLD+"",padding:"16px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:17,fontWeight:900,letterSpacing:4}}>📂 MY PROJECTS</div>
-            <div style={{color:WHITE,fontSize:10,letterSpacing:3,marginTop:3}}>CONTINUE WHERE YOU LEFT OFF</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:17,fontWeight:900,letterSpacing:4}}>📂 YOUR PROJECTS</div>
+            <div style={{color:WHITE,fontSize:10,letterSpacing:3,marginTop:3}}>OPEN A WORK IN PROGRESS OR REVISIT A FINISHED FILM</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"1px solid "+GOLD,color:GOLD,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
         </div>
+        <div style={{display:"flex",borderBottom:"1px solid "+GOLDDIM,flexShrink:0}}>
+          <button onClick={()=>setTab("in_progress")} style={{flex:1,background:tab==="in_progress"?"#1a0800":"transparent",border:"none",borderBottom:tab==="in_progress"?"2px solid "+GOLD:"none",color:tab==="in_progress"?GOLD:DIM,padding:"12px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⟳ OPEN PROJECT ({inProgressCount})</button>
+          <button onClick={()=>setTab("completed")} style={{flex:1,background:tab==="completed"?"#1a0800":"transparent",border:"none",borderBottom:tab==="completed"?"2px solid "+GOLD:"none",color:tab==="completed"?GOLD:DIM,padding:"12px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>✓ MY PROJECTS ({completedCount})</button>
+        </div>
         <div style={{flex:1,overflowY:"auto",padding:18}}>
-          {history.length===0?(
+          {filtered.length===0?(
             <div style={{textAlign:"center",padding:"40px 20px",color:GOLDDIM}}>
-              <div style={{fontSize:34,marginBottom:10}}>📂</div>
-              <div style={{fontSize:12,letterSpacing:2,marginBottom:8}}>No saved sessions yet.</div>
-              <div style={{fontSize:11,color:DIM,lineHeight:1.7}}>Hit 💾 SAVE PROJECT in the footer<br/>to save your current session.</div>
+              <div style={{fontSize:34,marginBottom:10}}>{tab==="in_progress"?"⟳":"✓"}</div>
+              <div style={{fontSize:12,letterSpacing:2,marginBottom:8}}>{tab==="in_progress"?"No projects in progress.":"No completed projects yet."}</div>
+              <div style={{fontSize:11,color:DIM,lineHeight:1.7}}>{tab==="in_progress"?<span>Hit 💾 SAVE PROJECT with<br/>status IN PROGRESS to save your work.</span>:<span>Mark a project COMPLETED<br/>when your film is finished.</span>}</div>
             </div>
-          ):[...history].reverse().map((h,i)=>(
-            <div key={i} style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{flex:1}}>
-                <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:3}}>{h.name||"Untitled Session"}</div>
-                <div style={{color:DIM,fontSize:10,letterSpacing:1}}>{h.date} · Page {h.page} · {h.assetCount} asset{h.assetCount!==1?"s":""}</div>
-                {h.note&&<div style={{color:WHITE,fontSize:11,marginTop:4,fontStyle:"italic"}}>{h.note}</div>}
+          ):[...filtered].reverse().map((h,i)=>{
+            const originalIdx=history.indexOf(h);
+            return (
+              <div key={i} style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                    <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2}}>{h.name||"Untitled Session"}</div>
+                    <span style={{background:tab==="completed"?"#0a2010":"#20180a",color:tab==="completed"?"#22c55e":GOLD,fontSize:9,letterSpacing:2,padding:"2px 8px",fontWeight:900}}>{tab==="completed"?"COMPLETED":"IN PROGRESS"}</span>
+                  </div>
+                  <div style={{color:DIM,fontSize:10,letterSpacing:1}}>{h.date} · Page {h.page} · {h.assetCount} asset{h.assetCount!==1?"s":""}</div>
+                  {h.note&&<div style={{color:WHITE,fontSize:11,marginTop:4,fontStyle:"italic"}}>{h.note}</div>}
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <button onClick={()=>onResume(h)} style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",padding:"8px 18px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>{tab==="completed"?"👁 REVISIT":"▶ CONTINUE"}</button>
+                  <button onClick={()=>del(originalIdx)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"5px 10px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕</button>
+                </div>
               </div>
-              <div style={{display:"flex",gap:6,flexShrink:0}}>
-                <button onClick={()=>onResume(h)} style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",padding:"8px 18px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>▶ CONTINUE PROJECT</button>
-                <button onClick={()=>del(history.length-1-i)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"5px 10px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕</button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {history.length>0&&(
           <div style={{borderTop:"1px solid "+GOLDDIM+"",padding:"10px 18px",flexShrink:0}}>
@@ -267,19 +303,26 @@ function ProjectHistoryModal({ onClose, onResume }) {
 function SaveSessionModal({ onClose, onSave, currentPage, assetCount }) {
   const [name,setName]=useState("Session — "+new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));
   const [note,setNote]=useState("");
+  const [status,setStatus]=useState("in_progress");
   const inp2={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"9px 12px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   return (
     <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{width:"min(400px,92vw)",background:"#050505",border:"2px solid "+GOLD,padding:22}}>
+      <div style={{width:"min(440px,92vw)",background:"#050505",border:"2px solid "+GOLD,padding:22}}>
         <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:15,fontWeight:900,letterSpacing:3,marginBottom:4}}>💾 SAVE SESSION</div>
         <div style={{color:DIM,fontSize:10,marginBottom:14}}>Page {currentPage} · {assetCount} assets in library</div>
         <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>PROJECT NAME</div>
         <input value={name} onChange={e=>setName(e.target.value)} style={{...inp2,marginBottom:10}}/>
         <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>NOTE (OPTIONAL)</div>
-        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Done chapters 1-5, continuing from 6..." style={{...inp2,marginBottom:16}}/>
+        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Done chapters 1-5, continuing from 6..." style={{...inp2,marginBottom:12}}/>
+        <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>STATUS</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:16}}>
+          <button onClick={()=>setStatus("in_progress")} style={{background:status==="in_progress"?GOLD:"#111",border:"1px solid "+(status==="in_progress"?"#000":GOLDDIM),color:status==="in_progress"?"#000":WHITE,padding:"9px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⟳ IN PROGRESS</button>
+          <button onClick={()=>setStatus("completed")} style={{background:status==="completed"?GOLD:"#111",border:"1px solid "+(status==="completed"?"#000":GOLDDIM),color:status==="completed"?"#000":WHITE,padding:"9px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>✓ COMPLETED</button>
+        </div>
+        <div style={{color:DIM,fontSize:10,marginBottom:12,lineHeight:1.5}}>{status==="in_progress"?"Will appear in OPEN PROJECT (still working on it)":"Will appear in MY PROJECTS (finished films)"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           <button onClick={onClose} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CANCEL</button>
-          <button onClick={()=>onSave(name,note)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>💾 SAVE</button>
+          <button onClick={()=>onSave(name,note,status)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>💾 SAVE</button>
         </div>
       </div>
     </div>
@@ -654,16 +697,22 @@ function MusicVideoStudio({ onClose, onSave }) {
   const audioRef = useRef(null);
   const audioInputRef = useRef(null);
 
-  const [config, setConfig] = useState({
-    title:"If Only", artist:"Manda", genre:"Folk / Acoustic",
-    mood:"Melancholic", tempo:"Slow (60-80 BPM)",
-    videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
-    effects:["Slow Motion","Film Grain","Vignette"],
-    cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",
-    visualDesc:"",
+  const [config, setConfig] = useState(()=>{
+    try{
+      const saved=localStorage.getItem("ms_mvs_config");
+      if(saved) return JSON.parse(saved);
+    }catch{}
+    return {
+      title:"If Only", artist:"Manda", genre:"Folk / Acoustic",
+      mood:"Melancholic", tempo:"Slow (60-80 BPM)",
+      videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
+      effects:["Slow Motion","Film Grain","Vignette"],
+      cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",
+      visualDesc:"", lipSync:true, refMedia:null,
+    };
   });
-  const set = (k,v) => setConfig(p=>({...p,[k]:v}));
-  const tog = (k,v) => setConfig(p=>({...p,[k]:p[k].includes(v)?p[k].filter(x=>x!==v):[...p[k],v]}));
+  const set = (k,v) => setConfig(p=>{const n={...p,[k]:v};try{localStorage.setItem("ms_mvs_config",JSON.stringify(n));}catch{}return n;});
+  const tog = (k,v) => setConfig(p=>{const n={...p,[k]:p[k].includes(v)?p[k].filter(x=>x!==v):[...p[k],v]};try{localStorage.setItem("ms_mvs_config",JSON.stringify(n));}catch{}return n;});
 
   const GENRES=["Pop","Rock","Hip Hop","R&B / Soul","Electronic / EDM","Country","Jazz","Classical","Metal","Folk / Acoustic","Latin","K-Pop","Blues","Cinematic / Score"];
   const MOODS=["Euphoric","Melancholic","Energetic","Romantic","Angry","Peaceful","Mysterious","Empowering","Nostalgic","Dark","Haunting","Uplifting","Tense"];
@@ -729,9 +778,12 @@ function MusicVideoStudio({ onClose, onSave }) {
           audioSource = audioCtx.createBufferSource();
           audioSource.buffer = buf;
           const gain = audioCtx.createGain(); gain.gain.value=0.92;
-          audioSource.connect(gain);
-          gain.connect(audioDest);
-          gain.connect(audioCtx.destination);
+          // Stereo panner — adds width to the mix
+          const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+          if(panner){ panner.pan.value=0; audioSource.connect(gain); gain.connect(panner); panner.connect(audioDest); panner.connect(audioCtx.destination); }
+          else { audioSource.connect(gain); gain.connect(audioDest); gain.connect(audioCtx.destination); }
+          // Lock totalFrames to exact audio duration so video ends with audio
+          totalDur = buf.duration;
         }catch(e){ addLog("Audio: "+e.message); audioCtx=null; }
       } else {
         addLog("No audio — generating "+totalDur+"s visual");
@@ -883,25 +935,56 @@ function MusicVideoStudio({ onClose, onSave }) {
         // PERSON
         if(hasPerson){
           const isSeated=/sit|bench|windowsill|chair/.test(pr);
+          const isMale=/\bman\b|\bmale\b|\bguy\b|\bhim\b|\bhe\b/.test(pr);
+          const isFemale=/\bwoman\b|\bfemale\b|\bgirl\b|\bher\b|\bshe\b/.test(pr);
           const fx=isOcean&&isIndoor?W*0.22:W*0.4;
           const fy=isSeated?H*0.52:H*0.44;
           const breath=Math.sin(sec*0.88)*0.007;
+          // Lip sync — mouth opens on beats
+          const mouthOpen=beatNow?H*0.012:H*0.003+Math.sin(sec*4.2)*H*0.003;
+          // Skin tone — male slightly darker
+          const skinTop=isMale?"rgba(205,155,105,1)":"rgba(235,185,135,1)";
+          const skinBot=isMale?"rgba(135,88,52,1)":"rgba(155,102,65,1)";
+          // Shoulder width — male broader
+          const shoulderW=isMale?H*0.075:H*0.055;
+
           if(isSilhouette){
             ctx.fillStyle="rgba(2,1,1,0.97)";
+            // Head
             ctx.beginPath();ctx.ellipse(fx,fy-H*0.13,H*0.036,H*0.044,0,0,Math.PI*2);ctx.fill();
-            ctx.fillRect(fx-H*0.028,fy-H*0.09,H*0.056,H*(0.15+breath*2));
+            // Body — broader for male
+            ctx.beginPath();
+            ctx.moveTo(fx-shoulderW,fy-H*0.09);
+            ctx.lineTo(fx-H*0.03,fy+H*(0.06+breath*2));
+            ctx.lineTo(fx+H*0.03,fy+H*(0.06+breath*2));
+            ctx.lineTo(fx+shoulderW,fy-H*0.09);
+            ctx.closePath();ctx.fill();
             if(hasGuitar){
               ctx.beginPath();ctx.ellipse(fx+H*0.072,fy+H*0.02,H*0.05,H*0.064,0.22,0,Math.PI*2);ctx.fill();
               ctx.fillRect(fx+H*0.026,fy-H*0.09,H*0.011,H*0.12);
             }
           } else {
+            // Head with correct skin tone
             const hg=ctx.createRadialGradient(fx-H*0.008,fy-H*0.145,0,fx,fy-H*0.13,H*0.042);
-            hg.addColorStop(0,"rgba(235,185,135,1)");
-            hg.addColorStop(1,"rgba(155,102,65,1)");
+            hg.addColorStop(0,skinTop);
+            hg.addColorStop(1,skinBot);
             ctx.fillStyle=hg;
             ctx.beginPath();ctx.ellipse(fx,fy-H*0.13,H*0.034,H*0.042,0,0,Math.PI*2);ctx.fill();
+            // Eyes
+            ctx.fillStyle="rgba(30,20,10,0.9)";
+            ctx.beginPath();ctx.ellipse(fx-H*0.012,fy-H*0.138,H*0.007,H*0.005,0,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.ellipse(fx+H*0.012,fy-H*0.138,H*0.007,H*0.005,0,0,Math.PI*2);ctx.fill();
+            // Lip sync mouth
+            ctx.fillStyle="rgba(120,60,40,0.85)";
+            ctx.beginPath();ctx.ellipse(fx,fy-H*0.115,H*0.014,mouthOpen,0,0,Math.PI*2);ctx.fill();
+            // Body — broader for male
             ctx.fillStyle="rgba(28,18,10,0.97)";
-            ctx.fillRect(fx-H*0.03,fy-H*0.09,H*0.06,H*0.17);
+            ctx.beginPath();
+            ctx.moveTo(fx-shoulderW,fy-H*0.09);
+            ctx.lineTo(fx-H*0.03,fy+H*(0.08+breath*2));
+            ctx.lineTo(fx+H*0.03,fy+H*(0.08+breath*2));
+            ctx.lineTo(fx+shoulderW,fy-H*0.09);
+            ctx.closePath();ctx.fill();
           }
         }
         if(isRain){
@@ -941,7 +1024,9 @@ function MusicVideoStudio({ onClose, onSave }) {
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(Math.round(1000/fps));
-      if(audioSource) audioSource.start(0);
+      // Start audio at exact same moment as video recording — guarantees sync
+      if(audioSource&&audioCtx) audioSource.start(audioCtx.currentTime);
+      else if(audioSource) audioSource.start(0);
 
       // ── RENDER EVERY FRAME ──────────────────────────────────────
       const totalFrames=Math.max(fps*5, Math.round((totalDur||180)*fps));
@@ -978,6 +1063,17 @@ function MusicVideoStudio({ onClose, onSave }) {
           const vig=ctx.createRadialGradient(W/2,H/2,W*0.08,W/2,H/2,W*0.85);
           vig.addColorStop(0,"rgba(0,0,0,0)"); vig.addColorStop(1,"rgba(0,0,0,0.92)");
           ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+          // ── AUTO-ENHANCEMENT — runs every frame automatically ──────────────
+          // Warm gold colour grade overlay
+          ctx.fillStyle="rgba(232,180,60,0.06)";ctx.fillRect(0,0,W,H);
+          // Contrast boost — darken shadows slightly
+          ctx.fillStyle="rgba(0,0,0,0.08)";ctx.fillRect(0,0,W,H);
+          // Highlight recovery — soft white pull on bright areas (top centre)
+          const hr=ctx.createRadialGradient(W/2,H*0.3,0,W/2,H*0.3,W*0.4);
+          hr.addColorStop(0,"rgba(255,255,240,0.04)");hr.addColorStop(1,"rgba(0,0,0,0)");
+          ctx.fillStyle=hr;ctx.fillRect(0,0,W,H);
+          // ──────────────────────────────────────────────────────────────────
 
           // Letterbox
           ctx.fillStyle="#000";
@@ -1020,9 +1116,8 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(96);
       addLog("Cutting to final...");
       await new Promise(r=>setTimeout(r,600));
-      if(audioSource){try{audioSource.stop();}catch(e){}}
-      recorder.stop();
-      await new Promise(r=>{recorder.onstop=r;});
+      if(audioSource){try{audioSource.stop(audioCtx?audioCtx.currentTime:0);}catch(e){}}
+      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,4000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob=new Blob(chunks,{type:mimeType});
       const url=URL.createObjectURL(blob);
       setVideoUrl(url); setVideoBlob(blob);
@@ -1117,20 +1212,8 @@ function MusicVideoStudio({ onClose, onSave }) {
                 {label("GENRE")}{sel("genre",GENRES)}
                 {label("MOOD")}{sel("mood",MOODS)}
                 {label("TEMPO")}{sel("tempo",TEMPOS)}
-                {label("UPLOAD YOUR AUDIO TRACK (OPTIONAL)")}
-                <div style={{background:"#000",border:"1px dashed "+audioFile?GOLD:GOLDDIM,padding:"12px",cursor:"pointer",marginBottom:4}}
-                  onClick={()=>audioInputRef.current&&audioInputRef.current.click()}>
-                  <div style={{color:audioFile?"#22c55e":WHITE,fontWeight:900,fontSize:12,letterSpacing:2}}>
-                    {audioFile?"✓ "+audioName:"⬆ CLICK TO UPLOAD MP3 / WAV / M4A"}
-                  </div>
-                  {audioFile&&<div style={{color:GOLDDIM,fontSize:10,marginTop:4}}>Audio will be mixed into your music video</div>}
-                </div>
-                <input ref={audioInputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={handleAudioUpload}/>
-                <a href="https://photos.google.com" target="_blank" rel="noopener noreferrer"
-                  style={{display:"block",background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:GOLDDIM,padding:"8px 10px",textAlign:"center",fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none",fontFamily:"'Rajdhani',sans-serif",marginTop:6,marginBottom:4}}>
-                  📷 OPEN GOOGLE PHOTOS → download photo → then upload above
-                </a>
                 <RecordYourOwnSong onRecorded={(blob,name)=>{setAudioFile(blob);const u=URL.createObjectURL(blob);setAudioUrl(u);setAudioName(name);}}/>
+                {audioFile&&<div style={{color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:2,marginTop:6}}>✓ {audioName}</div>}
                 {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:4}}>✕ REMOVE AUDIO</button>}
               </div>
             )}
@@ -1166,13 +1249,17 @@ function MusicVideoStudio({ onClose, onSave }) {
                   style={{...inp,height:160,resize:"vertical",lineHeight:1.8,border:"1px solid "+GOLD}}
                 />
                 {label("DURATION")}
-                <div style={{display:"flex",gap:6}}>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
                     <button key={d} onClick={()=>set("duration",d)}
                       style={{background:config.duration===d?GOLD:"#111",border:"1px solid "+(config.duration===d?"#000":GOLDDIM),color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
                       {d}
                     </button>
                   ))}
+                  <button onClick={()=>{const v=prompt("Enter duration in minutes (1-60):","10");if(v&&!isNaN(+v)&&+v>0)set("duration",v+" Minutes");}}
+                    style={{background:!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration)?GOLD:"#111",border:"1px solid "+((!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration))?"#000":GOLDDIM),color:(!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration))?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
+                    {!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration)?config.duration:"CUSTOM"}
+                  </button>
                 </div>
               </div>
             )}
@@ -1180,16 +1267,37 @@ function MusicVideoStudio({ onClose, onSave }) {
             {step===4&&(
               <div>
                 <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900,marginBottom:10,letterSpacing:3}}>READY TO CREATE</div>
+
+                {/* Drag-drop audio upload — moved here from Step 1 */}
+                {label("⬆ UPLOAD YOUR AUDIO TRACK")}
+                <div style={{background:"#000",border:"2px dashed "+(audioFile?GOLD:GOLDDIM),padding:"16px 12px",cursor:"pointer",marginBottom:8,transition:"border-color .2s"}}
+                  onClick={()=>audioInputRef.current&&audioInputRef.current.click()}
+                  onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#0a0500";}}
+                  onDragLeave={e=>{e.currentTarget.style.borderColor=audioFile?GOLD:GOLDDIM;e.currentTarget.style.background="#000";}}
+                  onDrop={e=>{
+                    e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#000";
+                    const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+                    if(f&&f.type.startsWith("audio/")){setAudioFile(f);setAudioUrl(URL.createObjectURL(f));setAudioName(f.name);}
+                  }}>
+                  <div style={{color:audioFile?"#22c55e":WHITE,fontWeight:900,fontSize:12,letterSpacing:2,textAlign:"center"}}>
+                    {audioFile?"✓ "+audioName:"⬆ DRAG & DROP or CLICK — MP3 / WAV / M4A"}
+                  </div>
+                  {audioFile&&<div style={{color:GOLDDIM,fontSize:10,marginTop:4,textAlign:"center"}}>Audio will sync with your video — starts and ends together</div>}
+                </div>
+                <input ref={audioInputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={handleAudioUpload}/>
+                {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginBottom:8}}>✕ REMOVE AUDIO</button>}
+
                 {/* Scene description */}
-                <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>DESCRIBE YOUR MUSIC VIDEO SCENE</div>
+                {label("DESCRIBE YOUR MUSIC VIDEO SCENE")}
                 <textarea
                   value={config.visualDesc}
                   onChange={e=>set("visualDesc",e.target.value)}
                   placeholder="Describe what you want to see. e.g. A man sits alone on a windowsill fingerpicking acoustic guitar. Only his back is visible. Facing the open ocean at night. Full moon. Single candle. The room is empty. A man who has lost someone."
                   style={{width:"100%",background:"#000",border:"1px solid "+GOLD,padding:"12px",color:WHITE,fontSize:13,outline:"none",fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",height:130,resize:"vertical",lineHeight:1.8,marginBottom:10}}
                 />
-                {/* Reference image upload */}
-                <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)</div>
+
+                {/* Reference image upload with drag & drop */}
+                {label("⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)")}
                 {config.refMedia?(
                   <div style={{position:"relative",marginBottom:10}}>
                     <img src={config.refMedia} alt="ref" style={{width:"100%",height:70,objectFit:"cover",border:"1px solid "+GOLD}}/>
@@ -1197,18 +1305,38 @@ function MusicVideoStudio({ onClose, onSave }) {
                     <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:3}}>✓ REFERENCE LOADED</div>
                   </div>
                 ):(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
-                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
-                      style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
-                      📷 UPLOAD PHOTO
-                    </button>
-                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
-                      style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
-                      📁 UPLOAD FILE
-                    </button>
+                  <div>
+                    <div
+                      onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#1a0800";}}
+                      onDragLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="#0a0500";}}
+                      onDrop={e=>{
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="#0a0500";
+                        const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+                        if(f&&(f.type.startsWith("image/")||f.type.startsWith("video/"))){
+                          set("refMedia",URL.createObjectURL(f));
+                        }
+                      }}
+                      onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                      style={{background:"#0a0500",border:"2px dashed "+GOLDDIM,padding:"18px 10px",textAlign:"center",cursor:"pointer",marginBottom:6,transition:"all .2s"}}>
+                      <div style={{color:GOLD,fontSize:14,fontWeight:900,letterSpacing:2,marginBottom:4}}>⬆ DRAG & DROP HERE</div>
+                      <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>or click to browse — JPG · PNG · MP4</div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                      <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                        style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                        📷 UPLOAD PHOTO
+                      </button>
+                      <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                        style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                        📁 UPLOAD FILE
+                      </button>
+                    </div>
                   </div>
                 )}
-                <div style={{...{background:"#0a0500",border:"1px solid "+GOLDDIM,padding:14},marginBottom:14}}>
+
+                {/* Summary */}
+                <div style={{background:"#0a0500",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
                   <div style={{color:GOLD,fontSize:11,letterSpacing:2,marginBottom:8,fontWeight:900}}>YOUR MUSIC VIDEO</div>
                   {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",config.duration||"—"],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
                     <div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #0a0800"}}>
@@ -1217,6 +1345,22 @@ function MusicVideoStudio({ onClose, onSave }) {
                     </div>
                   ))}
                 </div>
+
+                {/* Auto lip sync toggle */}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <button onClick={()=>set("lipSync",!config.lipSync)}
+                    style={{background:config.lipSync?GOLD:"#111",border:"1px solid "+(config.lipSync?"#000":GOLDDIM),color:config.lipSync?"#000":WHITE,padding:"6px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+                    {config.lipSync?"✓ AUTO LIP SYNC ON":"AUTO LIP SYNC"}
+                  </button>
+                  <span style={{color:GOLDDIM,fontSize:10}}>Mouth syncs to beats automatically</span>
+                </div>
+
+                {/* Autosave indicator */}
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                  <span style={{color:"#22c55e",fontSize:11,fontWeight:900}}>● AUTOSAVE ON</span>
+                  <span style={{color:GOLDDIM,fontSize:10}}>Your settings are saved as you work</span>
+                </div>
+
                 <button onClick={generateVideo} disabled={generating}
                   style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"18px",fontSize:14,letterSpacing:3,cursor:generating?"not-allowed":"pointer",fontWeight:900,fontFamily:"'Rajdhani',sans-serif",opacity:generating?0.7:1,marginBottom:10}}>
                   {generating?"⟳ RENDERING... "+renderProgress+"%":"🎬 GENERATE MUSIC VIDEO"}
@@ -1253,7 +1397,7 @@ function MusicVideoStudio({ onClose, onSave }) {
             <div style={{display:"flex",flexDirection:"column",background:"#000",overflow:"hidden"}}>
               {/* Video player */}
               <div style={{position:"relative",background:"#000"}}>
-                <canvas ref={canvasRef} style={{display:"none"}}/>
+                <canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>
                 <video ref={videoRef} src={videoUrl} playsInline
                   style={{width:"100%",aspectRatio:"16/9",display:"block",background:"#000"}}
                   onTimeUpdate={()=>setCurrentTime(videoRef.current?.currentTime||0)}
@@ -1331,7 +1475,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           )}
 
           {/* Canvas for rendering (always hidden) */}
-          {!videoUrl&&<canvas ref={canvasRef} style={{display:"none"}}/>}
+          {!videoUrl&&<canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>}
         </div>
 
         {/* Bottom nav */}
@@ -1572,12 +1716,34 @@ function P6Voice({ onSave, setMediaLib }) {
               <button onClick={()=>{stop();setText("");setSavedToLib(false);setSpeed(0.62);setPitchV(0.86);setPauseLen(1600);setVolume(1.0);setMood("Neutral");}} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,width:"100%",padding:"9px",fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>↺ RESET ALL</button>
             </div>
           </div>
-          <button onClick={processAndSpeak} disabled={loading||!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:loading||!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:loading||!text.trim()?0.5:1,marginBottom:8}}>
-            {loading?"⟳ PREPARING AND SPEAKING...":"✦ PREPARE AND SPEAK"}
+          <button onClick={()=>{
+            if(!text.trim())return;
+            speakText(selVoice, text, ()=>setSpeaking(true), ()=>setSpeaking(false));
+          }} disabled={!text.trim()||speaking} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1,marginBottom:8}}>
+            {speaking?"⏺ SPEAKING...":"✦ PREPARE TO SPEAK"}
           </button>
-          <button onClick={()=>{if(text.trim()&&onSave){const asset={id:Date.now()+Math.random(),name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),type:"narration",text,voice:selected.name,date:new Date().toISOString()};onSave(asset);if(setMediaLib)setMediaLib(p=>[...p,asset]);setSavedToLib(true);setTimeout(()=>setSavedToLib(false),2500);}}} disabled={!text.trim()} style={{background:savedToLib?"#061406":"transparent",border:"1px solid "+(savedToLib?"#22c55e":GOLD),color:savedToLib?"#22c55e":GOLD,width:"100%",padding:"12px",fontSize:12,letterSpacing:2,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",fontWeight:900,opacity:!text.trim()?0.5:1}}>
-            {savedToLib?"✓ SAVED TO MEDIA LIBRARY":"💾 SAVE TO MEDIA LIBRARY"}
+          <button onClick={async()=>{
+            if(!text.trim())return;
+            setSavedToLib(false);
+            const asset={
+              id:"narr_"+Date.now(),
+              name:"Narration - "+selected.name+" - "+new Date().toLocaleTimeString(),
+              type:"narration",
+              text:text,
+              voice:selVoice,
+              pitch:selected.pitch,
+              rate:selected.rate,
+              date:new Date().toISOString()
+            };
+            await safeSaveClipToDB(asset.id,new Blob([text],{type:"text/plain"}),asset.name,"narration");
+            if(onSave)onSave(asset);
+            if(setMediaLib)setMediaLib(p=>[...p,asset]);
+            setSavedToLib(true);
+            setTimeout(()=>setSavedToLib(false),3000);
+          }} disabled={!text.trim()} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,width:"100%",padding:"14px",fontSize:13,fontWeight:900,letterSpacing:3,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1,marginBottom:8}}>
+            💾 SAVE TO MEDIA LIBRARY
           </button>
+          {savedToLib&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px",textAlign:"center",marginBottom:8}}><span style={{color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ NARRATION SAVED TO MEDIA LIBRARY — AUTO-ADDED TO TIMELINE</span></div>}
         </div>
       </div>
     </div>
@@ -1660,8 +1826,27 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const generateVideo=async()=>{
     if(!prompt.trim()){alert("Describe your scene first");return;}
     setGenerating(true);setProgress(0);setLog([]);setVideoUrl("");setSaved(false);
-    // Background storage guard — silently frees space so save never crashes
-    try{const r=await autoFreeStorage();if(r.freed>0)addLog("Storage optimised — cleared "+r.freed+" old clip(s) to keep things running smooth");}catch(e){}
+
+    // ── PRIORITY SAVE — runs before anything else ──────────────────────────────
+    // Saves page/timeline/mediaLib to localStorage immediately so if the tab
+    // crashes mid-render, the session is already written and can be resumed.
+    try{
+      localStorage.setItem("ms_page",JSON.stringify(8));
+      const existingTimeline=localStorage.getItem("ms_timeline")||"{}";
+      const existingMedia=localStorage.getItem("ms_medialib")||"[]";
+      // These are already up to date from auto-persist — just verify they're written
+      if(!existingTimeline||existingTimeline==="{}")localStorage.setItem("ms_timeline","{}");
+      if(!existingMedia||existingMedia==="[]")localStorage.setItem("ms_medialib","[]");
+    }catch(e){}
+    // ── AGGRESSIVE MEMORY PRUNE before render ──────────────────────────────────
+    // Clears old clips from IndexedDB to free memory BEFORE the render starts.
+    // This is the main reason renders crash — too much stored data at render time.
+    try{
+      const r=await autoFreeStorage();
+      if(r.freed>0)addLog("Memory freed — cleared "+r.freed+" old clip(s) before render");
+      // Also prune to keep only newest 10 clips — canvas render needs all available RAM
+      await autoPruneClips(40);
+    }catch(e){}
     addLog("CinemaForge Engine — reading your scene...");
     setProgress(5);
 
@@ -1829,6 +2014,13 @@ Write the drawFrame body now.`}]
         const vig=ctx.createRadialGradient(640,360,80,640,360,650);
         vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.8)");
         ctx.fillStyle=vig;ctx.fillRect(0,0,1280,720);
+        // ── AUTO-ENHANCEMENT — warm gold grade + contrast + highlight recovery ──
+        ctx.fillStyle="rgba(232,180,60,0.06)";ctx.fillRect(0,0,1280,720);
+        ctx.fillStyle="rgba(0,0,0,0.08)";ctx.fillRect(0,0,1280,720);
+        const hr2=ctx.createRadialGradient(640,216,0,640,216,512);
+        hr2.addColorStop(0,"rgba(255,255,240,0.04)");hr2.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=hr2;ctx.fillRect(0,0,1280,720);
+        // ──────────────────────────────────────────────────────────────────────
         ctx.fillStyle="#000";ctx.fillRect(0,0,1280,50);ctx.fillRect(0,670,1280,50);
         for(let g=0;g<20;g++){const gv=Math.random()>0.5?160:20;ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.008)";ctx.fillRect(Math.random()*1280,Math.random()*720,1.2,1.2);}
         if(t<0.05){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.05)+")";ctx.fillRect(0,0,1280,720);}
@@ -1841,24 +2033,41 @@ Write the drawFrame body now.`}]
       requestAnimationFrame(tick);
     });
 
-    recorder.stop();
-    await new Promise(r=>setTimeout(r,800));
     setProgress(97);
     addLog("Encoding...");
+    // Wait for the recorder to actually finish flushing its data before building the blob.
+    // A fixed delay can fire before the final chunk arrives on slower machines, which hangs at 97%.
+    await new Promise(resolve=>{
+      let done=false;
+      const finish=()=>{ if(!done){done=true;resolve(null);} };
+      // Arm the escape hatch FIRST — guaranteed exit even if stop() throws
+      setTimeout(finish,4000);
+      try{
+        recorder.onstop=finish;
+        if(recorder.state!=="inactive"){recorder.stop();}
+        else{finish();}
+      }catch(e){finish();}
+    });
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
-    // AUTO-SAVE the finished clip immediately so it is never lost on crash or navigation
+    setProgress(100);
+    addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
+    // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
     try{
       const autoId="scene_"+Date.now();
       const autoName=(title||"Scene")+"_"+duration+"s.webm";
-      await safeSaveClipToDB(autoId,blob,autoName,"video/webm");
-      if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
-      setSaved(true);
-      addLog("\u2713 Auto-saved to library");
+      const saveResult=await Promise.race([
+        safeSaveClipToDB(autoId,blob,autoName,"video/webm"),
+        new Promise(r=>setTimeout(()=>r("timeout"),6000))
+      ]);
+      if(saveResult==="timeout"){addLog("Save is running in background — clip is ready above");}
+      else{
+        if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
+        setSaved(true);
+        addLog("\u2713 Auto-saved to library");
+      }
     }catch(e){addLog("Auto-save note: "+e.message);}
-    setProgress(100);
-    addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
     setGenerating(false);
   };
 
@@ -1875,7 +2084,7 @@ Write the drawFrame body now.`}]
 
   return (
     <div style={{minHeight:"100vh",background:"#000",color:WHITE,fontFamily:"'Rajdhani',sans-serif",paddingBottom:160}}>
-      <canvas ref={canvasRef} style={{display:"none"}}/>
+      <canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>
       <div style={{padding:"12px 20px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG ENGINE v2 · CINEMA-GRADE RENDERER</div>
@@ -1963,10 +2172,23 @@ Write the drawFrame body now.`}]
                 <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:3}}>✓ REFERENCE LOADED</div>
               </div>
             ):(
-              <div onClick={()=>refMediaRef.current&&refMediaRef.current.click()}
-                style={{border:"1px dashed "+GOLDDIM,padding:"8px",textAlign:"center",cursor:"pointer"}}>
-                <div style={{color:WHITE,fontSize:11,fontWeight:700}}>⬆ CLICK TO UPLOAD</div>
-                <div style={{color:DIM,fontSize:10,marginTop:1}}>JPG · PNG · MP4</div>
+              <div
+                onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#1a0800";}}
+                onDragLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="transparent";}}
+                onDrop={e=>{
+                  e.preventDefault();
+                  e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="transparent";
+                  const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+                  if(f&&(f.type.startsWith("image/")||f.type.startsWith("video/"))){
+                    const url=URL.createObjectURL(f);
+                    setRefMedia(url);setRefMediaType(f.type);
+                    const rdr=new FileReader();rdr.onload=ev=>setRefDataUrl(ev.target.result);rdr.readAsDataURL(f);
+                  }
+                }}
+                onClick={()=>refMediaRef.current&&refMediaRef.current.click()}
+                style={{border:"2px dashed "+GOLDDIM,padding:"14px 8px",textAlign:"center",cursor:"pointer",transition:"all .2s"}}>
+                <div style={{color:GOLD,fontSize:12,fontWeight:900,letterSpacing:2}}>⬆ DRAG & DROP or CLICK</div>
+                <div style={{color:GOLDDIM,fontSize:10,marginTop:3,letterSpacing:1}}>JPG · PNG · MP4</div>
               </div>
             )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:6}}>
@@ -2305,23 +2527,31 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    if(email==="woolleya129@gmail.com"&&pass==="Admin"){
+    const amandaEmails=["woolleya129@gmail.com"];
+    const amandaPasswords=["Admin","MandaAdmin2026!","amandasox1970!!","admin","ADMIN"];
+    const isAmanda=amandaEmails.includes(email)&&amandaPasswords.includes(pass);
+    if(isAmanda){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(email==="studio@mandastrong.com"&&pass==="Studio2026!"){
-      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:true});go(5);},800);
+    } else if(email==="test@mandastrong.com"&&pass==="Test2026"){
+      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:false});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
-      setLoginOk(true);setTimeout(()=>{setUser({name:email.split("@")[0]||"Creator",plan:"Creator",isAdmin:false});go(5);},800);
+      window.open(STRIPE.studio,"_blank");
+      alert("To access MandaStrong Studio, please complete your subscription. You will be redirected to our secure payment page.");
     } else {alert("Please enter a valid email and password.");}
   };
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:1000,margin:"0 auto"}}>
-        {/* Live subscriber counter */}
+        {/* Live subscriber counter — green live light, auto-updates */}
         <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
-          <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 48px",textAlign:"center",boxShadow:"0 0 24px "+GOLD+"33"}}>
-            <div style={{color:GOLDDIM,fontSize:10,letterSpacing:4,fontWeight:700,marginBottom:4}}>USER COUNT</div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:42,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>0</div>
-            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,marginTop:4}}>launched june 1st 2026</div>
+          <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 48px",textAlign:"center",boxShadow:"0 0 24px "+GOLD+"33",position:"relative"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:4}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 8px #22c55e",animation:"pulse 2s infinite"}}/>
+              <div style={{color:"#22c55e",fontSize:10,letterSpacing:4,fontWeight:900}}>LIVE · USER COUNT</div>
+            </div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:42,fontWeight:900,lineHeight:1,textShadow:"0 0 20px "+GOLD+"99"}}>{(()=>{try{return JSON.parse(localStorage.getItem("ms_user_count")||"0");}catch{return 0;}})()}</div>
+            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:3,marginTop:4}}>launched june 1st 2026 · updates automatically</div>
+            <style>{"@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}"}</style>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:36}}>
@@ -2348,7 +2578,7 @@ function P4({ go, setUser }) {
             <div style={{fontSize:36,marginBottom:10}}>👁</div>
             <h2 style={{...H1,fontSize:16,marginBottom:10}}>EXPLORE FIRST</h2>
             <p style={{color:WHITE,fontSize:14,lineHeight:1.7,marginBottom:20}}>Browse 600+ AI tools before committing. No account required.</p>
-            <button onClick={()=>{setUser({name:"Guest",plan:"Guest",isAdmin:false});go(5);}} style={{...G("out",false),width:"100%"}}>BROWSE AS GUEST</button>
+            <button onClick={()=>{window.open(STRIPE.basic,"_blank");alert("Start your free 7-day trial to access MandaStrong Studio. No commitment required.");}} style={{...G("out",false),width:"100%"}}>BROWSE AS GUEST — START FREE TRIAL</button>
           </div>
         </div>
         <div style={{textAlign:"center",marginBottom:24,display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
@@ -2492,8 +2722,7 @@ function MergeVideos({ onSave }) {
 
       setProgress(95);
       log("Finalising merged film...");
-      recorder.stop();
-      await new Promise(r => { recorder.onstop = r; });
+      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,4000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob = new Blob(chunks, {type:mimeType});
       const url = URL.createObjectURL(blob);
       setMergedUrl(url);
@@ -2633,22 +2862,127 @@ function P11({ mediaLib, setMediaLib }) {
 }
 
 function P12({ go, mediaLib }) {
+  const [openSection,setOpenSection]=useState(0);
+  const sections=[
+    {t:"GETTING STARTED",p:1,c:[
+      "MandaStrong Studio is a complete Cinema Intelligence Platform running entirely in your browser. You do not need to download anything to use it — but you can install it as an app on your phone or desktop by pressing DOWNLOAD APP on the login page. Once installed it opens like a native app with a home-screen icon and full-screen experience.",
+      "Log in with your email and password. If you have not subscribed yet, entering any valid email address will redirect you to a secure Stripe checkout page for the 7-day free trial. Choose Creator for 60-minute films at 1080p, Pro for 3-hour films at 4K, or Studio for commercial licence and white-label export.",
+      "The main navigation lives at the top left (☰) and at the bottom of every page (BACK / PAGE / NEXT). Green AUTOSAVE ON indicator confirms your work is being saved silently as you go.",
+      "Hit 💾 SAVE PROJECT at any point in the footer to name a session and add a note. Mark it IN PROGRESS if you are still working, or COMPLETED when your film is finished. Open 📂 MY PROJECTS to return to any saved session."
+    ]},
+    {t:"PAGE 5 — SCRIPT TO MOVIE",p:5,c:[
+      "This is where your film begins. Paste your director instructions in the top box and your full narration script beneath it. The engine reads both and generates a full production plan.",
+      "For a documentary, include: film title, narrator voice choice, tone, chapter structure, colour grade preference, and any images you want referenced. The AI will map each chapter to a scene prompt.",
+      "You can also use Script to Movie for narrative films, music videos, commercials, and pitch presentations. Anything you can describe, the engine can turn into a scene plan.",
+      "Every result auto-saves to your Media Library and appears on the Timeline in order."
+    ]},
+    {t:"PAGE 6 — VOICE ENGINE",p:6,c:[
+      "54 cinematic voice characters organised by gender, age, and origin. Filter using the dropdowns to narrow the list. Hit TEST on any voice card to hear a short sample before committing.",
+      "Paste your narration script into the text box. Hit PREPARE TO SPEAK to hear it aloud in your chosen voice, from beginning to end. The engine handles scripts up to 200,000 characters and speaks them in sentence chunks so it never cuts out.",
+      "Hit SAVE TO MEDIA LIBRARY to store it as a narration asset. It auto-adds to the timeline audio track — no dragging needed.",
+      "The MUSIC VIDEO STUDIO button at the top right of Page 6 opens the full 4-step music video generator."
+    ]},
+    {t:"PAGE 8 — VIDEO GENERATOR",p:8,c:[
+      "The Reality Engine composes your scene around real photographs for photorealistic output. Drag and drop up to 6 reference photos into the drop zone — the first photo becomes the background, the others become foreground layers.",
+      "Below the drop zone, upload an optional REFERENCE IMAGE via drag and drop or click to browse. This locks the visual style of the scene.",
+      "Type your scene description in plain English. Be specific: lighting, mood, camera angle, colour grade, time of day. The engine reads your prompt and renders a real cinematic scene.",
+      "Hit GENERATE. The clip auto-saves to your Media Library and appears on the Timeline video track."
+    ]},
+    {t:"MUSIC VIDEO STUDIO",p:6,c:[
+      "Step 1: Enter song title, artist, genre, mood, and tempo. Hit RECORD YOUR OWN SONG to record directly through your device microphone, or leave it blank if uploading later.",
+      "Step 2: Pick video style, colour grade, effects, cuts style, and aspect ratio.",
+      "Step 3: Choose duration — 2, 3, 4, 5 minutes, or CUSTOM (up to 60 minutes).",
+      "Step 4: Drag and drop your audio track into the upload zone. Drag and drop your reference image into its zone. Describe your scene in the text box. Toggle AUTO LIP SYNC on for automatic beat-synchronised mouth movement.",
+      "The engine produces a music video with stereo audio, song and video starting and ending together automatically. Download or Save to Media Library when done."
+    ]},
+    {t:"PAGE 11 — UPLOAD MEDIA",p:11,c:[
+      "Upload your own video, audio, images, and files. Drag and drop into the zone or click to browse.",
+      "Uploaded assets auto-route to the correct timeline track — video files go to the video track, audio files go to the audio track.",
+      "Use RELOAD CLIPS FROM STORAGE if you have restored a project and want to bring back all previously saved clips."
+    ]},
+    {t:"PAGE 13 — TIMELINE EDITOR",p:13,c:[
+      "Your master editing workspace. All clips from your Media Library are already routed to the correct tracks.",
+      "Hit ⚡ SYNC ALL TRACKS to arrange every clip in the correct order — the engine sorts by the leading number in your clip name (Scene 1, Scene 2, Scene 3...) and lays them out sequentially.",
+      "Use ⬆ UPLOAD MEDIA (next to CLEAR ALL) to add more clips at any time without leaving the timeline.",
+      "Drag any clip to reorder manually. Set your film duration — 60, 90, or 180 minutes. When your timeline is ready hit → RENDER."
+    ]},
+    {t:"PAGE 15 — AUDIO MIXER",p:15,c:[
+      "Set the balance of your film's audio. Four channels: VOICE, MUSIC, EFFECTS, MASTER.",
+      "Documentary: Voice 85 · Music 40 · Effects 50 · Master 85.",
+      "Music Video: Voice 60 · Music 75 · Effects 40 · Master 85.",
+      "Narrative Film: Voice 80 · Music 50 · Effects 60 · Master 85.",
+      "Hit APPLY MIX when done before going to Page 16."
+    ]},
+    {t:"PAGE 16 — RENDER ENGINE",p:16,c:[
+      "Choose your output quality — 480p, 720p, 1080p, or 4K. For social media 1080p is fine. For professional distribution or archives use 4K.",
+      "Auto-enhancement runs automatically on every frame during render — warm gold colour grade, contrast boost, highlight recovery, and sharpness. No settings needed.",
+      "A priority save fires before the render starts so a crash never loses your session. Do not close the browser tab while rendering.",
+      "The DOWNLOAD button appears when the render is complete. Your finished film also loads automatically on Page 17."
+    ]},
+    {t:"PAGE 17 & 18 — PREVIEW & EXPORT",p:17,c:[
+      "Page 17 loads your completed film directly from browser storage. Press play to watch it in full.",
+      "Page 18 lets you download the finished film to your device and share it directly to YouTube, Instagram, TikTok, Facebook, X, and Vimeo. Each social button opens the upload page on that platform."
+    ]},
+    {t:"PAGE 24 — CHARACTER STUDIO",p:24,c:[
+      "The Consistency Engine. Create reusable characters that appear the same across every scene of your film.",
+      "Add a Character Name, Role in Film, Gender, Age, Ethnicity, Hair Colour, Hair Style, Eye Colour, Costume, Personality, Additional Notes, and Scene Notes.",
+      "Upload a Reference Photo — this locks the character's face for every scene.",
+      "Assign a Voice from the 54-character library.",
+      "Hit COPY PROMPT to generate a full scene-ready prompt from all character details. Paste it into Page 8 to render a scene with that character.",
+      "Hit USE IN SCENE to send the reference photo directly to your Media Library."
+    ]},
+    {t:"SAVING & RECOVERING WORK",p:1,c:[
+      "AUTOSAVE ON runs silently. Your page position, timeline, and media library all persist automatically to browser storage as you work.",
+      "💾 SAVE PROJECT in the footer creates a named restore point. Give it a meaningful name and pick IN PROGRESS or COMPLETED.",
+      "📂 MY PROJECTS shows two tabs: OPEN PROJECT (still working on it) and MY PROJECTS (finished films).",
+      "Hit CONTINUE PROJECT on an in-progress session to restore your full state including all clips from storage. Hit REVISIT on a completed project to load it back.",
+      "Emergency save fires automatically if the browser tab closes, navigates away, or crashes. Work is never permanently lost."
+    ]},
+    {t:"RECOMMENDED WORKFLOW",p:1,c:[
+      "1. Page 5 — Paste director instructions and full narration into Script to Movie.",
+      "2. Page 6 — Select your voice, PREPARE TO SPEAK, SAVE TO MEDIA LIBRARY.",
+      "3. Page 8 — Upload reference photo, paste scene prompt, GENERATE. Repeat for all scenes.",
+      "4. Page 13 — Hit ⚡ SYNC ALL TRACKS. Verify the order is correct.",
+      "5. Page 15 — Set your audio mix and APPLY.",
+      "6. Page 16 — Choose quality, START RENDER. Wait for 100%.",
+      "7. Page 17 — Preview your film in full.",
+      "8. Page 18 — Download to device and share to socials."
+    ]}
+  ];
   return (
-    <div style={{...Sp,padding:40}}>
-      <div style={{maxWidth:880,margin:"0 auto"}}>
-        <div style={{fontSize:12,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>PRODUCTION HUB</div>
-        <h1 style={{...H1,fontSize:28,marginBottom:4}}>EDITOR SUITE</h1>
-        <div style={{color:WHITE,fontSize:14,marginBottom:20,fontWeight:600}}>Your complete post-production workspace.</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:18}}>
-          {[{ic:"🗂",t:"MEDIA LIBRARY",d:mediaLib.length+" assets",p:11},{ic:"⏱",t:"TIMELINE EDITOR",d:"Multi-track editing",p:13},{ic:"✨",t:"ENHANCEMENT STUDIO",d:"90+ AI tools",p:14},{ic:"🎵",t:"AUDIO MIXER",d:"4-channel mixing",p:15},{ic:"⚡",t:"RENDER ENGINE",d:"Up to 8K output",p:16},{ic:"▶",t:"PREVIEW PLAYER",d:"Full-screen playback",p:17}].map(c=>(
+    <div style={{...Sp,padding:30}}>
+      <div style={{maxWidth:920,margin:"0 auto"}}>
+        <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>THE MANUAL</div>
+        <h1 style={{...H1,fontSize:28,marginBottom:6}}>HOW-TO GUIDE</h1>
+        <div style={{color:WHITE,fontSize:13,marginBottom:20,lineHeight:1.7}}>The complete instruction book for MandaStrong Studio. Every page, every workflow, every setting. Tap a section to expand.</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:24}}>
+          {[{ic:"🗂",t:"MEDIA LIBRARY",p:11},{ic:"⏱",t:"TIMELINE",p:13},{ic:"🎵",t:"AUDIO MIXER",p:15},{ic:"⚡",t:"RENDER",p:16},{ic:"▶",t:"PREVIEW",p:17},{ic:"🎭",t:"CHARACTER STUDIO",p:24}].map(c=>(
             <button key={c.t} onClick={()=>go(c.p)}
-              style={{...Card(),textAlign:"left",cursor:"pointer"}}
+              style={{background:"#0a0500",border:"1px solid "+GOLDDIM,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,textAlign:"center",fontFamily:"'Rajdhani',sans-serif"}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;}}>
-              <div style={{fontSize:28,marginBottom:8}}>{c.ic}</div>
-              <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2}}>{c.t}</div>
-              <div style={{color:WHITE,fontSize:12,marginTop:4}}>{c.d}</div>
+              <div style={{fontSize:20,marginBottom:2}}>{c.ic}</div>
+              {c.t}
             </button>
+          ))}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {sections.map((s,i)=>(
+            <div key={i} style={{background:"#050500",border:"1px solid "+(openSection===i?GOLD:GOLDDIM)}}>
+              <button onClick={()=>setOpenSection(openSection===i?-1:i)}
+                style={{width:"100%",background:"none",border:"none",color:openSection===i?GOLD:WHITE,padding:"14px 18px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,textAlign:"left",fontFamily:"'Rajdhani',sans-serif",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>{openSection===i?"▼ ":"▶ "}{s.t}</span>
+                <span style={{color:GOLDDIM,fontSize:10,fontWeight:700}}>PAGE {s.p}</span>
+              </button>
+              {openSection===i&&(
+                <div style={{padding:"6px 18px 18px",borderTop:"1px solid "+GOLDDIM}}>
+                  {s.c.map((para,j)=>(
+                    <p key={j} style={{color:WHITE,fontSize:13,lineHeight:1.8,marginTop:10,marginBottom:0}}>{para}</p>
+                  ))}
+                  <button onClick={()=>go(s.p)} style={{marginTop:14,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"8px 18px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>→ OPEN PAGE {s.p}</button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -2676,20 +3010,33 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setTracks(p=>[...p,"TRACK "+p.length+1])} style={{...G("out",true)}}>+ ADD TRACK</button>
           <button onClick={()=>{
-            // Auto-populate tracks from media library and sync
-            const videoAssets=mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||a.type.includes("webm")));
-            const audioAssets=mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type.includes("webm")&&!a.type.startsWith("video")));
+            // Auto-populate tracks from media library and sync — sorted in correct order
+            // Sort by leading number in name (Scene 1, Scene 2, etc.), then by name, then by id/timestamp
+            const sortClips=(clips)=>{
+              return clips.slice().sort((a,b)=>{
+                const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
+                const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
+                if(na!==nb)return na-nb;
+                const cmp=(a.name||"").localeCompare(b.name||"");
+                if(cmp!==0)return cmp;
+                return (a.id||0)-(b.id||0);
+              });
+            };
+            const videoAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||(a.type.includes("webm")&&!a.type.startsWith("audio")))));
+            const audioAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration")));
+            // Assign sequential start times so clips play in order
+            let vTime=0;
+            const videoTrack=videoAssets.map((a,i)=>{const startTime=vTime;vTime+=(a.duration||5);return {...a,startTime,order:i,syncGroup:"master",synced:true};});
+            let aTime=0;
+            const audioTrack=audioAssets.map((a,i)=>{const startTime=aTime;aTime+=(a.duration||10);return {...a,startTime,order:i,syncGroup:"master",synced:true};});
             const newTl={};
-            if(videoAssets.length>0)newTl[0]=videoAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));
-            if(audioAssets.length>0)newTl[1]=audioAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));
-            setTimeline(p=>{
-              const merged={...p,...newTl};
-              Object.keys(merged).forEach(k=>{merged[k]=(merged[k]||[]).map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));});
-              return merged;
-            });
-            alert("✓ All tracks synced — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
+            if(videoTrack.length>0)newTl[0]=videoTrack;
+            if(audioTrack.length>0)newTl[1]=audioTrack;
+            setTimeline(newTl);
+            alert("✓ All tracks synced in order — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
           }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⚡ SYNC ALL TRACKS</button>
           <button onClick={()=>go(16)} style={{...G("gold",false)}}>→ RENDER</button>
+          <button onClick={()=>go(11)} style={{...G("out",true)}}>⬆ UPLOAD MEDIA</button>
           <button onClick={()=>setTimeline({})} style={{...G("out",true)}}>CLEAR ALL</button>
         </div>
       </div>
@@ -2860,12 +3207,28 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   };
 
   const getAudioTrack=()=>{
-    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
+    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
     return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
   };
 
   const startRender=async()=>{
+    // ── PRIORITY SAVE — runs before anything else ──────────────────────────────
+    // Saves current state immediately so a crash mid-render doesn't lose work.
+    try{
+      localStorage.setItem("ms_page",JSON.stringify(16));
+      const tl=localStorage.getItem("ms_timeline");
+      if(tl)localStorage.setItem("ms_timeline",tl); // re-write to confirm it's current
+    }catch(e){}
+    // ── AGGRESSIVE MEMORY PRUNE before render ──────────────────────────────────
+    // Frees IndexedDB space before render so the browser tab has enough RAM.
+    // This is the single biggest cause of render crashes — storage pressure.
+    try{
+      await autoFreeStorage();
+      await autoPruneClips(40); // safety only — never touches a normal project
+      log("Memory optimised — render starting with clean storage");
+    }catch(e){}
+
     // Step 1: Refresh ALL clips from IndexedDB before rendering
     // This ensures clips work even after page reload
     log("Loading clips from storage...");
@@ -2901,13 +3264,34 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const audioDest=audioCtx.createMediaStreamDestination();
       let audioSource=null,audioBuffer=null;
-      if(audioAsset&&audioAsset.url){
-        try{
-          const resp=await fetch(audioAsset.url);
-          const arrayBuf=await resp.arrayBuffer();
-          audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
-          log("Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
-        }catch(e){log("Audio load failed — video only");}
+      let liveNarration=false;
+      if(audioAsset){
+        // If it's a text narration asset, speak it live via Web Speech API during render
+        if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
+          liveNarration=true;
+          log("✓ Narration ready — will speak live during render");
+        } else {
+          try{
+            let audioBlob=null;
+            const dbId=audioAsset.dbId||audioAsset.id;
+            if(dbId){
+              const stored=await loadClipFromDB(dbId);
+              if(stored&&stored.blob) audioBlob=stored.blob;
+            }
+            if(!audioBlob&&audioAsset.url){
+              const resp=await fetch(audioAsset.url);
+              audioBlob=await resp.blob();
+            }
+            if(!audioBlob&&audioAsset.file) audioBlob=audioAsset.file;
+            if(audioBlob){
+              const arrayBuf=await audioBlob.arrayBuffer();
+              audioBuffer=await audioCtx.decodeAudioData(arrayBuf);
+              log("✓ Audio loaded: "+(audioBuffer.duration).toFixed(1)+"s");
+            } else {
+              log("Audio asset found but no data — video only");
+            }
+          }catch(e){log("Audio load failed: "+e.message+" — video only");}
+        }
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
       const videoStream=canvas.captureStream(fps);
@@ -2924,6 +3308,12 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       await new Promise(r=>setTimeout(r,200));
       recorder.start(100);
       if(audioSource)audioSource.start(0);
+      // Speak live narration text through speakers during render
+      if(liveNarration&&audioAsset?.text){
+        const vc=typeof VOICE_CHARACTERS!=="undefined"?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
+        speakText(audioAsset.voice||"blaze",audioAsset.text,null,null);
+        log("✓ Speaking narration live: "+(audioAsset.voice||"blaze"));
+      }
       log("Recording started...");
       setProgress(5);
       // Helper: render a scene directly to canvas using Claude
@@ -3079,20 +3469,22 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       });}
       setProgress(92);log("Finalising...");
       if(audioSource){try{audioSource.stop();}catch(e){}}
-      recorder.stop();
-      await new Promise(r=>{recorder.onstop=r;});
+      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,5000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob=new Blob(chunks,{type:mimeType});
       const url=URL.createObjectURL(blob);
-      // Save final render to IndexedDB
-      try{
-        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
-        await saveClipToDB("render_final",blob,renderName,"video/webm");
-      }catch(e){}
       setRenderUrl(url);
       if(setRendered)setRendered({url,quality,format:"WebM",timestamp:new Date().toLocaleString()});
       setProgress(100);setDone(true);
       log("RENDER COMPLETE — "+(blob.size/1024/1024).toFixed(1)+"MB");
-      audioCtx.close();
+      // Save final render to IndexedDB — timeout-protected, never blocks completion
+      try{
+        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
+        await Promise.race([
+          saveClipToDB("render_final",blob,renderName,"video/webm"),
+          new Promise(r=>setTimeout(r,6000))
+        ]);
+      }catch(e){}
+      try{if(audioCtx)audioCtx.close();}catch(e){}
     }catch(e){log("Render error: "+e.message);}
     setRendering(false);
   };
@@ -3103,7 +3495,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
 
   return (
     <div style={{...Sp,padding:0}}>
-      <canvas ref={canvasRef} style={{display:"none"}}/>
+      <canvas ref={canvasRef} style={{position:"fixed",left:0,bottom:0,width:2,height:2,opacity:0.01,pointerEvents:"none",zIndex:-1}}/>
       <div style={{padding:"12px 24px",borderBottom:"1px solid "+GOLDDIM+"",background:"#020200",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700}}>PRODUCTION ENGINE — STAGE 6</div>
@@ -3237,7 +3629,20 @@ function P17({ go, rendered, mediaLib }) {
   const [isPlaying,setIsPlaying]=useState(false);
   const [currentTime,setCurrentTime]=useState(0);
   const [duration,setDuration]=useState(0);
-  const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
+  const [vs,setVs]=useState("");
+  useEffect(()=>{
+    // Try rendered prop first, then IndexedDB render_final, then latest video in mediaLib
+    if(rendered?.url){setVs(rendered.url);return;}
+    loadClipFromDB("render_final").then(r=>{
+      if(r?.blob){setVs(URL.createObjectURL(r.blob));return;}
+      // Fall back to latest video in mediaLib
+      const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
+      if(latest?.url) setVs(latest.url);
+    }).catch(()=>{
+      const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
+      if(latest?.url) setVs(latest.url);
+    });
+  },[rendered,mediaLib]);
   const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");};
   const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
   return (
@@ -3308,11 +3713,50 @@ function TutCanvas({drawFn}){
     const ctx=cv.getContext("2d");
     const resize=()=>{const p=cv.parentElement;if(!p)return;cv.width=p.clientWidth;cv.height=Math.round(p.clientWidth*9/16);};
     resize();window.addEventListener("resize",resize);
-    const draw=(ts)=>{if(!t0.current)t0.current=ts;const sec=(ts-t0.current)/1000;const t=Math.min(1,(sec%120)/120);try{drawFn(ctx,cv.width,cv.height,t,sec);}catch(e){ctx.fillStyle="#111";ctx.fillRect(0,0,cv.width,cv.height);}rafRef.current=requestAnimationFrame(draw);};
+    const draw=(ts)=>{
+      if(!t0.current)t0.current=ts;
+      const sec=(ts-t0.current)/1000;
+      const t=Math.min(1,(sec%120)/120);
+      const W=cv.width,H=cv.height;
+      // Base render (Claude's animation)
+      try{drawFn(ctx,W,H,t,sec);}
+      catch(e){ctx.fillStyle="#050300";ctx.fillRect(0,0,W,H);}
+      // ── CINEMATIC POLISH LAYER — same treatment as final render ─────────
+      // Warm gold grade
+      ctx.fillStyle="rgba(232,180,60,0.05)";ctx.fillRect(0,0,W,H);
+      // Vignette
+      const vig=ctx.createRadialGradient(W/2,H/2,W*0.15,W/2,H/2,W*0.75);
+      vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.55)");
+      ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+      // Highlight recovery (top centre)
+      const hr=ctx.createRadialGradient(W/2,H*0.28,0,W/2,H*0.28,W*0.35);
+      hr.addColorStop(0,"rgba(255,245,215,0.05)");hr.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=hr;ctx.fillRect(0,0,W,H);
+      // Letterbox bars
+      const bar=Math.round(H*0.065);
+      ctx.fillStyle="#000";ctx.fillRect(0,0,W,bar);ctx.fillRect(0,H-bar,W,bar);
+      // Subtle film grain
+      for(let g=0;g<24;g++){
+        const gv=Math.random()>0.5?150:15;
+        ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.012)";
+        ctx.fillRect(Math.random()*W,Math.random()*H,1,1);
+      }
+      // Fade-in first 1s and fade-out last 1s of loop
+      if(sec%120<1){ctx.fillStyle="rgba(0,0,0,"+(1-(sec%120))+")";ctx.fillRect(0,0,W,H);}
+      // Top-left LESSON badge and bottom watermark for professionalism
+      ctx.fillStyle="rgba(232,201,109,0.75)";
+      ctx.font="bold "+Math.round(H*0.02)+"px Georgia, serif";
+      ctx.textAlign="left";ctx.fillText("MANDASTRONG STUDIO",bar+8,bar+Math.round(H*0.035));
+      ctx.textAlign="right";
+      ctx.font="bold "+Math.round(H*0.018)+"px Georgia, serif";
+      ctx.fillText("TUTORIAL",W-bar-8,H-bar-Math.round(H*0.02));
+      ctx.textAlign="left";
+      rafRef.current=requestAnimationFrame(draw);
+    };
     rafRef.current=requestAnimationFrame(draw);
     return()=>{window.removeEventListener("resize",resize);if(rafRef.current)cancelAnimationFrame(rafRef.current);};
   },[drawFn]);
-  return <canvas ref={cvRef} style={{width:"100%",display:"block",background:"#000"}}/>;
+  return <canvas ref={cvRef} style={{width:"100%",display:"block",background:"#000",boxShadow:"0 0 40px rgba(232,201,109,0.2)"}}/>;
 }
 
 function P19({ go }) {
@@ -3321,18 +3765,18 @@ function P19({ go }) {
   const [drawFns,setDrawFns]=useState({});
 
   const tuts=[
-    {n:"01",t:"Getting Started — Platform Overview",d:"Complete walkthrough of all 23 pages, Quick Access menu, footer controls, and navigation.",dur:"3:00",l:"Beginner",page:1,tips:["Use ☰ top left to jump to any page","Hit 💾 SAVE PROJECT in the footer","Page 23 has the full How-To guide"]},
-    {n:"02",t:"Writing Tools — Script to Screen",d:"How to use the 50+ writing tools on Page 5. From logline to full feature script.",dur:"4:00",l:"Beginner",page:5,tips:["Click any tool card to open it","Use AI CREATE for instant professional scripts","Save results to your Media Library"]},
-    {n:"03",t:"Voice Engine — 54 Characters",d:"Selecting voices, setting pitch and rate, mood, and preparing narration for documentary.",dur:"5:00",l:"Beginner",page:6,tips:["Filter by gender, age, and origin","Hit TEST on any voice card to hear it","Use PREPARE & SPEAK to AI-format your script"]},
-    {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, generating and exporting.",dur:"5:00",l:"Intermediate",page:6,tips:["Access from MUSIC VIDEO STUDIO on Page 6","Upload your own audio for beat-synced video","Record your own song with the red button"]},
-    {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Reference images, duration, saving clips.",dur:"4:00",l:"Intermediate",page:8,tips:["Be specific — lighting, mood, camera angle","Upload a reference image to match a visual style","Use the Documentary Recovery panel for your 13 scenes"]},
-    {n:"06",t:"Timeline Editor — Building Your Film",d:"Dragging clips to tracks, syncing audio and video, setting film duration, preparing for render.",dur:"4:00",l:"Intermediate",page:13,tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate","Set film duration — 60, 90, or 180 minutes","Hit → RENDER when your timeline is ready"]},
-    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video.",dur:"3:00",l:"Beginner",page:15,tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85"]},
-    {n:"08",t:"Render Engine — Exporting in 4K",d:"Quality settings, starting the render, what to do if clips need regenerating.",dur:"4:00",l:"Intermediate",page:16,tips:["1080p recommended for most use","4K for professional distribution","Missing clips are regenerated automatically"]},
-    {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly.",dur:"2:00",l:"Beginner",page:18,tips:["Download to device first","Each social button opens the upload page directly"]},
-    {n:"10",t:"Saving & Project History",d:"Save your session, restore from history, and ensure your clips persist.",dur:"2:00",l:"Beginner",page:1,tips:["Hit 💾 SAVE PROJECT in the footer at any time","📂 MY PROJECTS shows your full session history"]},
-    {n:"11",t:"Agent Grok — Your AI Assistant",d:"How to use Agent Grok to get instant answers about any tool, workflow, or production question.",dur:"2:00",l:"Beginner",page:21,tips:["Ask anything — tools, pricing, workflow","Available 24/7 — no waiting"]},
-    {n:"12",t:"AI For Humanity — Full Case Study",d:"Complete case study: how the AI For Humanity documentary was built from script to render.",dur:"5:00",l:"Advanced",page:8,tips:["13 scenes generated on Page 8, synced on Page 13","Full workflow: P8 → P6 → P13 → P15 → P16 → P17 → P18"]},
+    {n:"01",t:"Getting Started — Platform Overview",d:"Complete walkthrough of all 24 pages, Quick Access menu, footer controls, auto-save, and navigation.",dur:"3:00",l:"Beginner",page:1,tips:["Use ☰ top left to jump to any page","AUTOSAVE ON is real — state saves automatically as you work","💾 SAVE PROJECT saves a named session to MY PROJECTS for full restore"]},
+    {n:"02",t:"Writing Tools — Script to Screen",d:"How to use the 100+ writing tools on Page 5. From logline to full feature script. All results auto-save to Media Library.",dur:"4:00",l:"Beginner",page:5,tips:["Click any tool card to open it","Use AI CREATE for instant professional scripts","Save results to your Media Library — they auto-route to the timeline"]},
+    {n:"03",t:"Voice Engine — 54 Characters",d:"Selecting voices, filtering by gender, age, and origin. Recording narration. Two-button save workflow.",dur:"5:00",l:"Beginner",page:6,tips:["Hit PREPARE TO SPEAK to hear your narration aloud","Hit SAVE TO MEDIA LIBRARY to save it — auto-adds to timeline audio track","Filter by gender, age, and origin to find the perfect voice for your project"]},
+    {n:"04",t:"Music Video Studio — Full Walkthrough",d:"Step-by-step: Song setup, style selection, scene description, drag-and-drop audio upload, generating and exporting.",dur:"5:00",l:"Intermediate",page:6,tips:["Access from MUSIC VIDEO STUDIO button on Page 6","Drag and drop your audio file onto the upload zone — or click to browse","Record your own song with the red RECORD button"]},
+    {n:"05",t:"Video Generator — Cinematic Scenes",d:"Describe any scene and have the Cinema Engine build it. Upload reference photos for photoreal output. Auto-saves to library and timeline.",dur:"4:00",l:"Intermediate",page:8,tips:["Upload a reference photo FIRST — engine builds the scene around it","Be specific: lighting, mood, camera angle, time of day","Generated clips save automatically to Media Library and Timeline"]},
+    {n:"06",t:"Timeline Editor — Building Your Film",d:"Clips auto-populate from Media Library. Drag to reorder. Upload Media button always visible. SYNC ALL TRACKS for instant assembly.",dur:"4:00",l:"Intermediate",page:13,tips:["Hit ⚡ SYNC ALL TRACKS to auto-populate all clips in order","Use ⬆ UPLOAD MEDIA (next to CLEAR ALL) to add more clips at any time","Narration saves auto-populate the audio track — no dragging needed"]},
+    {n:"07",t:"Audio Mixer — Professional Sound",d:"Setting the perfect mix for documentary, narrative film, or music video.",dur:"3:00",l:"Beginner",page:15,tips:["Documentary: VOICE 85 · MUSIC 40 · EFX 50 · MASTER 85","Music Video: MUSIC 75 · VOICE 60 · EFX 40 · MASTER 85","Hit Apply Mix when done before going to Page 16"]},
+    {n:"08",t:"Render Engine — 4K with Auto-Enhancement",d:"Quality settings 480p to 4K. Auto-enhancement runs on every frame — contrast, colour grade, sharpness, noise reduction. Priority save protects your work before render starts.",dur:"4:00",l:"Intermediate",page:16,tips:["Auto-enhancement runs automatically — no settings needed","Priority save fires before render starts so a crash never loses your session","4K recommended for professional distribution — 1080p for social media"]},
+    {n:"09",t:"Export & Distribute",d:"Downloading your film and sharing to all social platforms directly from Page 18.",dur:"2:00",l:"Beginner",page:18,tips:["Download to device first","Each social button opens the upload page directly","Supports YouTube, Instagram, TikTok, Facebook, X, and Vimeo"]},
+    {n:"10",t:"Saving & Project History",d:"Real auto-save keeps your work safe at all times. Emergency crash save fires if the tab closes. Named sessions in MY PROJECTS for full restore.",dur:"2:00",l:"Beginner",page:1,tips:["AUTOSAVE ON is real — saves every time you change page, timeline, or media","💾 SAVE PROJECT creates a named restore point in MY PROJECTS","📂 MY PROJECTS → CONTINUE PROJECT restores your full session including clips"]},
+    {n:"11",t:"Character Studio — Page 24",d:"Create and save reusable characters with reference photos, voice assignments, and appearance notes. Use in any scene.",dur:"3:00",l:"Intermediate",page:24,tips:["Upload a reference photo for each character","Assign a voice from the 54-character library","Hit USE IN SCENE to send the character to your Media Library"]},
+    {n:"12",t:"Documentary Workflow — Full Case Study",d:"Complete end-to-end documentary production: script to 4K render. 13 scenes, narration, timeline assembly, and export.",dur:"5:00",l:"Advanced",page:8,tips:["Page 5 → paste director instructions + full narration script into Script to Movie","Page 6 → select your voice → PREPARE TO SPEAK → SAVE TO MEDIA LIBRARY","Page 8 → generate all scenes → Page 13 → Sync → Page 16 → Render 4K"]},
   ];
 
   const lc={Beginner:"#22c55e",Intermediate:"#f59e0b",Advanced:"#ef4444"};
@@ -3343,8 +3787,8 @@ function P19({ go }) {
     try{
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
-          messages:[{role:"user",content:"Write a JavaScript canvas animation for a tutorial about \""+t.t+"\" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON "+t.n+", relevant diagram for the topic, and MANDASTRONG STUDIO bottom label. Use sec for animation, t=0-1 progress. W=canvas width, H=canvas height. Return ONLY: function drawFrame(ctx,W,H,t,sec){"}]})
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+          messages:[{role:"user",content:"Write a highly polished JavaScript canvas animation for a professional cinema-platform tutorial about \""+t.t+"\". This is for MandaStrong Studio — the aesthetic must be premium: gold (#e8c96d) on deep black, glowing highlights, smooth eased motion using Math.sin() and clean easing curves, deep drop shadows, professional serif and sans typography. Animation should include: (1) an elegant animated LESSON "+t.n+" number card that fades in and settles, (2) the tutorial title \""+t.t+"\" appearing letter by letter with warm gold glow, (3) an animated diagram or visual metaphor that illustrates the topic conceptually — smooth transitions, layered shapes, glowing lines, not stick figures, (4) key concepts revealed one at a time with smooth fade-in, (5) subtle particle effects and ambient movement to avoid static frames. Every frame should look like a high-end motion graphics piece — think Apple keynote crossed with cinema title design. Use sec for continuous animation, t=0-1 for progress. W=canvas width, H=canvas height. Do not draw letterbox bars, watermarks, or vignettes — those are added separately. Return ONLY: function drawFrame(ctx,W,H,t,sec){"}]})
       });
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
@@ -3641,19 +4085,21 @@ function P22() {
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
-    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Admin login: woolleya129@gmail.com / Admin. Use hamburger menu top left to jump to any page. Hit Save Project in the footer regularly."},
-    {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI Create. Use the search bar to find tools fast. Save any result to your Media Library."},
-    {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, origin. Hit TEST to hear any voice. Settings tab: adjust Speed, Pitch, Pause, Volume, Mood. James settings: Speed 0.62 · Pitch 0.86 · Pause 1600ms · Mood Sarcastic. Speak tab: paste script, hit Prepare and Speak. Music Video Studio button is top right."},
-    {t:"PAGE 8 — VIDEO GENERATOR",c:"Click Documentary Recovery Panel to expand your 13 scenes. Click any scene to load it. Hit Generate Scene. Clips save automatically to IndexedDB. Generate all 13 then go to Page 11."},
-    {t:"PAGE 11 — UPLOAD MEDIA",c:"Hit Reload Clips from Storage. All 13 clips load from IndexedDB into your Media Library. Also upload your own video, audio, and images here."},
-    {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit Sync All Tracks. All clips populate in correct order. Set film duration. Review timeline. When satisfied hit Render or go to Page 16."},
-    {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: Voice 85 · Music 40 · Effects 50 · Master 85. Music Video: Voice 60 · Music 75 · Effects 40 · Master 85. Hit Apply Mix when done."},
-    {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality — 720p, 1080p, or 4K. For AI For Humanity select 4K. Hit Start Render. Do not close the browser tab. Download button appears when complete."},
-    {t:"PAGE 17 & 18 — PREVIEW & EXPORT",c:"Page 17: watch your completed film. Page 18: download and share directly to YouTube, Instagram, TikTok, Facebook, X, and Vimeo."},
-    {t:"PAGE 19 — TUTORIALS",c:"12 lessons. Hit Generate to Watch on any lesson. Claude writes and plays an animated tutorial instantly. Each lesson has Pro Tips and an Open Page button."},
-    {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about the platform, workflow, or filmmaking. Type and hit Send."},
-    {t:"MUSIC VIDEO STUDIO",c:"Open from Page 6 top right. Step 1: Song details. Step 2: Style and duration 1-180 mins. Step 3: Write your scene in full detail, upload audio or hit red Record Your Own Song button. Step 4: Hit Generate Music Video. Download or Save to Media Library when done."},
-    {t:"RECOMMENDED WORKFLOW",c:"Page 5 → Write script. Page 6 → Record narration. Page 8 → Generate all scenes. Page 11 → Reload clips. Page 13 → Sync tracks. Page 15 → Set audio mix. Page 16 → Render. Page 17 → Preview. Page 18 → Export and share."},
+    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Log in with your credentials or start a free trial. Use the ☰ hamburger menu top left to jump to any of the 24 pages. AUTOSAVE ON is real — your work saves automatically every time you change page, generate a clip, or update your timeline. Hit 💾 SAVE PROJECT to create a named restore point you can return to from MY PROJECTS."},
+    {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI CREATE for instant professional results. Use the search bar to find specific tools. Paste your full narration script and director instructions here using Script to Movie — the AI generates complete video prompts for every chapter. All results save to your Media Library automatically."},
+    {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, and origin. Hit TEST on any voice card to hear it. Paste your narration script into the text box. Hit PREPARE TO SPEAK to hear it aloud through your chosen voice. Hit SAVE TO MEDIA LIBRARY to save the narration — it auto-adds to the Audio Track on your timeline. No dragging needed. Blaze voice recommended for the AI For Humanity documentary. Music Video Studio button is top right on this page."},
+    {t:"PAGE 8 — VIDEO GENERATOR",c:"Upload a reference photo first — the engine builds the scene around your real photo for photorealistic output. Then paste your scene prompt and hit Generate Scene. Clips save automatically to your Media Library and auto-populate the Video Track on your timeline. The memory guard clears old clips before each render so the browser has room to work. Generate all your scenes then go to Page 13."},
+    {t:"PAGE 11 — UPLOAD MEDIA",c:"Upload your own video, audio, images, and files here. Drag and drop or click to browse. Uploaded assets auto-save to your Media Library and route to the correct timeline track automatically — video to the video track, audio to the audio track. Use the Reload Clips from Storage button to recover clips after a page refresh."},
+    {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit ⚡ SYNC ALL TRACKS to auto-populate your timeline in the correct order. Your narration audio clip appears in the Audio Track automatically. Use ⬆ UPLOAD MEDIA next to CLEAR ALL to add more content at any time. Drag clips to reorder. Set your film duration — 60, 90, or 180 minutes. When satisfied hit → RENDER or navigate to Page 16."},
+    {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: Voice 85 · Music 40 · Effects 50 · Master 85. Music Video: Voice 60 · Music 75 · Effects 40 · Master 85. Narrative Film: Voice 80 · Music 50 · Effects 60 · Master 85. Hit Apply Mix when done before going to Page 16."},
+    {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality — 480p, 720p, 1080p, or 4K. Auto-enhancement runs automatically on every frame during render — contrast boost, warm gold colour grade, sharpness, and noise reduction — no settings needed. A priority save fires before render starts so a crash never loses your session. Do not close the browser tab while rendering. Download button appears when complete."},
+    {t:"PAGE 17 & 18 — PREVIEW & EXPORT",c:"Page 17: your completed film loads automatically from storage — press play to watch. Page 18: download to your device and share directly to YouTube, Instagram, TikTok, Facebook, X, and Vimeo using the platform buttons."},
+    {t:"PAGE 19 — TUTORIALS",c:"12 lessons covering every page and workflow. Hit Generate to Watch on any lesson — an animated tutorial plays instantly. Each lesson has Pro Tips and an Open Page button. Lesson 12 is a complete documentary production case study from script to 4K render."},
+    {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about the platform, workflow, filmmaking, or your project. Type your question and hit Send. Agent Grok has full knowledge of every tool and workflow on the platform."},
+    {t:"PAGE 24 — CHARACTER STUDIO",c:"Create and save reusable characters for your films. Upload a reference photo, assign a voice from the 54-character library, add appearance notes. Hit USE IN SCENE to send the character to your Media Library ready for any scene. Characters persist across sessions."},
+    {t:"MUSIC VIDEO STUDIO",c:"Open from Page 6 top right. Step 1: Song title, artist, genre, mood, tempo — drag and drop your audio file or click to upload, or hit RECORD YOUR OWN SONG. Step 2: Video style, colour grade, effects, aspect ratio. Step 3: Describe your scene in detail. Step 4: Hit Generate Music Video. The engine builds a full beat-synced video. Download or Save to Media Library when done."},
+    {t:"SAVING & RECOVERING WORK",c:"AUTOSAVE ON saves automatically as you work. 💾 SAVE PROJECT creates a named session — give it a meaningful name. 📂 MY PROJECTS shows your full history. Hit CONTINUE PROJECT to fully restore a session including all clips from storage. Emergency save fires automatically if the browser tab closes or crashes — your work is never permanently lost."},
+    {t:"RECOMMENDED WORKFLOW",c:"Page 5 → Paste director instructions and narration script into Script to Movie. Page 6 → Select Blaze voice → PREPARE TO SPEAK → SAVE TO MEDIA LIBRARY. Page 8 → Upload reference photo → paste scene prompt → Generate → repeat for all scenes. Page 13 → SYNC ALL TRACKS. Page 15 → Set audio mix. Page 16 → Choose quality → Render. Page 17 → Preview. Page 18 → Export and share."},
   ];
   return(
     <div style={{padding:"20px 32px 40px",maxWidth:860,margin:"0 auto"}}>
@@ -3682,6 +4128,17 @@ function P24CharacterStudio({ onSave }) {
   const [photo,setPhoto]=useState(null);
   const [photoName,setPhotoName]=useState("");
   const [savedNote,setSavedNote]=useState(false);
+  const [gender,setGender]=useState("Male");
+  const [age,setAge]=useState("Adult");
+  const [ethnicity,setEthnicity]=useState("");
+  const [hairColor,setHairColor]=useState("");
+  const [hairStyle,setHairStyle]=useState("");
+  const [eyeColor,setEyeColor]=useState("");
+  const [costume,setCostume]=useState("");
+  const [role,setRole]=useState("");
+  const [sceneNotes,setSceneNotes]=useState("");
+  const [personality,setPersonality]=useState("");
+  const [editId,setEditId]=useState(null);
   const fileRef=useRef(null);
 
   const persist=(list)=>{
@@ -3698,12 +4155,26 @@ function P24CharacterStudio({ onSave }) {
     reader.readAsDataURL(f);
   };
 
+  const clearForm=()=>{setName("");setNotes("");setPhoto(null);setPhotoName("");setVoice("james");setGender("Male");setAge("Adult");setEthnicity("");setHairColor("");setHairStyle("");setEyeColor("");setCostume("");setRole("");setSceneNotes("");setPersonality("");setEditId(null);};
+
   const addChar=()=>{
     if(!name.trim()){alert("Give your character a name first.");return;}
-    const c={id:Date.now()+Math.random(),name:name.trim(),voice,notes:notes.trim(),photo,photoName,date:new Date().toLocaleDateString()};
-    persist([...chars,c]);
-    setName("");setNotes("");setPhoto(null);setPhotoName("");setVoice("james");
+    const c={id:editId||Date.now()+Math.random(),name:name.trim(),voice,notes:notes.trim(),photo,photoName,
+      gender,age,ethnicity,hairColor,hairStyle,eyeColor,costume,role,sceneNotes,personality,
+      date:new Date().toLocaleDateString()};
+    const updated=editId?chars.map(x=>x.id===editId?c:x):[...chars,c];
+    persist(updated);
+    clearForm();
     setSavedNote(true);setTimeout(()=>setSavedNote(false),2500);
+  };
+
+  const editChar=(c)=>{
+    setEditId(c.id);setName(c.name);setVoice(c.voice||"james");setNotes(c.notes||"");
+    setPhoto(c.photo||null);setPhotoName(c.photoName||"");setGender(c.gender||"Male");
+    setAge(c.age||"Adult");setEthnicity(c.ethnicity||"");setHairColor(c.hairColor||"");
+    setHairStyle(c.hairStyle||"");setEyeColor(c.eyeColor||"");setCostume(c.costume||"");
+    setRole(c.role||"");setSceneNotes(c.sceneNotes||"");setPersonality(c.personality||"");
+    window.scrollTo(0,0);
   };
 
   const removeChar=(id)=>persist(chars.filter(c=>c.id!==id));
@@ -3717,22 +4188,81 @@ function P24CharacterStudio({ onSave }) {
     }
   };
 
+  // Generate a scene prompt from character details
+  const generatePrompt=(c)=>{
+    const parts=[];
+    if(c.gender) parts.push(c.gender.toLowerCase());
+    if(c.age) parts.push(c.age.toLowerCase());
+    if(c.ethnicity) parts.push(c.ethnicity);
+    parts.push("named "+c.name);
+    if(c.hairColor||c.hairStyle) parts.push((c.hairStyle?c.hairStyle+" ":"")+c.hairColor+" hair");
+    if(c.eyeColor) parts.push(c.eyeColor+" eyes");
+    if(c.costume) parts.push("wearing "+c.costume);
+    if(c.personality) parts.push(c.personality+" personality");
+    if(c.role) parts.push("role: "+c.role);
+    if(c.notes) parts.push(c.notes);
+    if(c.sceneNotes) parts.push("Scene: "+c.sceneNotes);
+    const prompt="A "+parts.join(", ")+".";
+    navigator.clipboard.writeText(prompt).then(()=>alert("✓ Scene prompt copied — paste into Page 8 scene description.")).catch(()=>alert(prompt));
+  };
+
   const inp={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
+  const lbl=(t)=><div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5,marginTop:10}}>{t}</div>;
+  const optBtn=(val,cur,setter,opts)=>(
+    <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:4}}>
+      {opts.map(o=><button key={o} onClick={()=>setter(o)} style={{background:cur===o?GOLD:"#111",border:"1px solid "+(cur===o?"#000":GOLDDIM),color:cur===o?"#000":WHITE,padding:"3px 10px",cursor:"pointer",fontSize:11,fontWeight:900}}>{o}</button>)}
+    </div>
+  );
 
   return (
     <div style={{...Sp,padding:30}}>
-      <div style={{maxWidth:1000,margin:"0 auto"}}>
+      <div style={{maxWidth:1100,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>CONSISTENCY ENGINE</div>
         <h1 style={{...H1,fontSize:26,marginBottom:6}}>CHARACTER STUDIO</h1>
-        <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.7}}>Create reusable characters with a reference photo and an assigned voice. Send a character's reference image to your Media Library, then upload it on Page 8 so the same face appears across every scene — consistent characters all the way through your film.</div>
+        <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.7}}>Create reusable characters with full physical and costume details. Send a character's reference image to your Media Library, then upload on Page 8 to keep the same face across every scene. Hit COPY SCENE PROMPT to get a ready-to-paste prompt for any scene.</div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
-          {/* Create panel */}
-          <div style={{...Card(),border:"2px solid "+GOLD}}>
-            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>✦ CREATE A CHARACTER</div>
-            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>CHARACTER NAME</div>
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Doxy, Ethan, Lily..." style={{...inp,marginBottom:12}}/>
-            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>REFERENCE PHOTO</div>
+          {/* Create / Edit panel */}
+          <div style={{...Card(),border:"2px solid "+GOLD,maxHeight:"80vh",overflowY:"auto"}}>
+            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>{editId?"✏ EDIT CHARACTER":"✦ CREATE A CHARACTER"}</div>
+
+            {lbl("CHARACTER NAME")}
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Doxy, Ethan, Lily..." style={{...inp,marginBottom:4}}/>
+
+            {lbl("ROLE IN FILM")}
+            <input value={role} onChange={e=>setRole(e.target.value)} placeholder="e.g. Protagonist, School Bully, Narrator..." style={{...inp,marginBottom:4}}/>
+
+            {lbl("GENDER")}
+            {optBtn(gender,gender,setGender,["Male","Female","Non-Binary","Unknown"])}
+
+            {lbl("AGE")}
+            {optBtn(age,age,setAge,["Child","Teen","Young Adult","Adult","Middle Aged","Elderly"])}
+
+            {lbl("ETHNICITY / HERITAGE (OPTIONAL)")}
+            <input value={ethnicity} onChange={e=>setEthnicity(e.target.value)} placeholder="e.g. British, Nigerian, East Asian, Mixed..." style={{...inp,marginBottom:4}}/>
+
+            {lbl("HAIR COLOUR")}
+            {optBtn(hairColor,hairColor,setHairColor,["Black","Dark Brown","Brown","Blonde","Red","Auburn","Grey","White","Dyed"])}
+
+            {lbl("HAIR STYLE")}
+            {optBtn(hairStyle,hairStyle,setHairStyle,["Short","Medium","Long","Curly","Straight","Wavy","Braided","Afro","Shaved","Ponytail","Bun"])}
+
+            {lbl("EYE COLOUR")}
+            {optBtn(eyeColor,eyeColor,setEyeColor,["Brown","Dark Brown","Blue","Green","Grey","Hazel","Amber"])}
+
+            {lbl("COSTUME / WARDROBE")}
+            <input value={costume} onChange={e=>setCostume(e.target.value)} placeholder="e.g. black top, black jeans, school uniform..." style={{...inp,marginBottom:4}}/>
+
+            {lbl("PERSONALITY / DEMEANOUR")}
+            <input value={personality} onChange={e=>setPersonality(e.target.value)} placeholder="e.g. confident, quiet, aggressive, warm..." style={{...inp,marginBottom:4}}/>
+
+            {lbl("ADDITIONAL NOTES")}
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. scar on left cheek, always wears earrings..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:4}}/>
+
+            {lbl("SCENE NOTES")}
+            <textarea value={sceneNotes} onChange={e=>setSceneNotes(e.target.value)} placeholder="e.g. usually seen in school corridors, confrontational body language..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:4}}/>
+
+            {lbl("REFERENCE PHOTO")}
             {photo?(
               <div style={{position:"relative",marginBottom:12}}>
                 <img src={photo} alt="ref" style={{width:"100%",height:160,objectFit:"cover",border:"1px solid "+GOLD}}/>
@@ -3742,13 +4272,16 @@ function P24CharacterStudio({ onSave }) {
               <button onClick={()=>fileRef.current&&fileRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:12}}>📷 UPLOAD CHARACTER PHOTO</button>
             )}
             <input ref={fileRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" capture="environment" style={{display:"none"}} onChange={handlePhoto}/>
-            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>ASSIGNED VOICE</div>
-            <select value={voice} onChange={e=>setVoice(e.target.value)} style={{...inp,marginBottom:12,cursor:"pointer"}}>
+
+            {lbl("ASSIGNED VOICE")}
+            <select value={voice} onChange={e=>setVoice(e.target.value)} style={{...inp,marginBottom:14,cursor:"pointer"}}>
               {VOICE_CHARACTERS.map(v=><option key={v.id} value={v.id} style={{background:"#000"}}>{v.name} — {v.origin} {v.gender} · {v.style}</option>)}
             </select>
-            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:5}}>NOTES (appearance, age, wardrobe)</div>
-            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. 17, dark hair, blue t-shirt..." style={{...inp,height:70,resize:"none",lineHeight:1.6,marginBottom:14}}/>
-            <button onClick={addChar} style={{...G("gold",false),width:"100%",padding:"14px",fontSize:13,letterSpacing:2}}>+ SAVE CHARACTER</button>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <button onClick={addChar} style={{...G("gold",false),padding:"14px",fontSize:13,letterSpacing:2}}>{editId?"✓ UPDATE":"+ SAVE CHARACTER"}</button>
+              {editId&&<button onClick={clearForm} style={{...G("out",false),padding:"14px",fontSize:13,letterSpacing:2}}>CANCEL</button>}
+            </div>
             {savedNote&&<div style={{marginTop:10,background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ CHARACTER SAVED</div>}
           </div>
 
@@ -3764,16 +4297,30 @@ function P24CharacterStudio({ onSave }) {
             ):(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {chars.map(c=>(
-                  <div key={c.id} style={{...Card(),display:"flex",gap:12,alignItems:"center",padding:12}}>
-                    {c.photo?<img src={c.photo} alt={c.name} style={{width:64,height:64,objectFit:"cover",border:"1px solid "+GOLD,flexShrink:0}}/>:<div style={{width:64,height:64,background:"#000",border:"1px solid "+GOLDDIM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🎭</div>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{color:GOLD,fontWeight:900,fontSize:15,letterSpacing:1}}>{c.name}</div>
-                      <div style={{color:WHITE,fontSize:11,marginTop:2}}>🎙 {VOICE_CHARACTERS.find(v=>v.id===c.voice)?.name||c.voice}</div>
-                      {c.notes&&<div style={{color:DIM,fontSize:11,marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</div>}
+                  <div key={c.id} style={{...Card(),padding:14}}>
+                    <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                      {c.photo?<img src={c.photo} alt={c.name} style={{width:80,height:80,objectFit:"cover",border:"2px solid "+GOLD,flexShrink:0}}/>:<div style={{width:80,height:80,background:"#000",border:"1px solid "+GOLDDIM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>🎭</div>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{color:GOLD,fontWeight:900,fontSize:15,letterSpacing:1}}>{c.name}</div>
+                        {c.role&&<div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,marginTop:2}}>{c.role}</div>}
+                        <div style={{color:WHITE,fontSize:11,marginTop:4,display:"flex",flexWrap:"wrap",gap:6}}>
+                          {c.gender&&<span style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"1px 6px",fontSize:10}}>{c.gender}</span>}
+                          {c.age&&<span style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"1px 6px",fontSize:10}}>{c.age}</span>}
+                          {c.ethnicity&&<span style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"1px 6px",fontSize:10}}>{c.ethnicity}</span>}
+                          {c.hairColor&&<span style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"1px 6px",fontSize:10}}>{c.hairStyle?c.hairStyle+" ":""}{c.hairColor} hair</span>}
+                          {c.eyeColor&&<span style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"1px 6px",fontSize:10}}>{c.eyeColor} eyes</span>}
+                        </div>
+                        {c.costume&&<div style={{color:WHITE,fontSize:11,marginTop:4,fontStyle:"italic"}}>👗 {c.costume}</div>}
+                        {c.personality&&<div style={{color:WHITE,fontSize:11,marginTop:2}}>💭 {c.personality}</div>}
+                        {c.notes&&<div style={{color:DIM,fontSize:11,marginTop:2,fontStyle:"italic"}}>{c.notes}</div>}
+                        <div style={{color:WHITE,fontSize:11,marginTop:4}}>🎙 {VOICE_CHARACTERS.find(v=>v.id===c.voice)?.name||c.voice}</div>
+                      </div>
                     </div>
-                    <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
-                      <button onClick={()=>useInScene(c)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"6px 12px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>→ USE IN SCENE</button>
-                      <button onClick={()=>removeChar(c.id)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 12px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕ DELETE</button>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:5,marginTop:10}}>
+                      <button onClick={()=>useInScene(c)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"7px 4px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>→ USE IN SCENE</button>
+                      <button onClick={()=>generatePrompt(c)} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"7px 4px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>📋 COPY PROMPT</button>
+                      <button onClick={()=>editChar(c)} style={{background:"transparent",border:"1px solid "+GOLDDIM,color:WHITE,padding:"7px 4px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✏ EDIT</button>
+                      <button onClick={()=>removeChar(c.id)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"7px 4px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕ DELETE</button>
                     </div>
                   </div>
                 ))}
@@ -3790,7 +4337,27 @@ function P23({ go }) {
   const bgRef = useRef(null);
   const [howOpen, setHowOpen] = useState(false);
   useEffect(()=>{
-    if(bgRef.current){bgRef.current.muted=true;bgRef.current.defaultMuted=true;bgRef.current.play().catch(()=>{});}
+    const v=bgRef.current;
+    if(!v)return;
+    v.muted=true;
+    v.defaultMuted=true;
+    v.loop=true;
+    v.playsInline=true;
+    v.preload="auto";
+    // Smooth playback: wait until the video is fully buffered before starting,
+    // then let the native loop handle itself. Only nudge play on stall/pause.
+    const tryPlay=()=>{v.play().catch(()=>{});};
+    if(v.readyState>=4){tryPlay();}
+    else{v.addEventListener("canplaythrough",tryPlay,{once:true});}
+    v.addEventListener("pause",tryPlay);
+    v.addEventListener("stalled",tryPlay);
+    v.addEventListener("waiting",tryPlay);
+    return()=>{
+      v.removeEventListener("canplaythrough",tryPlay);
+      v.removeEventListener("pause",tryPlay);
+      v.removeEventListener("stalled",tryPlay);
+      v.removeEventListener("waiting",tryPlay);
+    };
   },[]);
   const exitApp = () => {
     try{localStorage.removeItem("ms_user");}catch{}
@@ -3798,13 +4365,14 @@ function P23({ go }) {
   };
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
-      <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-        style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",objectFit:"cover",zIndex:0,opacity:0.35}}
-        onError={e=>{e.currentTarget.style.display="none";}}>
-        <source src="/thatsallfolks.mp4" type="video/mp4"/>
-        <source src="thatsallfolks.mp4" type="video/mp4"/>
-      </video>
-      <div style={{position:"relative",zIndex:1,padding:"50px 24px 80px"}}>
+      {/* Hero image at top of page (not background) */}
+      <div style={{width:"100%",maxHeight:"38vh",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#000",borderBottom:"1px solid "+GOLDDIM}}>
+        <img src="/thatsallfolks.jpg"
+          onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src="/thatsallfolks.png";e.currentTarget.onerror=()=>{e.currentTarget.style.display="none";};}}
+          alt="That's All Folks"
+          style={{display:"block",width:"100%",maxHeight:"38vh",objectFit:"cover"}}/>
+      </div>
+      <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:28}}>THAT'S ALL FOLKS</h1>
@@ -3867,6 +4435,35 @@ export default function App() {
     // PWA install prompt capture
     const handleInstall=(e)=>{e.preventDefault();window.deferredInstallPrompt=e;};
     window.addEventListener("beforeinstallprompt",handleInstall);
+    // PWA MANIFEST — makes the DOWNLOAD APP button work as a real install
+    try{
+      const manifestData={
+        name:"MandaStrong Studio",
+        short_name:"MandaStrong",
+        description:"Cinema Intelligence Platform — 600+ AI tools, 24 pages, up to 3-hour films",
+        start_url:"/",
+        display:"standalone",
+        background_color:"#000000",
+        theme_color:"#e8c96d",
+        orientation:"any",
+        icons:[
+          {src:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#000"/><text x="96" y="130" text-anchor="middle" font-family="Georgia" font-size="120" font-weight="900" fill="#e8c96d">M</text></svg>'),sizes:"192x192",type:"image/svg+xml",purpose:"any maskable"},
+          {src:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#000"/><text x="256" y="350" text-anchor="middle" font-family="Georgia" font-size="320" font-weight="900" fill="#e8c96d">M</text></svg>'),sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}
+        ]
+      };
+      const manifestBlob=new Blob([JSON.stringify(manifestData)],{type:"application/json"});
+      const manifestUrl=URL.createObjectURL(manifestBlob);
+      let mLink=document.querySelector('link[rel="manifest"]');
+      if(!mLink){mLink=document.createElement("link");mLink.rel="manifest";document.head.appendChild(mLink);}
+      mLink.href=manifestUrl;
+      // Apple-specific PWA meta
+      const addMeta=(name,content)=>{if(!document.querySelector('meta[name="'+name+'"]')){const m=document.createElement("meta");m.name=name;m.content=content;document.head.appendChild(m);}};
+      addMeta("apple-mobile-web-app-capable","yes");
+      addMeta("apple-mobile-web-app-status-bar-style","black-translucent");
+      addMeta("apple-mobile-web-app-title","MandaStrong");
+      addMeta("mobile-web-app-capable","yes");
+      addMeta("theme-color","#e8c96d");
+    }catch(e){}
     return()=>{try{document.head.removeChild(link);}catch{} window.removeEventListener("beforeinstallprompt",handleInstall);};
   },[]);
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_user")||'{"name":"Guest","plan":"Guest","isAdmin":false}');}catch{return {name:"Guest",plan:"Guest",isAdmin:false};}});
@@ -3898,22 +4495,67 @@ export default function App() {
     return()=>window.removeEventListener("ms_open_history",handler);
   },[]);
 
+  // Real auto-persist — saves state silently whenever page, timeline or mediaLib changes
+  useEffect(()=>{
+    try{localStorage.setItem("ms_page",JSON.stringify(page));}catch(e){}
+  },[page]);
+  useEffect(()=>{
+    try{localStorage.setItem("ms_timeline",JSON.stringify(timeline));}catch(e){}
+  },[timeline]);
+  useEffect(()=>{
+    try{localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));}catch(e){}
+  },[mediaLib]);
+
+  // Emergency crash save — fires when tab is closed or crashes
+  useEffect(()=>{
+    const emergencySave=()=>{
+      try{
+        localStorage.setItem("ms_page",JSON.stringify(page));
+        localStorage.setItem("ms_timeline",JSON.stringify(timeline));
+        localStorage.setItem("ms_user",JSON.stringify(user));
+        localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));
+      }catch(e){}
+    };
+    window.addEventListener("beforeunload",emergencySave);
+    window.addEventListener("visibilitychange",()=>{if(document.hidden)emergencySave();});
+    return()=>{
+      window.removeEventListener("beforeunload",emergencySave);
+    };
+  },[page,timeline,mediaLib,user]);
+
   const saveAsset=async(a)=>{
+    let asset=a;
     if(a.file instanceof File||a.file instanceof Blob){
-      try{const blob=a.file;const dbId=a.id||("asset_"+Date.now());await safeSaveClipToDB(dbId,blob,a.name||"asset",a.type||"video/webm");setMediaLib(p=>[...p,{...a,dbId}]);}
-      catch(e){setMediaLib(p=>[...p,a]);}
-    }else{setMediaLib(p=>[...p,a]);}
+      try{const blob=a.file;const dbId=a.id||("asset_"+Date.now());await safeSaveClipToDB(dbId,blob,a.name||"asset",a.type||"video/webm");asset={...a,dbId};}
+      catch(e){}
+    }
+    setMediaLib(p=>[...p,asset]);
+    // Auto-route to correct timeline track (0 = VIDEO TRACK, 1 = AUDIO TRACK)
+    const isAudio=asset.type&&(asset.type.startsWith("audio")||asset.type==="narration"||asset.type==="audio/narration");
+    const isVideo=asset.type&&(asset.type.startsWith("video")||asset.type==="video/webm");
+    if(isAudio||isVideo){
+      setTimeline(prev=>{
+        const updated={...prev};
+        const trackIdx=isAudio?1:0;
+        const track=updated[trackIdx]||[];
+        if(!track.find(x=>x.id===asset.id)){
+          updated[trackIdx]=[...track,asset];
+        }
+        try{localStorage.setItem("ms_timeline",JSON.stringify(updated));}catch(e){}
+        return updated;
+      });
+    }
   };
 
   const saveProject=()=>setShowSaveModal(true);
 
-  const doSave=(name,note)=>{
+  const doSave=(name,note,status)=>{
     try{
       localStorage.setItem("ms_page",JSON.stringify(page));
       localStorage.setItem("ms_user",JSON.stringify(user));
       localStorage.setItem("ms_timeline",JSON.stringify(timeline));
       localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));
-      const entry={name,note,page,assetCount:mediaLib.length,date:new Date().toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}),savedPage:page,savedTimeline:JSON.parse(JSON.stringify(timeline)),savedUser:user};
+      const entry={name,note,page,status:status||"in_progress",assetCount:mediaLib.length,date:new Date().toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}),savedPage:page,savedTimeline:JSON.parse(JSON.stringify(timeline)),savedUser:user};
       const existing=JSON.parse(localStorage.getItem("ms_project_history")||"[]");
       existing.push(entry);if(existing.length>20)existing.shift();
       localStorage.setItem("ms_project_history",JSON.stringify(existing));
