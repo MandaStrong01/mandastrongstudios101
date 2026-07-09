@@ -1,24 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect, Component } from "react";
-
-class ErrorBoundary extends Component {
-  constructor(props){super(props);this.state={error:null};}
-  static getDerivedStateFromError(error){return{error};}
-  componentDidCatch(error,info){console.error("App error:",error,info);}
-  render(){
-    if(this.state.error){
-      return(
-        <div style={{minHeight:"100vh",background:"#000",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:32}}>
-          <div style={{color:"#e53e3e",fontWeight:900,fontSize:18,letterSpacing:2}}>SOMETHING WENT WRONG</div>
-          <div style={{color:"#aaa",fontSize:13,maxWidth:400,textAlign:"center"}}>{String(this.state.error.message||this.state.error)}</div>
-          <button onClick={()=>this.setState({error:null})} style={{background:"#c8a84b",color:"#000",border:"none",padding:"10px 28px",fontWeight:900,fontSize:13,letterSpacing:2,cursor:"pointer",marginTop:8}}>↺ TRY AGAIN</button>
-          <button onClick={()=>{try{localStorage.clear();}catch{}window.location.reload();}} style={{background:"#333",color:"#fff",border:"none",padding:"10px 28px",fontWeight:900,fontSize:13,letterSpacing:2,cursor:"pointer"}}>RESET &amp; RELOAD</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import { useState, useRef, useEffect } from "react";
 
 // IndexedDB helpers for persistent clip storage
 const DB_NAME="mandastrong_db",DB_VER=1,STORE="clips";
@@ -4601,12 +4582,10 @@ export default function App() {
         localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));
       }catch(e){}
     };
-    const onVisibility=()=>{if(document.hidden)emergencySave();};
     window.addEventListener("beforeunload",emergencySave);
-    window.addEventListener("visibilitychange",onVisibility);
+    window.addEventListener("visibilitychange",()=>{if(document.hidden)emergencySave();});
     return()=>{
       window.removeEventListener("beforeunload",emergencySave);
-      window.removeEventListener("visibilitychange",onVisibility);
     };
   },[page,timeline,mediaLib,user]);
 
@@ -4697,9 +4676,7 @@ export default function App() {
       {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
       <div style={{minHeight:"calc(100vh - 116px)"}}>
-        <ErrorBoundary key={page}>
-          <div key={page}>{renderPage()}</div>
-        </ErrorBoundary>
+        <div key={page}>{renderPage()}</div>
       </div>
       <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
     </div>
