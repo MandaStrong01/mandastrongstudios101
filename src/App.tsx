@@ -807,13 +807,56 @@ function MusicVideoStudio({ onClose, onSave }) {
       const hasGuitar = /guitar|musician|fingerpick/.test(pr);
       const isSilhouette = /silhouette|back to camera|facing away/.test(pr);
 
+      // Load reference image if user uploaded one — Reality Engine base
+      let refImgEl = null;
+      if(config.refMedia){
+        try{
+          refImgEl = await new Promise((resolve)=>{
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = ()=>resolve(img);
+            img.onerror = ()=>resolve(null);
+            img.src = config.refMedia;
+            setTimeout(()=>resolve(refImgEl||null), 5000);
+          });
+          if(refImgEl) addLog("✓ Reference image loaded — Reality Engine base active");
+        }catch(e){}
+      }
+
       const renderFn = (ctx, W, H, t, sec, totalSec, beatNow) => {
         const pulse = beatNow ? 1.02 : 1.0;
         ctx.save();
         ctx.translate(W/2, H/2);
         ctx.scale(pulse + t*0.04, pulse + t*0.04);
         ctx.translate(-W/2, -H/2);
-        // SKY
+
+        // ── REALITY ENGINE — if user uploaded a reference image, use it as photorealistic base
+        if(refImgEl){
+          // Cover the full frame with the reference image
+          const imgR = refImgEl.width / refImgEl.height;
+          const canR = W / H;
+          let dw, dh, dx, dy;
+          if(imgR > canR){
+            dh = H;
+            dw = H * imgR;
+            dx = (W - dw) / 2;
+            dy = 0;
+          } else {
+            dw = W;
+            dh = W / imgR;
+            dx = 0;
+            dy = (H - dh) / 2;
+          }
+          // Subtle Ken Burns pan across the reference image for movement
+          const panX = Math.sin(sec * 0.08) * W * 0.02;
+          const panY = Math.cos(sec * 0.06) * H * 0.015;
+          ctx.drawImage(refImgEl, dx + panX, dy + panY, dw, dh);
+          // Warm cinematic overlay + vignette handled by post-processing later
+          // Skip procedural sky/water/room drawing when we have real photo base
+          ctx.restore();
+          return;
+        }
+        // SKY (fallback for when no reference image is uploaded)
         if(isSpace){
           const sky=ctx.createLinearGradient(0,0,0,H);
           sky.addColorStop(0,"rgb(1,1,8)"); sky.addColorStop(1,"rgb(3,3,18)");
@@ -1401,7 +1444,17 @@ function MusicVideoStudio({ onClose, onSave }) {
                 <video ref={videoRef} src={videoUrl} playsInline
                   style={{width:"100%",aspectRatio:"16/9",display:"block",background:"#000"}}
                   onTimeUpdate={()=>setCurrentTime(videoRef.current?.currentTime||0)}
-                  onLoadedMetadata={()=>setDuration2(videoRef.current?.duration||0)}
+                  onLoadedMetadata={()=>{
+                    const v=videoRef.current;if(!v)return;
+                    // Chrome WebM duration bug: force seek to end so browser reads real duration
+                    if(v.duration===Infinity||isNaN(v.duration)||v.duration===0){
+                      v.currentTime=1e10;
+                      const fix=()=>{v.currentTime=0;setDuration2(v.duration||0);v.removeEventListener("timeupdate",fix);};
+                      v.addEventListener("timeupdate",fix);
+                    } else {
+                      setDuration2(v.duration);
+                    }
+                  }}
                   onPlay={()=>setPlaying(true)}
                   onPause={()=>setPlaying(false)}
                   onEnded={()=>setPlaying(false)}
