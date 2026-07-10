@@ -69,8 +69,8 @@ export default function Page23({ onNavigate }: PageProps) {
         <video autoPlay loop playsInline preload="auto" muted
           style={{ width: "100%", display: "block", maxHeight: "65vh", objectFit: "cover" }}
           onError={e => { (e.currentTarget as HTMLVideoElement).style.display = "none"; }}>
-          <source src="/background_(5).mp4" type="video/mp4" />
-          <source src="background_(5).mp4" type="video/mp4" />
+          <source src="/background.mp4" type="video/mp4" />
+          <source src="background.mp4" type="video/mp4" />
         </video>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, #000 100%)", pointerEvents: "none" }} />
 
