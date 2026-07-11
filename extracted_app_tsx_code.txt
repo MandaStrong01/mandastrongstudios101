@@ -4372,3 +4372,6 @@ export default function App() {
   );
 }
 
+<system-reminder>A Supabase database is available to use for any data persistence. ALWAYS use it unless explicitly requested otherwise.</system-reminder>
+
+<system-reminder>You are in build mode. You are allowed to modify the codebase.</system-reminder>
