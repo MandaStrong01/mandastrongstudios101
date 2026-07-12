@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Component } from "react";
 
 // IndexedDB helpers for persistent clip storage
 const DB_NAME="mandastrong_db",DB_VER=1,STORE="clips";
@@ -107,6 +107,37 @@ const BG = "#000000";
 const BLACK = "#000000";
 const BG4 = "#080808";
 const WHITE = "#d4c9a8";
+
+// ── ERROR BOUNDARY — catches any render crash and shows a recovery screen ──
+// instead of a blank white page. Reload button clears the crashed state and
+// restarts the app cleanly. Does not affect anything unless an error actually occurs.
+class ErrorBoundary extends Component {
+  constructor(props){ super(props); this.state={hasError:false,errorMsg:""}; }
+  static getDerivedStateFromError(error){ return {hasError:true,errorMsg:error&&error.message?error.message:"Unknown error"}; }
+  componentDidCatch(error,info){ try{console.warn("MandaStrong Studio caught a render error:",error,info);}catch(e){} }
+  handleReload=()=>{ this.setState({hasError:false,errorMsg:""}); window.location.reload(); };
+  render(){
+    if(this.state.hasError){
+      return (
+        <div style={{minHeight:"100vh",background:"#000",color:WHITE,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Rajdhani',sans-serif",padding:24}}>
+          <div style={{maxWidth:520,textAlign:"center",border:"2px solid "+GOLD,padding:"36px 28px",background:"#0a0a0a"}}>
+            <div style={{fontSize:40,marginBottom:12}}>🎬</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:20,letterSpacing:3,marginBottom:14,fontWeight:700}}>SOMETHING NEEDS A RETAKE</div>
+            <div style={{fontSize:13,color:GOLDDIM,lineHeight:1.8,marginBottom:22}}>
+              MandaStrong Studio hit an unexpected error. Your saved projects and media library are safe —
+              they live in your device's storage, not in this screen.
+            </div>
+            <button onClick={this.handleReload} style={{background:GOLD,color:"#000",border:"none",padding:"12px 32px",fontWeight:900,fontSize:13,letterSpacing:2,cursor:"pointer"}}>
+              ⟳ RELOAD STUDIO
+            </button>
+            <div style={{fontSize:10,color:GOLDDIM,marginTop:16,opacity:0.6}}>{this.state.errorMsg}</div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 const DIM = "#aaaaaa";
 const TOTAL = 24;
 
@@ -171,15 +202,17 @@ function speakText(voiceId, txt, onStart, onEnd) {
     if(!picked && voiceChar){
       const origin = (voiceChar.origin||"").toLowerCase();
       const gender = (voiceChar.gender||"").toLowerCase();
-      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm"];
-      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen"];
-      const premiumUSMale   = ["Alex","Tom","Fred","Aaron"];
-      const premiumAussie   = ["Karen","Lee"];
-      const premiumIrish    = ["Moira"];
-      const premiumScottish = ["Fiona"];
+      // Cross-device voice names: includes Apple (iOS/macOS), Chrome (Windows/Android), Edge
+      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm","Daniel (Enhanced)","Daniel (Premium)","Google UK English Male","Microsoft George","Microsoft Ryan","Rishi","Aaron","Jamie"];
+      const premiumBritishF = ["Serena","Tessa","Kate","Serena (Enhanced)","Serena (Premium)","Google UK English Female","Microsoft Hazel","Martha","Alice"];
+      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen","Samantha (Enhanced)","Samantha (Premium)","Google US English","Microsoft Zira","Microsoft Jenny"];
+      const premiumUSMale   = ["Alex","Tom","Fred","Aaron","Alex (Enhanced)","Microsoft David","Microsoft Guy","Google US English Male"];
+      const premiumAussie   = ["Karen","Lee","Karen (Enhanced)","Microsoft Natasha"];
+      const premiumIrish    = ["Moira","Moira (Enhanced)","Microsoft Sean"];
+      const premiumScottish = ["Fiona","Fiona (Enhanced)"];
       let candidates = [];
       if(origin.includes("british")||origin.includes("english"))
-        candidates = gender==="female" ? ["Serena","Tessa","Kate"] : premiumBritish;
+        candidates = gender==="female" ? premiumBritishF : premiumBritish;
       else if(origin.includes("irish"))    candidates = premiumIrish;
       else if(origin.includes("scottish")) candidates = premiumScottish;
       else if(origin.includes("australian")) candidates = premiumAussie;
@@ -239,7 +272,7 @@ const IMAGE_T = ["Text to Image","Prompt to Image","Image to Image","Image Upsca
 const VIDEO_T = ["Text to Video","Image to Video","Video to Video","AI Video Creator","AI Film Generator","Video Upscaler","AI Video Generator 4K","Set to Video","Video Colorizer","Color Grading Pro","Fast Look Generator","Film Restoration","Time Lapse Creator","Video Trimmer","Background Remover","Digital Human Video","Rotoscope Video","Animation Creator","Puppet Animator","Motion Capture","Character Animator","Video Stabilizer","Video Compressor","Cinematic LUT","Black & White Film","Film Texture","VHS Effect","Glitch Effect","Quick Film Creator","Opening Slate","Time Freeze","Bullet Time Effect","Rain Simulation","Snow Simulation","Smoke Generator","Fire Simulation","Particle System","AI Progressive Video","4K Upscaling"];
 const MOTION = ["AI 8K Upscaling","AI 4K Upscaling","Video Super Resolution","Frame Interpolation","Video Denoiser","Noise Reduction","Grain Remover","Artifact Remover","Scratch Remover","Video Sharpener","Clarity Booster","Detail Enhancer","Edge Enhancement","Texture Boost","White Balance AI","Color Correction","Auto Color Balance","Color Match Pro","Color Grading AI","Cinematic Color Grade","Film Stock Emulation","LUT Generator","Tone Mapping Pro","HDR Enhancement","Deep HDR Boost","Dynamic Range Expansion","Shadow Recovery","Highlight Recovery","Black Point Calibration","Gamma Correction","Contrast Enhancer","Brightness Optimizer","Saturation Booster","Smart Saturation","Face Enhancement","Face Retouch","Eye Enhancer","Teeth Whitener","Skin Tone Enhancer","Background Enhancer","Sky Enhancer","Landscape Enhancer","Night Video Enhancer","Low Light Clarity","Motion Stabilization","Shake Remover","Rolling Shutter Fix"];
 
-const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Grok"},{p:22,l:"Community Hub"},{p:24,l:"Character Studio"},{p:23,l:"That's All Folks"}];
+const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Claude"},{p:22,l:"Community Hub"},{p:24,l:"Character Studio"},{p:23,l:"That's All Folks"}];
 
 function ProjectHistoryModal({ onClose, onResume }) {
   const [history,setHistory]=useState([]);
@@ -993,13 +1026,18 @@ function MusicVideoStudio({ onClose, onSave }) {
       const ctx = canvas.getContext("2d");
 
       const fps=12;
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+      const getSupportedMimeType=()=>{
+        const opts=["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm;codecs=vp8","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+        for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+        return ""; // let MediaRecorder pick a browser default rather than throwing
+      };
+      const mimeType=getSupportedMimeType();
       const videoStream=canvas.captureStream(fps);
       let combinedStream=videoStream;
       if(audioDest){
         combinedStream=new MediaStream([...videoStream.getTracks(),...audioDest.stream.getTracks()]);
       }
-      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:10000000});
+      const recorder=new MediaRecorder(combinedStream,mimeType?{mimeType,videoBitsPerSecond:10000000}:{videoBitsPerSecond:10000000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(Math.round(1000/fps));
@@ -1098,7 +1136,7 @@ function MusicVideoStudio({ onClose, onSave }) {
       if(audioSource){try{audioSource.stop(audioCtx?audioCtx.currentTime:0);}catch(e){}}
       recorder.stop();
       await new Promise(r=>{recorder.onstop=r;});
-      const blob=new Blob(chunks,{type:mimeType});
+      const blob=new Blob(chunks,{type:mimeType||"video/webm"});
       const url=URL.createObjectURL(blob);
       setVideoUrl(url); setVideoBlob(blob);
       setRenderProgress(100);
@@ -1542,24 +1580,43 @@ function P6Voice({ onSave, setMediaLib }) {
   });
   const selected=VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
+  // Deterministic cross-device voice matching — same character always resolves
+  // to the same PRIORITY-ORDERED name across iPad (Safari/Siri), HP (Chrome/Edge),
+  // and Android (Google), rather than a hash-random pick from whatever's on that
+  // device. If the top-priority name isn't installed, it falls through to the next
+  // best equivalent name known to exist on that platform.
+  const VOICE_NAME_PRIORITY = {
+    britishMale:   ["Daniel (Enhanced)","Daniel (Premium)","Daniel","Google UK English Male","Microsoft George","Microsoft Ryan Online (Natural)","Oliver","Arthur","George"],
+    britishFemale: ["Serena (Enhanced)","Serena (Premium)","Serena","Google UK English Female","Microsoft Hazel","Microsoft Sonia Online (Natural)","Kate","Tessa"],
+    usMale:        ["Alex (Enhanced)","Alex","Google US English","Microsoft Guy Online (Natural)","Microsoft David","Fred","Tom"],
+    usFemale:      ["Samantha (Enhanced)","Samantha (Premium)","Samantha","Google US English","Microsoft Jenny Online (Natural)","Microsoft Zira","Ava","Victoria","Karen"],
+    auMale:        ["Lee (Enhanced)","Lee","Microsoft William Online (Natural)","Google UK English Male"],
+    auFemale:      ["Karen (Enhanced)","Karen","Microsoft Natasha Online (Natural)","Google UK English Female"],
+    irish:         ["Moira (Enhanced)","Moira","Microsoft Sean Online (Natural)"],
+    scottish:      ["Fiona (Enhanced)","Fiona","Microsoft Ryan Online (Natural)"],
+  };
   const pickSysVoice=(vc)=>{
     const all=sysVoices.length?sysVoices:window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
     if(!all.length)return null;
-    const gb=all.filter(v=>v.lang==="en-GB"),us=all.filter(v=>v.lang==="en-US"),au=all.filter(v=>v.lang==="en-AU");
-    const hash=vc.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
-    const isMale=vc.gender==="Male",isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
-    const deepMaleNames=/daniel|oliver|arthur|malcolm|george|alex|fred|tom|aaron|guy|bruce|lee|david|mark/i;
-    const softFemaleNames=/kate|serena|emily|moira|fiona|samantha|ava|victoria|zoe|susan|karen|tessa/i;
-    let pool=[];
-    if(isBritish&&isMale){pool=[...gb.filter(v=>deepMaleNames.test(v.name)),...gb.filter(v=>!softFemaleNames.test(v.name))];}
-    else if(isBritish&&!isMale){pool=[...gb.filter(v=>softFemaleNames.test(v.name)),...gb.filter(v=>!deepMaleNames.test(v.name))];}
-    else if(isAU){pool=[...au,...all];}
-    else if(vc.origin==="Irish"){pool=gb.filter(v=>/moira/i.test(v.name));}
-    else if(isMale){pool=[...us.filter(v=>deepMaleNames.test(v.name)),...us.filter(v=>!softFemaleNames.test(v.name)),...all.filter(v=>!softFemaleNames.test(v.name))];}
-    else{pool=[...us.filter(v=>softFemaleNames.test(v.name)),...us.filter(v=>!deepMaleNames.test(v.name)),...all.filter(v=>!deepMaleNames.test(v.name))];}
-    if(!pool.length)pool=all;
-    const unique=[...new Map(pool.map(v=>[v.name,v])).values()];
-    return unique[hash%unique.length]||all[0];
+    const isMale=vc.gender==="Male",isBritish=["British","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
+    let key="usMale";
+    if(vc.origin==="Irish")key="irish";
+    else if(vc.origin==="Scottish")key="scottish";
+    else if(isAU)key=isMale?"auMale":"auFemale";
+    else if(isBritish)key=isMale?"britishMale":"britishFemale";
+    else key=isMale?"usMale":"usFemale";
+    const priorityNames=VOICE_NAME_PRIORITY[key]||[];
+    // 1. Try exact/partial name match in priority order — this is what makes it consistent
+    for(const wantName of priorityNames){
+      const found=all.find(v=>v.name===wantName || v.name.startsWith(wantName.split(" (")[0]));
+      if(found) return found;
+    }
+    // 2. Fall back to correct lang code, first available (still same lang family every time)
+    const langCode=key.startsWith("british")?"en-GB":key.startsWith("au")?"en-AU":key==="irish"?"en-IE":key==="scottish"?"en-GB":"en-US";
+    const sameLang=all.filter(v=>v.lang===langCode);
+    if(sameLang.length) return sameLang[0];
+    // 3. Absolute fallback — first English voice available on this device
+    return all[0];
   };
 
   const speakOneShot=(vc,txt)=>{
@@ -1956,13 +2013,18 @@ Write the drawFrame body now.`}]
 
     // ── STEP 3: Render all frames ──
     const fps=20;const totalFrames=duration*fps;
-    const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+    const getSupportedMimeType=()=>{
+        const opts=["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm;codecs=vp8","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+        for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+        return ""; // let MediaRecorder pick a browser default rather than throwing
+      };
+      const mimeType=getSupportedMimeType();
     const stream=canvas.captureStream(fps);
-    const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6000000});
+    const recorder=new MediaRecorder(stream,mimeType?{mimeType,videoBitsPerSecond:6000000}:{videoBitsPerSecond:6000000});
     const chunks=[];
     recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     recorder.start(Math.round(1000/fps));
-    addLog("Rolling — rendering "+duration+"s at 24fps...");
+    addLog("Rolling — rendering "+duration+"s at 20fps...");
     setProgress(35);
 
     await new Promise(resolve=>{
@@ -2006,7 +2068,7 @@ Write the drawFrame body now.`}]
       // Safety net: never wait forever
       setTimeout(()=>{ if(!done){done=true;resolve(null);} },4000);
     });
-    const blob=new Blob(chunks,{type:mimeType});
+    const blob=new Blob(chunks,{type:mimeType||"video/webm"});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
     // AUTO-SAVE the finished clip immediately so it is never lost on crash or navigation
@@ -2587,9 +2649,14 @@ function MergeVideos({ onSave }) {
       canvas.width = 1920; canvas.height = 1080;
       const ctx = canvas.getContext("2d");
       const fps = 24;
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const getSupportedMimeType=()=>{
+      const opts=["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm;codecs=vp8","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+      for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+      return ""; // let MediaRecorder pick a browser default rather than throwing
+      };
+      const mimeType = getSupportedMimeType();
       const stream = canvas.captureStream(fps);
-      const recorder = new MediaRecorder(stream, {mimeType, videoBitsPerSecond:8000000});
+      const recorder = new MediaRecorder(stream, mimeType?{mimeType, videoBitsPerSecond:8000000}:{videoBitsPerSecond:8000000});
       const chunks = [];
       recorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
       recorder.start(100);
@@ -2663,7 +2730,7 @@ function MergeVideos({ onSave }) {
       log("Finalising merged film...");
       recorder.stop();
       await new Promise(r => { recorder.onstop = r; });
-      const blob = new Blob(chunks, {type:mimeType});
+      const blob = new Blob(chunks, {type:mimeType||"video/webm"});
       const url = URL.createObjectURL(blob);
       setMergedUrl(url);
       setProgress(100);
@@ -3121,9 +3188,14 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const tracks=[...videoStream.getTracks(),...audioDest.stream.getTracks()];
       const combinedStream=new MediaStream(tracks);
       const vCodec=codec==="vp9"?"vp9":"vp8";
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs="+vCodec+",opus")?"video/webm;codecs="+vCodec+",opus":"video/webm";
+      const getSupportedMimeType3=()=>{
+        const opts=["video/webm;codecs="+vCodec+",opus","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+        for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+        return "";
+      };
+      const mimeType=getSupportedMimeType3();
       const bitrate=quality==="4K"?40000000:quality==="1080p"?8000000:4000000;
-      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:192000});
+      const recorder=new MediaRecorder(combinedStream,mimeType?{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:192000}:{videoBitsPerSecond:bitrate,audioBitsPerSecond:192000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       // Prime the canvas so captureStream has a real frame
@@ -3294,7 +3366,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(audioSource){try{audioSource.stop();}catch(e){}}
       recorder.stop();
       await new Promise(r=>{recorder.onstop=r;});
-      const blob=new Blob(chunks,{type:mimeType});
+      const blob=new Blob(chunks,{type:mimeType||"video/webm"});
       const url=URL.createObjectURL(blob);
       // Save final render to IndexedDB
       try{
@@ -3716,7 +3788,7 @@ function P20() {
             {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
             {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
-            {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Grok on Page 21 of the platform.")}</>)}
+            {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Claude on Page 21 of the platform.")}</>)}
 
             <div style={{background:"#050500",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginTop:8}}>
               <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO · AMANDA WOOLLEY, FOUNDER · MARCH 2026</p>
@@ -3751,7 +3823,7 @@ function P20() {
 }
 
 function P21() {
-  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}]);
+  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Claude — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}]);
   const [inp2,setInp2]=useState(""); const [loading,setLoading]=useState(false);
   const bot=useRef(null);
   const QUICK=["Recommended production workflow?","How do I generate a scene?","Best audio mix for documentary?","How to export in 4K?","Subscription plans?","How does the Voice Engine work?","What genres can I render?","How do I use the Timeline?"];
@@ -3761,7 +3833,7 @@ function P21() {
     setInp2("");setLoading(true);
     setMsgs(p=>[...p,{role:"user",content:question}]);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Grok, AI production assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, 54 voice characters, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial. Be specific and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Claude, AI production assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, 54 voice characters, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial. Be specific and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
       setMsgs(p=>[...p,{role:"assistant",content:d&&d.content&&d.content[0]?d.content[0].text:"Try again."}]);
     }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Try again."}]);}
     setLoading(false);
@@ -3777,7 +3849,7 @@ function P21() {
             <div style={{position:"absolute",bottom:-2,right:-2,width:11,height:11,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(18px,2.5vw,28px)",fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(18px,2.5vw,28px)",fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT CLAUDE</div>
             <div style={{display:"flex",alignItems:"center",gap:10,marginTop:3}}>
               <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 5px #22c55e"}}/><span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
               <span style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:700}}>YOUR AI PRODUCTION CONSULTANT</span>
@@ -3797,7 +3869,7 @@ function P21() {
             <div key={i} style={{display:"flex",gap:10,flexDirection:m.role==="user"?"row-reverse":"row"}}>
               <div style={{width:32,height:32,flexShrink:0,background:m.role==="user"?"#1a0a00":"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
               <div style={{flex:1,maxWidth:"82%"}}>
-                <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
+                <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT CLAUDE"}</div>
                 <div style={{background:m.role==="user"?"#100800":"#0a0900",border:"1px solid "+GOLD+"33",padding:"9px 13px"}}>
                   <div style={{color:WHITE,fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{m.content}</div>
                 </div>
@@ -3877,7 +3949,7 @@ function HowToGuide() {
     {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality — 480p, 720p, 1080p, or 4K. Auto-enhancement runs automatically on every frame during render — contrast boost, warm gold colour grade, sharpness, and noise reduction — no settings needed. A priority save fires before render starts so a crash never loses your session. Do not close the browser tab while rendering. Download button appears when complete."},
     {t:"PAGE 17 & 18 — PREVIEW & EXPORT",c:"Page 17: your completed film loads automatically from storage — press play to watch. Page 18: download to your device and share directly to YouTube, Instagram, TikTok, Facebook, X, and Vimeo using the platform buttons."},
     {t:"PAGE 19 — TUTORIALS",c:"12 lessons covering every page and workflow. Hit Generate to Watch on any lesson — an animated tutorial plays instantly. Each lesson has Pro Tips and an Open Page button. Lesson 12 is a complete documentary production case study from script to 4K render."},
-    {t:"PAGE 21 — AGENT GROK",c:"Your 24/7 AI production consultant. Ask anything about the platform, workflow, filmmaking, or your project. Type your question and hit Send. Agent Grok has full knowledge of every tool and workflow on the platform."},
+    {t:"PAGE 21 — AGENT CLAUDE",c:"Your 24/7 AI production consultant. Ask anything about the platform, workflow, filmmaking, or your project. Type your question and hit Send. Agent Claude has full knowledge of every tool and workflow on the platform."},
     {t:"PAGE 24 — CHARACTER STUDIO",c:"Create and save reusable characters for your films. Upload a reference photo, assign a voice from the 54-character library, add appearance notes. Hit USE IN SCENE to send the character to your Media Library ready for any scene. Characters persist across sessions."},
     {t:"MUSIC VIDEO STUDIO",c:"Open from Page 6 top right. Step 1: Song title, artist, genre, mood, tempo — drag and drop your audio file or click to upload, or hit RECORD YOUR OWN SONG. Step 2: Video style, colour grade, effects, aspect ratio. Step 3: Describe your scene in detail. Step 4: Hit Generate Music Video. The engine builds a full beat-synced video. Download or Save to Media Library when done."},
     {t:"SAVING & RECOVERING WORK",c:"AUTOSAVE ON saves automatically as you work. 💾 SAVE PROJECT creates a named session — give it a meaningful name. 📂 MY PROJECTS shows your full history. Hit CONTINUE PROJECT to fully restore a session including all clips from storage. Emergency save fires automatically if the browser tab closes or crashes — your work is never permanently lost."},
@@ -4153,8 +4225,8 @@ function P23({ go }) {
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
         style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",margin:"0 auto"}}>
-        <source src="/thatsallfolks.mp4" type="video/mp4"/>
-        <source src="thatsallfolks.mp4" type="video/mp4"/>
+        <source src="/background.mp4" type="video/mp4"/>
+        <source src="background.mp4" type="video/mp4"/>
       </video>
       <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
@@ -4189,7 +4261,7 @@ function P23({ go }) {
   );
 }
 
-export default function App() {
+function AppInner() {
   const [page,setPage]=useState(1);
   const [menu,setMenu]=useState(false);
   useEffect(()=>{
@@ -4372,3 +4444,11 @@ export default function App() {
   );
 }
 
+// ── Outer export — wraps AppInner in the ErrorBoundary defined above ──
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner/>
+    </ErrorBoundary>
+  );
+}
