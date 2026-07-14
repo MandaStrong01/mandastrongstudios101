@@ -2304,6 +2304,23 @@ Write the drawFrame body now.`}]
   );
 }
 
+// ── DOWNLOAD APP BUTTON — simple, works everywhere ──
+function DownloadAppButton() {
+  const install = () => {
+    if(window.deferredInstallPrompt){
+      window.deferredInstallPrompt.prompt();
+      window.deferredInstallPrompt.userChoice.then(()=>{ window.deferredInstallPrompt = null; });
+    } else {
+      alert("To install: use your browser menu and choose 'Add to Home Screen' or look for the install icon in your address bar.");
+    }
+  };
+  return (
+    <button onClick={install} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
+      ⬇ DOWNLOAD APP
+    </button>
+  );
+}
+
 function P1({ go }) {
   return (
     <div style={{...Sp}}>
@@ -2335,34 +2352,13 @@ function P1({ go }) {
       </div>
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-          <button onClick={()=>{
-            // Detect device and trigger correct install method
-            const ua = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua);
-            const isAndroid = /android/.test(ua);
-            const isMobile = isIOS || isAndroid;
-            const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
-
-            if(window.deferredInstallPrompt){
-              // Chrome/Edge/Android — native install prompt
-              window.deferredInstallPrompt.prompt();
-              window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
-            } else {
-              // Desktop — look for install icon in address bar
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
-            }
-          }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
-            ⬇ DOWNLOAD APP
-          </button>
+          <DownloadAppButton/>
           <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>BROWSER MENU → ADD TO HOME SCREEN</div>
         </div>
       </div>
     </div>
   );
+
 }
 
 function P2({ go }) {
@@ -2528,13 +2524,9 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    const amandaEmails=["woolleya129@gmail.com"];
-    const amandaPasswords=["Admin","MandaAdmin2026!","amandasox1970!!","admin","ADMIN"];
-    const isAmanda=amandaEmails.includes(email)&&amandaPasswords.includes(pass);
+    const isAmanda=email==="woolleya129@gmail.com"&&pass==="Admin";
     if(isAmanda){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(email==="test@mandastrong.com"&&pass==="Test2026"){
-      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:false});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
       window.open(STRIPE.studio,"_blank");
       alert("To access MandaStrong Studio, please complete your subscription. You will be redirected to our secure payment page.");
@@ -4224,6 +4216,7 @@ function P23({ go }) {
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
       <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
+        onError={e=>{try{e.currentTarget.style.display="none";}catch(err){}}}
         style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",margin:"0 auto"}}>
         <source src="/background.mp4" type="video/mp4"/>
         <source src="background.mp4" type="video/mp4"/>
