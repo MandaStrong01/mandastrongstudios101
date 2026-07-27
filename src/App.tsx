@@ -16,6 +16,118 @@ async function proxyFetch(body){
     return res.json();
   }catch(e){clearTimeout(timeout);throw e;}
 }
+
+// ══════════════════════════════════════════════════════════════════
+// MANDASTRONG ENGINE — real photorealistic footage
+// Single shared client. Every studio page renders through this.
+// ══════════════════════════════════════════════════════════════════
+const ENGINE_URL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate-video";
+const ENGINE_KEY="msk_live_j-HsVOiMDEbwfqLInIsNTrnMreDvr-VKKbPNf21oink";
+const engineHeaders={"Content-Type":"application/json","x-engine-key":ENGINE_KEY};
+
+// The engine answers with .url; older builds looked for .output. Accept either.
+const pickEngineUrl=(d)=>{ if(!d||typeof d!=="object")return""; const v=d.url||d.output||d.video||""; return (typeof v==="string"&&v.indexOf("http")===0)?v:""; };
+
+async function engineCall(body){
+  const res=await fetch(ENGINE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify(body)});
+  return res.json();
+}
+
+// ── CINEMA VOICE ENGINE ──────────────────────────────────────────
+// Server-side speech. Same voice on every device — iPad, Galaxy, HP.
+const VOICE_URL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate-voice";
+let __msAudio=null;
+
+async function engineSpeak(text,meta){
+  meta=meta||{};
+  try{
+    const res=await fetch(VOICE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify({
+      text:String(text||"").slice(0,3500),
+      voice:meta.voice||"",
+      gender:meta.gender||"",
+      origin:meta.origin||"",
+      speed:meta.speed||1
+    })});
+    let d=await res.json();
+    let url=pickEngineUrl(d);
+    if(url) return url;
+    if(d&&d.id){
+      for(let i=0;i<40;i++){
+        await new Promise(r=>setTimeout(r,1500));
+        const p=await fetch(VOICE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify({id:d.id})});
+        const pd=await p.json();
+        url=pickEngineUrl(pd);
+        if(url) return url;
+        if(pd&&(pd.status==="failed"||pd.status==="canceled")) return "";
+      }
+    }
+  }catch(e){}
+  return "";
+}
+
+function playEngineAudio(url,volume){
+  return new Promise((resolve)=>{
+    try{
+      const a=new Audio(url);
+      a.volume=typeof volume==="number"?Math.max(0,Math.min(1,volume)):1;
+      __msAudio=a;
+      a.onended=()=>resolve(true);
+      a.onerror=()=>resolve(false);
+      a.play().catch(()=>resolve(false));
+    }catch(e){resolve(false);}
+  });
+}
+
+function stopEngineAudio(){
+  try{ if(__msAudio){ __msAudio.pause(); __msAudio.currentTime=0; __msAudio=null; } }catch(e){}
+}
+
+// Health check — tells you if the engine has a provider key installed.
+async function engineStatus(){
+  try{ const r=await fetch(ENGINE_URL); return await r.json(); }catch(e){ return {ok:false,message:"Engine unreachable"}; }
+}
+
+// Starts one render and polls until the footage lands.
+// Returns a playable URL, or "" if the engine could not deliver.
+async function engineRender(prompt,opts){
+  opts=opts||{};
+  try{
+    const body={prompt:String(prompt||"").slice(0,1800),duration:opts.duration||5,aspect_ratio:opts.aspect_ratio||"16:9",cheap_only:true};
+    if(opts.image)body.image=opts.image;
+    const started=await engineCall(body);
+    if(!started||started.error)return "";
+    let url=pickEngineUrl(started);
+    const pid=started.id;
+    if(!url&&!pid)return "";
+    for(let i=0;i<100&&!url&&pid;i++){
+      await new Promise(r=>setTimeout(r,3000));
+      if(opts.onTick)opts.onTick(i);
+      const pd=await engineCall({id:pid});
+      if(pd&&pd.status==="failed")return "";
+      url=pickEngineUrl(pd);
+    }
+    return url||"";
+  }catch(e){ return ""; }
+}
+
+// Renders several shots at once. Much faster than one after another.
+async function engineRenderMany(prompts,opts){
+  const results=await Promise.all(prompts.map(p=>engineRender(p,opts)));
+  return results.filter(Boolean);
+}
+
+// Pulls footage into the browser so canvas can draw it without tainting.
+async function engineToLocalVideo(url){
+  try{
+    const res=await fetch(url);
+    const blob=await res.blob();
+    const v=document.createElement("video");
+    v.src=URL.createObjectURL(blob);
+    v.muted=true; v.loop=true; v.playsInline=true; v.crossOrigin="anonymous";
+    await new Promise((res2)=>{ v.onloadeddata=()=>res2(null); v.onerror=()=>res2(null); setTimeout(()=>res2(null),15000); });
+    return v;
+  }catch(e){ return null; }
+}
 const saveClipToDB=async(id,blob,name,type)=>{try{const db=await openDB();const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put({id,blob,name,type});await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=j;});}catch(e){console.warn("DB save failed",e);}};
 const loadClipFromDB=async(id)=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).get(id);req.onsuccess=()=>res(req.result);req.onerror=rej;});}catch(e){return null;}};
 const getAllClipsFromDB=async()=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).getAll();req.onsuccess=()=>res(req.result||[]);req.onerror=rej;});}catch(e){return[];}};
@@ -1073,6 +1185,79 @@ function MusicVideoStudio({ onClose, onSave }) {
         ctx.restore();
       };
 
+      // ══════════════════════════════════════════════════════════════
+      // MANDASTRONG ENGINE — real footage, not drawn shapes
+      // The shot list renders in parallel, then the canvas below
+      // composites it with your grade, your beats and your audio.
+      // If the engine can't deliver, the built-in renderer still runs.
+      // ══════════════════════════════════════════════════════════════
+      let engineClips=[];
+      try{
+        const shotCount=Math.min(4,Math.max(3,Math.round(totalDur/45))); // capped at 4 to protect render spend
+        const ANGLES=[
+          "wide establishing shot, full scene visible",
+          "medium shot, subject centred in frame",
+          "slow push in, shallow depth of field",
+          "close detail shot, hands and texture",
+          "low angle looking up, dramatic",
+          "slow lateral tracking shot",
+          "framed from behind, subject facing away",
+          "wide static held frame, atmospheric"
+        ];
+        const look=[config.videoStyle,config.colorGrade,(config.effects||[]).join(", ")].filter(Boolean).join(", ");
+        const shots=[];
+        for(let i=0;i<shotCount;i++){
+          shots.push(sceneDesc+". "+ANGLES[i%ANGLES.length]+". "+look+". Photorealistic, cinematic, natural motion, 35mm film, no text, no captions.");
+        }
+        addLog("Cinema Engine \u2014 rendering "+shotCount+" photorealistic shots...");
+        setRenderProgress(8);
+        let done=0;
+        const ar=(config.aspectRatio||"").indexOf("9:16")===0?"9:16":"16:9";
+        const seedImg=(typeof config.refMedia==="string"&&config.refMedia.indexOf("data:")===0)?config.refMedia:"";
+        const urls=await Promise.all(shots.map(s=>engineRender(s,{duration:5,aspect_ratio:ar,image:seedImg})
+          .then(u=>{ done++; addLog("Shot "+done+"/"+shotCount+(u?" \u2713":" \u2014 unavailable")); setRenderProgress(Math.min(26,8+done*2)); return u; })));
+        const good=urls.filter(Boolean);
+        if(good.length){
+          addLog("Loading footage into the compositor...");
+          const vids=await Promise.all(good.map(u=>engineToLocalVideo(u)));
+          engineClips=vids.filter(Boolean);
+          for(const v of engineClips){ try{ await v.play(); }catch(e){} }
+          addLog("\u2713 "+engineClips.length+" live shots ready \u2014 compositing with your grade and beats");
+        } else {
+          const diag=await engineStatus();
+          addLog((diag&&diag.ok===false?("Cinema Engine: "+(diag.message||"unavailable")):"Engine returned no footage")+" \u2014 using built-in renderer");
+        }
+      }catch(e){ addLog("Cinema Engine offline \u2014 using built-in renderer"); }
+
+      // Shot length follows the editing style you picked on Step 2
+      const CUTLEN={"Fast Cuts / High Energy":1.1,"Slow & Deliberate":5.5,"Long Takes":8,"Beat-Synced Cuts":0,"Montage Style":2.2};
+      const shotLen=CUTLEN[config.cuts]!==undefined?CUTLEN[config.cuts]:4;
+      const cutPoints=[];
+      if(shotLen===0&&beatGrid.length){
+        let lastCut=-99;
+        beatGrid.forEach(b=>{ if(b-lastCut>1.4){ cutPoints.push(b); lastCut=b; } });
+      }
+      const clipAt=(sec)=>{
+        if(!engineClips.length)return null;
+        if(cutPoints.length){
+          let n=0;
+          for(let i=0;i<cutPoints.length;i++){ if(sec>=cutPoints[i]) n=i+1; }
+          return engineClips[n%engineClips.length];
+        }
+        return engineClips[Math.floor(sec/shotLen)%engineClips.length];
+      };
+      // Fills the frame without squashing. Slight overscan so the
+      // parallax drift never exposes a black edge.
+      const drawClip=(c,v,W2,H2)=>{
+        if(!v||!v.videoWidth)return false;
+        const vr=v.videoWidth/v.videoHeight, cr=W2/H2;
+        let dw,dh;
+        if(vr>cr){ dh=H2; dw=H2*vr; } else { dw=W2; dh=W2/vr; }
+        dw*=1.08; dh*=1.08;
+        c.drawImage(v,(W2-dw)/2,(H2-dh)/2,dw,dh);
+        return true;
+      };
+
       setRenderProgress(30);
       addLog("Rendering "+totalDur.toFixed(0)+"s film at 12fps...");
 
@@ -1117,7 +1302,12 @@ function MusicVideoStudio({ onClose, onSave }) {
           ctx.save();
           ctx.translate(-drift*0.3,0);
 
-          try{ renderFn(ctx,W,H,t,sec,totalDur,beatNow); }
+          try{
+            const liveClip=clipAt(sec);
+            if(!(liveClip&&drawClip(ctx,liveClip,W,H))){
+              renderFn(ctx,W,H,t,sec,totalDur,beatNow);
+            }
+          }
           catch(e){
             // Graceful fallback — keep rendering
             const bg=ctx.createLinearGradient(0,0,0,H);
@@ -1694,7 +1884,7 @@ function P6Voice({ onSave, setMediaLib }) {
     window.speechSynthesis.speak(utt);
   };
 
-  const speakNow=(txt)=>{
+  const speakDevice=(txt)=>{
     window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
     // iOS Safari fix — keepalive ping every 10s
     if(/iphone|ipad|ipod/i.test(navigator.userAgent)){
@@ -1720,7 +1910,32 @@ function P6Voice({ onSave, setMediaLib }) {
     window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);};
   };
 
-  const stop=()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);setSpeaking(false);};
+  // Engine voice first. Identical on every device. Device voice only if the engine cannot deliver.
+  const speakNow=async(txt)=>{
+    window.speechSynthesis.cancel(); stopEngineAudio();
+    if(timerRef.current)clearTimeout(timerRef.current);
+    const chunks=buildChunks(txt); chunksRef.current=chunks; idxRef.current=0;
+    setSpeaking(true);
+    const meta={voice:selected.engineVoice||"",gender:selected.gender||"",origin:selected.origin||"",speed:speed*(selected.rate||0.9)};
+    const first=chunks.find(c=>c&&c.text);
+    if(!first){setSpeaking(false);return;}
+    const probe=await engineSpeak(first.text,meta);
+    if(!probe){ console.log("Cinema Voice Engine unavailable — using device voice"); speakDevice(txt); return; }
+    console.log("\u2713 MANDASTRONG CINEMA VOICE ENGINE \u2014 studio narration ready");
+    let url=probe;
+    for(let i=0;i<chunks.length;i++){
+      const c=chunks[i];
+      if(!c||!c.text) continue;
+      if(i>0){ url=await engineSpeak(c.text,meta); if(!url) continue; }
+      const ok=await playEngineAudio(url,volume);
+      if(!ok){ console.log("Cinema Voice Engine playback blocked — using device voice"); speakDevice(txt); return; }
+      const ap=c.type==="question"?Math.round(pauseLen*1.1):c.type==="sentence"?pauseLen:Math.round(pauseLen*0.4);
+      await new Promise(r=>setTimeout(r,ap));
+    }
+    setSpeaking(false);
+  };
+
+  const stop=()=>{window.speechSynthesis.cancel();stopEngineAudio();if(timerRef.current)clearTimeout(timerRef.current);setSpeaking(false);};
 
   const processAndSpeak=async()=>{
     if(!text.trim())return;setLoading(true);
@@ -1905,7 +2120,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   // Real depth, real volumetric lighting, real atmosphere, real motion
   // ════════════════════════════════════════════════════════════════
   // ════════════════════════════════════════════════════════════════
-  // CINEMAFORGE ENGINE — AI writes a custom drawFrame() per prompt
+  // MANDASTRONG ENGINE — AI writes a custom drawFrame() per prompt
   // Every scene is unique. What you describe is exactly what renders.
   // ════════════════════════════════════════════════════════════════
   const generateVideo=async()=>{
@@ -1941,55 +2156,36 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     try{
       addLog("Cinema Engine — synthesising photorealistic footage...");
       setProgress(12);
-      const engineBody={prompt:prompt.trim(),duration};
-      if(refDataUrl)engineBody.image=refDataUrl;
-      const startRes=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate-video",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(engineBody)
+      const engineUrl=await engineRender(prompt.trim(),{
+        duration,
+        image:refDataUrl||"",
+        onTick:(i)=>{ setProgress(Math.min(88,12+i*2)); addLog("Cinema Engine rendering — "+Math.min(88,12+i*2)+"%"); }
       });
-      const started=await startRes.json();
-      if(started&&!started.error&&(started.id||started.output)){
-        let outUrl=started.output||null;
-        let pid=started.id;
-        // Poll until the footage is ready
-        for(let i=0;i<80&&!outUrl;i++){
-          await new Promise(r=>setTimeout(r,3000));
-          setProgress(Math.min(88,12+i*2));
-          addLog("Cinema Engine rendering — "+Math.min(88,12+i*2)+"%");
-          const pr=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate-video",{
-            method:"POST",headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({action:"status",id:pid})
-          });
-          const pd=await pr.json();
-          if(pd.status==="succeeded"&&pd.output){outUrl=pd.output;break;}
-          if(pd.status==="failed"){addLog("Cinema Engine could not render this scene — using built-in renderer");break;}
-        }
-        if(outUrl){
-          addLog("✓ Cinema Engine complete — downloading footage...");
-          setProgress(92);
-          const vidRes=await fetch(outUrl);
-          const vidBlob=await vidRes.blob();
-          const localUrl=URL.createObjectURL(vidBlob);
-          setVideoUrl(localUrl);
-          setProgress(100);
-          addLog("✓ MANDASTRONG CINEMA ENGINE — photorealistic scene ready");
-          try{
-            const autoId="scene_"+Date.now();
-            const autoName=(title||"Scene")+"_"+duration+"s.mp4";
-            await Promise.race([
-              safeSaveClipToDB(autoId,vidBlob,autoName,"video/mp4"),
-              new Promise(r=>setTimeout(()=>r("timeout"),8000))
-            ]);
-            if(onSave)onSave({id:autoId,name:autoName,type:"video/mp4",url:localUrl,file:new File([vidBlob],autoName,{type:"video/mp4"}),dbId:autoId});
-            setSaved(true);
-            addLog("✓ Saved to Media Library");
-          }catch(e){}
-          setGenerating(false);
-          return;
-        }
-      } else {
-        addLog("Cinema Engine unavailable — using built-in renderer");
+      if(engineUrl){
+        addLog("\u2713 Cinema Engine complete — downloading footage...");
+        setProgress(92);
+        const vidRes=await fetch(engineUrl);
+        const vidBlob=await vidRes.blob();
+        const localUrl=URL.createObjectURL(vidBlob);
+        setVideoUrl(localUrl);
+        setProgress(100);
+        addLog("\u2713 MANDASTRONG CINEMA ENGINE — photorealistic scene ready");
+        try{
+          const autoId="scene_"+Date.now();
+          const autoName=(title||"Scene")+"_"+duration+"s.mp4";
+          await Promise.race([
+            safeSaveClipToDB(autoId,vidBlob,autoName,"video/mp4"),
+            new Promise(r=>setTimeout(()=>r("timeout"),8000))
+          ]);
+          if(onSave)onSave({id:autoId,name:autoName,type:"video/mp4",url:localUrl,file:new File([vidBlob],autoName,{type:"video/mp4"}),dbId:autoId});
+          setSaved(true);
+          addLog("\u2713 Saved to Media Library");
+        }catch(e){}
+        setGenerating(false);
+        return;
       }
+      const diag=await engineStatus();
+      addLog(diag&&diag.ok===false?("Cinema Engine: "+(diag.message||"unavailable")):"Cinema Engine returned no footage — using built-in renderer");
     }catch(e){
       addLog("Cinema Engine offline — using built-in renderer");
     }
@@ -2016,7 +2212,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     // ── STEP 1: Ask Claude to write a custom drawFrame for this exact scene ──
     let drawFnBody="";
     try{
-      addLog("CinemaForge — asking AI to compose your scene...");
+      addLog("MandaStrong Engine — asking AI to compose your scene...");
       setProgress(12);
       const hasPhotos=loadedRefImages.length>0;
       const photoNote=hasPhotos?"The user has uploaded "+loadedRefImages.length+" reference photo(s). The main photo will be drawn as the base layer already — your drawFrame should add atmosphere, lighting, overlays, and cinematic elements ON TOP of the photo base. Do NOT try to redraw the background from scratch.":"No reference photos. You must paint the entire scene from scratch using canvas drawing primitives — sky, ground, environment, people, objects, lighting. Make it look as photorealistic as possible using gradients, layering, and detail.";
@@ -2028,7 +2224,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
         body:JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens:3500,
-          system:`You are CinemaForge, a photorealistic canvas video renderer for MandaStrong Studio. You write JavaScript that renders cinematic scenes frame by frame on an HTML5 canvas.
+          system:`You are the MandaStrong Engine, a photorealistic canvas video renderer for MandaStrong Studio. You write JavaScript that renders cinematic scenes frame by frame on an HTML5 canvas.
 
 ${photoNote}
 
@@ -2196,7 +2392,7 @@ Write the drawFrame body now.`}]
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
     setProgress(100);
-    addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
+    addLog("\u2713 MANDASTRONG ENGINE COMPLETE — "+duration+"s cinema-grade video ready");
     // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
     try{
       const autoId="scene_"+Date.now();
@@ -4243,7 +4439,7 @@ function P20() {
             {sec("CHANGES TO THIS DISCLAIMER",<>{p("MandaStrong Studio reserves the right to update this disclaimer at any time. Continued use of the platform following any update constitutes your acceptance of the revised terms.")}</>)}
 
             <div style={{background:"#050500",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO · MARCH 2026 · mandastrongstudio2026.bolt.host</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO · MARCH 2026 · mandastrong01.bolt.host</p>
             </div>
           </div>
         )}
@@ -4369,7 +4565,7 @@ function P22() {
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
-    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Log in with your credentials or start a free trial. Use the ☰ hamburger menu top left to jump to any of the 24 pages. AUTOSAVE ON is real — your work saves automatically every time you change page, generate a clip, or update your timeline. Hit 💾 SAVE PROJECT to create a named restore point you can return to from MY PROJECTS."},
+    {t:"GETTING STARTED",c:"Open mandastrong01.bolt.host. Log in with your credentials or start a free trial. Use the ☰ hamburger menu top left to jump to any of the 24 pages. AUTOSAVE ON is real — your work saves automatically every time you change page, generate a clip, or update your timeline. Hit 💾 SAVE PROJECT to create a named restore point you can return to from MY PROJECTS."},
     {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI CREATE for instant professional results. Use the search bar to find specific tools. Paste your full narration script and director instructions here using Script to Movie — the AI generates complete video prompts for every chapter. All results save to your Media Library automatically."},
     {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, and origin. Hit TEST on any voice card to hear it. Paste your narration script into the text box. Hit PREPARE TO SPEAK to hear it aloud through your chosen voice. Hit SAVE TO MEDIA LIBRARY to save the narration — it auto-adds to the Audio Track on your timeline. No dragging needed. Blaze voice recommended for the AI For Humanity documentary. Music Video Studio button is top right on this page."},
     {t:"PAGE 8 — VIDEO GENERATOR",c:"Upload a reference photo first — the engine builds the scene around your real photo for photorealistic output. Then paste your scene prompt and hit Generate Scene. Clips save automatically to your Media Library and auto-populate the Video Track on your timeline. The memory guard clears old clips before each render so the browser has room to work. Generate all your scenes then go to Page 13."},
