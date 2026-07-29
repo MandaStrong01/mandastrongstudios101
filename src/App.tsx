@@ -25,12 +25,59 @@ const ENGINE_URL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate
 const ENGINE_KEY="msk_live_j-HsVOiMDEbwfqLInIsNTrnMreDvr-VKKbPNf21oink";
 const engineHeaders={"Content-Type":"application/json","x-engine-key":ENGINE_KEY};
 
+// ── RECORDER FORMAT ───────────────────────────────────────────────
+// iPad and iPhone Safari cannot record WebM at all. Asking it for WebM
+// produces an empty file — that is the "Render produced no video data"
+// fault. Try every real container and use the first this device accepts.
+// MP4 is preferred everywhere: it plays in Photos, iMovie and every editor.
+let __msLastExt = "webm";
+function pickRecordMime(preferCodec){
+  const c = preferCodec === "vp9" ? "vp9" : "vp8";
+  const candidates = [
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=h264,aac",
+    "video/mp4",
+    "video/webm;codecs=" + c + ",opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm"
+  ];
+  try{
+    if(typeof MediaRecorder === "undefined") return "";
+    for(let i=0;i<candidates.length;i++){
+      if(MediaRecorder.isTypeSupported(candidates[i])){
+        __msLastExt = candidates[i].indexOf("mp4") >= 0 ? "mp4" : "webm";
+        return candidates[i];
+      }
+    }
+  }catch(e){}
+  __msLastExt = "webm";
+  return ""; // empty = let the browser choose its own default
+}
+function mimeExt(m){ return (m && m.indexOf("mp4") >= 0) ? "mp4" : "webm"; }
+// Never let an unsupported mimeType kill the recorder — fall back to default.
+function makeRecorder(stream, mime, opts){
+  const o = Object.assign({}, opts || {});
+  if(mime) o.mimeType = mime;
+  let r = null;
+  try{ r = new MediaRecorder(stream, o); }
+  catch(e){
+    try{ r = new MediaRecorder(stream); }
+    catch(e2){ r = null; }
+  }
+  try{ if(r) bumpUsage("render",1); }catch(e){}
+  return r;
+}
+
 // The engine answers with .url; older builds looked for .output. Accept either.
 const pickEngineUrl=(d)=>{ if(!d||typeof d!=="object")return""; const v=d.url||d.output||d.video||""; return (typeof v==="string"&&v.indexOf("http")===0)?v:""; };
 
 async function engineCall(body){
   const res=await fetch(ENGINE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify(body)});
-  return res.json();
+  const d=await res.json();
+  try{ if(d&&!d.error) bumpUsage("gen",1); }catch(e){}
+  return d;
 }
 
 // ── CINEMA VOICE ENGINE ──────────────────────────────────────────
@@ -65,15 +112,88 @@ async function engineSpeak(text,meta){
   return "";
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// AUTOMATIC STEREO
+// Speech engines hand back a MONO file. Played flat it sits as a dot in
+// the middle of the head. This spreads it into a real stereo field: the
+// voice stays centred and intelligible, while two short delayed copies
+// are panned hard left and right underneath it. Applied automatically —
+// the user never has to switch anything on.
+// ══════════════════════════════════════════════════════════════════
+function makeStereoChain(ctx,width){
+  const w = typeof width==="number" ? Math.max(0,Math.min(1,width)) : 0.62;
+  const input  = ctx.createGain();
+  const output = ctx.createGain();
+  try{
+    // centre — carries the intelligibility
+    const dry = ctx.createGain(); dry.gain.value = 1 - (w*0.22);
+    input.connect(dry); dry.connect(output);
+
+    if(!ctx.createStereoPanner || !ctx.createDelay){
+      input.connect(output);
+      return {input,output};
+    }
+    // right side — short Haas delay
+    const dR = ctx.createDelay(0.1); dR.delayTime.value = 0.014;
+    const gR = ctx.createGain();     gR.gain.value      = 0.30*w;
+    const pR = ctx.createStereoPanner(); pR.pan.value   = 0.85;
+    input.connect(dR); dR.connect(gR); gR.connect(pR); pR.connect(output);
+
+    // left side — slightly longer, so the two never phase-cancel
+    const dL = ctx.createDelay(0.1); dL.delayTime.value = 0.021;
+    const gL = ctx.createGain();     gL.gain.value      = 0.26*w;
+    const pL = ctx.createStereoPanner(); pL.pan.value   = -0.85;
+    input.connect(dL); dL.connect(gL); gL.connect(pL); pL.connect(output);
+  }catch(e){
+    try{ input.connect(output); }catch(e2){}
+  }
+  return {input,output};
+}
+let __msStereoCtx = null;
+function stereoCtx(){
+  try{
+    if(!__msStereoCtx) __msStereoCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(__msStereoCtx.state==="suspended") __msStereoCtx.resume().catch(()=>{});
+    return __msStereoCtx;
+  }catch(e){ return null; }
+}
+
 function playEngineAudio(url,volume){
-  return new Promise((resolve)=>{
+  return new Promise(async (resolve)=>{
     try{
-      const a=new Audio(url);
+      // Pull the file local first. A cross-origin element cannot be routed
+      // through Web Audio (it plays silent), so the blob step is what makes
+      // automatic stereo possible at all. If it fails we play flat instead.
+      let src=url, local=false;
+      try{
+        const r=await fetch(url);
+        const b=await r.blob();
+        src=URL.createObjectURL(b);
+        local=true;
+      }catch(e){}
+
+      const a=new Audio(src);
       a.volume=typeof volume==="number"?Math.max(0,Math.min(1,volume)):1;
+      a.crossOrigin="anonymous";
       __msAudio=a;
-      a.onended=()=>resolve(true);
-      a.onerror=()=>resolve(false);
-      a.play().catch(()=>resolve(false));
+
+      if(local){
+        try{
+          const ctx=stereoCtx();
+          if(ctx){
+            const node=ctx.createMediaElementSource(a);
+            const st=makeStereoChain(ctx,0.62);
+            node.connect(st.input);
+            st.output.connect(ctx.destination);
+          }
+        }catch(e){}
+      }
+
+      const done=(v)=>{ try{ if(local) URL.revokeObjectURL(src); }catch(e){} resolve(v); };
+      a.onended=()=>done(true);
+      a.onerror=()=>done(false);
+      a.play().catch(()=>done(false));
     }catch(e){resolve(false);}
   });
 }
@@ -467,7 +587,158 @@ function SaveSessionModal({ onClose, onSave, currentPage, assetCount }) {
   );
 }
 
-function QAMenu({ go, onClose, user }) {
+
+// ══════════════════════════════════════════════════════════════════
+// ACCOUNT & USAGE
+// Every signed-up user gets their own panel: which plan they are on,
+// what they have used this month, and exactly what is left. On screen,
+// no file to open. Admin accounts are unlimited.
+// ══════════════════════════════════════════════════════════════════
+const PLAN_INFO={
+  "Guest":        {label:"GUEST",        price:"0",  renders:3,   gens:10,   storage:"1 GB",   perks:"Preview access",              next:"basic",  nextLabel:"BASIC"},
+  "Basic":        {label:"BASIC PLAN",   price:"20", renders:30,  gens:150,  storage:"10 GB",  perks:"100 AI tools · HD 1080p",     next:"pro",    nextLabel:"PRO"},
+  "Pro":          {label:"PRO PLAN",     price:"30", renders:90,  gens:500,  storage:"100 GB", perks:"300 AI tools · 4K export",    next:"studio", nextLabel:"STUDIO"},
+  "Studio":       {label:"STUDIO PLAN",  price:"50", renders:300, gens:2000, storage:"1 TB",   perks:"600+ AI tools · 8K export",   next:"",       nextLabel:""},
+  "Studio Trial": {label:"STUDIO TRIAL", price:"0",  renders:15,  gens:60,   storage:"1 TB",   perks:"600+ AI tools · 7-day trial", next:"studio", nextLabel:"STUDIO"}
+};
+function planKey(p){
+  const t=String(p||"Guest").toLowerCase();
+  if(t.indexOf("trial")>=0) return "Studio Trial";
+  if(t.indexOf("studio")>=0) return "Studio";
+  if(t.indexOf("pro")>=0) return "Pro";
+  if(t.indexOf("basic")>=0||t.indexOf("creator")>=0) return "Basic";
+  return "Guest";
+}
+function planOf(user){ return PLAN_INFO[planKey(user&&user.plan)]||PLAN_INFO["Guest"]; }
+function isUnlimited(user){ return !!(user&&user.isAdmin); }
+
+const USAGE_KEY="ms_usage";
+function usagePeriod(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function readUsage(){
+  const blank={period:usagePeriod(),renders:0,gens:0};
+  try{
+    const u=JSON.parse(localStorage.getItem(USAGE_KEY)||"null");
+    if(!u||u.period!==usagePeriod()) return blank;
+    return {period:u.period,renders:u.renders||0,gens:u.gens||0};
+  }catch(e){ return blank; }
+}
+function writeUsage(u){
+  try{ localStorage.setItem(USAGE_KEY,JSON.stringify(u)); }catch(e){}
+  try{ window.dispatchEvent(new Event("ms_usage_changed")); }catch(e){}
+}
+function bumpUsage(kind,n){
+  const u=readUsage();
+  if(kind==="render") u.renders+=(n||1); else u.gens+=(n||1);
+  writeUsage(u);
+}
+function useUsage(){
+  const [u,setU]=useState(readUsage);
+  useEffect(()=>{
+    const h=()=>setU(readUsage());
+    window.addEventListener("ms_usage_changed",h);
+    return()=>window.removeEventListener("ms_usage_changed",h);
+  },[]);
+  return u;
+}
+function renewalDate(){
+  const d=new Date(); const n=new Date(d.getFullYear(),d.getMonth()+1,1);
+  return n.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+}
+
+function UsageBar({used,cap,label,unlimited}){
+  const pct = unlimited ? 100 : Math.min(100,Math.round((used/Math.max(1,cap))*100));
+  const col = unlimited ? GOLD : (pct>=90 ? "#ef4444" : pct>=70 ? "#f59e0b" : "#22c55e");
+  const left = Math.max(0,cap-used);
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5,gap:8,flexWrap:"wrap"}}>
+        <span style={{color:WHITE,fontSize:11,letterSpacing:2,fontWeight:700}}>{label}</span>
+        <span style={{color:col,fontSize:11,fontWeight:900,letterSpacing:1}}>
+          {unlimited ? "UNLIMITED" : (used+" USED  ·  "+left+" LEFT  ·  OF "+cap)}
+        </span>
+      </div>
+      <div style={{height:8,background:"#0a0a0a",border:"1px solid "+GOLDDIM}}>
+        <div style={{height:"100%",width:pct+"%",background:unlimited?("linear-gradient(90deg,"+GOLDDIM+","+GOLD+")"):col,transition:"width .35s"}}/>
+      </div>
+    </div>
+  );
+}
+
+// Compact strip — drops into the quick menu so the plan is never hidden
+function PlanStrip({user,onOpen}){
+  const usage=useUsage(); const p=planOf(user); const unl=isUnlimited(user);
+  const left = unl ? "∞" : Math.max(0,p.renders-usage.renders);
+  return (
+    <div onClick={onOpen} style={{background:"#0a0a0a",border:"1px solid "+GOLD,padding:"9px 10px",marginBottom:14,textAlign:"center",cursor:"pointer"}}>
+      <div style={{color:DIM,fontSize:9,letterSpacing:2}}>YOUR PLAN</div>
+      <div style={{color:GOLD,fontWeight:900,fontSize:14,fontFamily:"'Cinzel',serif",letterSpacing:2}}>{unl?"ADMIN":p.label}</div>
+      <div style={{color:WHITE,fontSize:10,letterSpacing:1,marginTop:3}}>{left} RENDERS LEFT</div>
+      <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginTop:4}}>TAP FOR MY ACCOUNT ▸</div>
+    </div>
+  );
+}
+
+function AccountPanel({user,onClose,go}){
+  const usage=useUsage();
+  const p=planOf(user);
+  const unl=isUnlimited(user);
+  const name=(user&&user.name)||"Creator";
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.88)",overflowY:"auto",padding:"24px 14px"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{maxWidth:560,margin:"0 auto",background:"#050505",border:"2px solid "+GOLD,boxShadow:"0 0 40px "+GOLD+"44"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",borderBottom:"1px solid "+GOLDDIM}}>
+          <span style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:14,fontWeight:900,letterSpacing:3}}>MY ACCOUNT</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:GOLD,fontSize:22,cursor:"pointer",lineHeight:1}}>✕</button>
+        </div>
+
+        <div style={{padding:18}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+            <div style={{width:52,height:52,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontSize:24,fontWeight:900,color:"#000",flexShrink:0}}>
+              {String(name).charAt(0).toUpperCase()}
+            </div>
+            <div style={{minWidth:0}}>
+              <div style={{color:WHITE,fontSize:17,fontWeight:900,letterSpacing:1}}>{name}</div>
+              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{unl?"ADMIN · UNLIMITED":p.label}</div>
+            </div>
+          </div>
+
+          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{color:DIM,fontSize:9,letterSpacing:2}}>PLAN</div>
+                <div style={{color:GOLD,fontSize:15,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{unl?"ADMIN":p.label}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:DIM,fontSize:9,letterSpacing:2}}>MONTHLY</div>
+                <div style={{color:GOLD,fontSize:15,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{unl?"—":("$"+p.price)}</div>
+              </div>
+            </div>
+            <div style={{color:WHITE,fontSize:12,marginTop:10,letterSpacing:1}}>{p.perks}</div>
+            <div style={{color:WHITE,fontSize:12,marginTop:4,letterSpacing:1}}>Storage: {p.storage}</div>
+          </div>
+
+          <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:10,fontFamily:"'Cinzel',serif"}}>THIS MONTH</div>
+          <UsageBar label="FILM RENDERS"     used={usage.renders} cap={p.renders} unlimited={unl}/>
+          <UsageBar label="AI GENERATIONS"   used={usage.gens}    cap={p.gens}    unlimited={unl}/>
+          <div style={{color:DIM,fontSize:11,letterSpacing:1,marginBottom:18}}>
+            {unl ? "Admin account — no limits applied." : ("Allowance resets "+renewalDate()+".")}
+          </div>
+
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {!unl && p.next ? (
+              <button onClick={()=>window.open(STRIPE[p.next],"_blank")} style={{...G("gold",false),flex:1,minWidth:170}}>
+                UPGRADE TO {p.nextLabel}
+              </button>
+            ) : null}
+            <button onClick={()=>{onClose();go(4);}} style={{...G("out",false),flex:1,minWidth:150}}>PLANS & BILLING</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QAMenu({ go, onClose, user, onAccount }) {
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,display:"flex"}}>
       <div style={{width:256,background:"#050505",borderRight:"1px solid "+GOLD+"",height:"100vh",overflowY:"auto",padding:18}}>
@@ -478,10 +749,7 @@ function QAMenu({ go, onClose, user }) {
         <div style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",padding:"9px 12px",marginBottom:10,textAlign:"center"}}>
           <div style={{color:"#000",fontWeight:900,fontSize:10,letterSpacing:3,fontFamily:"'Cinzel',serif"}}>MANDA STRONG STUDIO</div>
         </div>
-        <div style={{background:"#0a0a0a",border:"1px solid "+GOLD,padding:"7px 10px",marginBottom:14,textAlign:"center"}}>
-          <div style={{color:DIM,fontSize:9,letterSpacing:2}}>PLAN</div>
-          <div style={{color:GOLD,fontWeight:900,fontSize:14,fontFamily:"'Cinzel',serif"}}>STUDIO</div>
-        </div>
+        <PlanStrip user={user} onOpen={()=>{onClose();if(onAccount)onAccount();}}/>
         {NAV.map(i=>(
           <button key={i.p} onClick={()=>{go(i.p);onClose();}}
             style={{width:"100%",textAlign:"left",background:"none",border:"none",color:WHITE,padding:"8px",cursor:"pointer",fontSize:13,fontWeight:700,display:"block",marginBottom:1,letterSpacing:1}}
@@ -496,7 +764,7 @@ function QAMenu({ go, onClose, user }) {
   );
 }
 
-function Header({ go, setMenu }) {
+function Header({ go, setMenu, user, onAccount }) {
   return (
     <header style={{position:"sticky",top:0,zIndex:500,background:"#000",borderBottom:"1px solid "+GOLD+"",padding:"0 16px",height:52,display:"flex",alignItems:"center",gap:12}}>
       <button onClick={()=>setMenu(true)} style={{background:"none",border:"1px solid "+GOLD,color:GOLD,width:34,height:34,cursor:"pointer",fontSize:16,flexShrink:0}}>☰</button>
@@ -511,7 +779,18 @@ function Header({ go, setMenu }) {
       </div>
       <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
         <div style={{color:"#22c55e",fontSize:11,letterSpacing:2,fontWeight:900}}>● SYSTEM ONLINE</div>
-        <div onClick={()=>go(21)} style={{width:36,height:36,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:19,fontWeight:900,color:"#000",boxShadow:"0 0 18px "+GOLD+"77"}}>G</div>
+        <div onClick={()=>{if(onAccount)onAccount();}} title="My account, plan and usage"
+          style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+          <div style={{textAlign:"right",lineHeight:1.15}}>
+            <div style={{color:GOLDDIM,fontSize:8,letterSpacing:2}}>MY ACCOUNT</div>
+            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,fontFamily:"'Cinzel',serif",whiteSpace:"nowrap"}}>
+              {isUnlimited(user)?"ADMIN":planOf(user).label}
+            </div>
+          </div>
+          <div style={{width:36,height:36,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontSize:19,fontWeight:900,color:"#000",boxShadow:"0 0 18px "+GOLD+"77",flexShrink:0}}>
+            {String((user&&user.name)||"G").charAt(0).toUpperCase()}
+          </div>
+        </div>
       </div>
     </header>
   );
@@ -1269,13 +1548,14 @@ function MusicVideoStudio({ onClose, onSave }) {
       const ctx = canvas.getContext("2d");
 
       const fps=12;
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+      const mimeType=pickRecordMime("vp9");
       const videoStream=canvas.captureStream(fps);
       let combinedStream=videoStream;
       if(audioDest){
         combinedStream=new MediaStream([...videoStream.getTracks(),...audioDest.stream.getTracks()]);
       }
-      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:10000000});
+      const recorder=makeRecorder(combinedStream,mimeType,{videoBitsPerSecond:10000000});
+      if(!recorder){alert("This browser cannot record video. Try Safari or Chrome.");return;}
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(Math.round(1000/fps));
@@ -2335,9 +2615,10 @@ Write the drawFrame body now.`}]
 
     // ── STEP 3: Render all frames ──
     const fps=20;const totalFrames=duration*fps;
-    const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+    const mimeType=pickRecordMime("vp9");
     const stream=canvas.captureStream(fps);
-    const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6000000});
+    const recorder=makeRecorder(stream,mimeType,{videoBitsPerSecond:6000000});
+    if(!recorder){alert("This browser cannot record video. Try Safari or Chrome.");return;}
     const chunks=[];
     recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     recorder.start(Math.round(1000/fps));
@@ -2397,7 +2678,7 @@ Write the drawFrame body now.`}]
     // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
     try{
       const autoId="scene_"+Date.now();
-      const autoName=(title||"Scene")+"_"+duration+"s.webm";
+      const autoName=(title||"Scene")+"_"+duration+"s."+mimeExt(mimeType);
       const saveResult=await Promise.race([
         safeSaveClipToDB(autoId,blob,autoName,"video/webm"),
         new Promise(r=>setTimeout(()=>r("timeout"),6000))
@@ -2482,20 +2763,19 @@ Write the drawFrame body now.`}]
                 e.currentTarget.style.border="2px dashed "+GOLDDIM;
                 e.currentTarget.style.background="transparent";
                 e.currentTarget.style.boxShadow="none";
-                if(refImages.length>=6){alert("Max 6 photos/videos");return;}
-                const files=Array.from(e.dataTransfer.files).slice(0,6-refImages.length);
+                const files=Array.from(e.dataTransfer.files);
                 setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               }}
               style={{border:"2px dashed "+GOLDDIM,padding:"16px 8px",textAlign:"center",marginBottom:6,transition:"border 0.15s, background 0.15s, box-shadow 0.15s",cursor:"copy",background:"transparent"}}>
               <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,pointerEvents:"none"}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
-              <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · up to 6 files · drop zone lights up gold when ready</div>
+              <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · unlimited files · drop zone lights up gold when ready</div>
             </div>
             <input ref={realityPhotoRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" multiple style={{display:"none"}} onChange={e=>{
-              const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
+              const files=Array.from(e.target.files||[]);
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
             }}/>
-            <button onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+            <button onClick={()=>{realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
               📷 {refImages.length===0?"ADD PHOTOS / VIDEOS (UP TO 6)":"ADD MORE — "+refImages.length+"/6 LOADED"}
             </button>
             <a href="https://photos.google.com" target="_blank" rel="noopener noreferrer"
@@ -2866,15 +3146,24 @@ function P4({ go, setUser }) {
   const [email,setEmail]=useState(""); const [pass,setPass]=useState("");
   const [name,setName]=useState(""); const [re,setRe]=useState("");
   const [loginOk,setLoginOk]=useState(false);
+  const [gotPlan,setGotPlan]=useState("");
+  const startOn=(who,planName,isAdmin,link)=>{
+    const u={name:who,plan:planName,isAdmin:!!isAdmin};
+    setUser(u);
+    try{localStorage.setItem("ms_user",JSON.stringify(u));}catch(e){}
+    setGotPlan(planName);
+    if(link)window.open(link,"_blank");
+    setTimeout(()=>go(5),1700);
+  };
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
     const amandaEmails=["woolleya129@gmail.com"];
     const amandaPasswords=["Admin","MandaAdmin2026!","amandasox1970!!","admin","ADMIN"];
     const isAmanda=amandaEmails.includes(email)&&amandaPasswords.includes(pass);
     if(isAmanda){
-      setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
+      setLoginOk(true);startOn("Amanda","Studio",true,"");
     } else if(email==="test@mandastrong.com"&&pass==="Test2026"){
-      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:false});go(5);},800);
+      setLoginOk(true);startOn("Studio User","Studio",false,"");
     } else if(email.includes("@")&&pass.length>0){
       window.open(STRIPE.studio,"_blank");
       alert("To access MandaStrong Studio, please complete your subscription. You will be redirected to our secure payment page.");
@@ -2903,6 +3192,9 @@ function P4({ go, setUser }) {
             <input value={pass} onChange={e=>setPass(e.target.value)} type="password" placeholder="Password" style={{...inp,marginBottom:16}}/>
             {loginOk&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",marginBottom:8}}>
               <span style={{color:"#22c55e",fontWeight:900,fontSize:14,letterSpacing:2}}>✓ LOGIN SUCCESSFUL</span>
+              {gotPlan&&<div style={{color:WHITE,fontSize:12,letterSpacing:1,marginTop:5}}>
+                You are on the <b style={{color:GOLD}}>{planOf({plan:gotPlan}).label}</b> — {planOf({plan:gotPlan}).renders} renders and {planOf({plan:gotPlan}).gens} generations a month.
+              </div>}
             </div>}
             <button onClick={login} style={{...G("gold",false),width:"100%",padding:"12px"}}>{loginOk?"✓ ENTERING STUDIO...":"SIGN IN TO STUDIO"}</button>
           </div>
@@ -2912,7 +3204,13 @@ function P4({ go, setUser }) {
             <h2 style={{...H1,fontSize:18,marginBottom:18}}>CREATE ACCOUNT</h2>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your Name" style={inp}/>
             <input value={re} onChange={e=>setRe(e.target.value)} placeholder="Email address" style={{...inp,marginBottom:16}}/>
-            <button onClick={()=>{setUser({name:name||"Creator",plan:"Studio Trial",isAdmin:false});window.open(STRIPE.studio,"_blank");go(5);}}
+            {gotPlan==="Studio Trial"&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",marginBottom:10}}>
+              <span style={{color:"#22c55e",fontWeight:900,fontSize:13,letterSpacing:2}}>✓ ACCOUNT CREATED</span>
+              <div style={{color:WHITE,fontSize:12,letterSpacing:1,marginTop:5}}>
+                You are on the <b style={{color:GOLD}}>STUDIO TRIAL</b> — {PLAN_INFO["Studio Trial"].renders} renders and {PLAN_INFO["Studio Trial"].gens} generations included. Your usage is on the MY ACCOUNT button, top right.
+              </div>
+            </div>}
+            <button onClick={()=>startOn(name||"Creator","Studio Trial",false,STRIPE.studio)}
               style={{width:"100%",padding:"12px",background:"#22c55e",border:"none",color:"#000",fontWeight:900,fontSize:13,cursor:"pointer",letterSpacing:2}}>START FREE TRIAL — $0</button>
           </div>
           <div style={{...Card(),textAlign:"center"}}>
@@ -2924,7 +3222,7 @@ function P4({ go, setUser }) {
         </div>
         <div style={{textAlign:"center",marginBottom:24,display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
           <button onClick={()=>{try{const m=JSON.parse(localStorage.getItem("ms_medialib")||"[]");const t=JSON.parse(localStorage.getItem("ms_timeline")||"{}");const u=JSON.parse(localStorage.getItem("ms_user")||"{}");const p=JSON.parse(localStorage.getItem("ms_page")||"5");if(m.length>0||Object.keys(t).length>0){if(u&&u.name)setUser(u);go(p);}else{alert("No saved project found.");}}catch(e){alert("Could not load project.");}}} style={{...G("gold",false),padding:"12px 32px"}}>📂 OPEN PROJECT</button>
-          <button onClick={()=>{setUser({name:"Creator",plan:"Guest",isAdmin:false});go(5);}} style={{...G("out",false),padding:"12px 32px"}}>✦ NEW PROJECT</button>
+          <button onClick={()=>startOn("Creator","Guest",false,"")} style={{...G("out",false),padding:"12px 32px"}}>✦ NEW PROJECT</button>
         </div>
         <h2 style={{...H1,fontSize:22,textAlign:"center",marginBottom:22}}>SUBSCRIPTION PLANS</h2>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
@@ -2997,9 +3295,10 @@ function MergeVideos({ onSave }) {
       canvas.width = 1920; canvas.height = 1080;
       const ctx = canvas.getContext("2d");
       const fps = 24;
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const mimeType = pickRecordMime("vp9");
       const stream = canvas.captureStream(fps);
-      const recorder = new MediaRecorder(stream, {mimeType, videoBitsPerSecond:8000000});
+      const recorder = makeRecorder(stream, mimeType, {videoBitsPerSecond:8000000});
+      if(!recorder){alert("This browser cannot record video. Try Safari or Chrome.");return;}
       const chunks = [];
       recorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
       recorder.start(100);
@@ -3078,7 +3377,7 @@ function MergeVideos({ onSave }) {
       setProgress(100);
       log("✓ Merge complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+clips.length+" clips combined");
 
-      const fn = "MandaStrong_Merged_"+Date.now()+".webm";
+      const fn = "MandaStrong_Merged_"+Date.now()+"."+mimeExt(mimeType);
       try {
         const clipId = "merge_"+Date.now();
         await safeSaveClipToDB(clipId, blob, fn, "video/webm");
@@ -3539,8 +3838,34 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(audioAsset){
         // If it's a text narration asset, speak it live via Web Speech API during render
         if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
-          liveNarration=true;
-          log("✓ Narration ready — will speak live during render");
+          // Narration used to be SPOKEN LIVE through the device speaker while
+          // recording. Speaker output is never part of the audio graph, so it
+          // could never be captured — that is why finished films came out
+          // silent. Now we render the voice to a real audio file first and
+          // feed it into the recorder, so it lands inside the film.
+          log("Narration: rendering voice through the Cinema Voice Engine...");
+          try{
+            const vObj=(typeof VOICE_CHARACTERS!=="undefined")?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
+            const vMeta={
+              voice:(vObj&&vObj.engineVoice)||audioAsset.voice||"",
+              gender:(vObj&&vObj.gender)||"",
+              origin:(vObj&&vObj.origin)||"",
+              speed:audioAsset.speed||(vObj&&vObj.rate)||1
+            };
+            const vUrl=await engineSpeak(audioAsset.text,vMeta);
+            if(vUrl){
+              const vResp=await fetch(vUrl);
+              const vArr=await vResp.arrayBuffer();
+              audioBuffer=await audioCtx.decodeAudioData(vArr);
+              log("✓ Narration baked into film: "+audioBuffer.duration.toFixed(1)+"s");
+            } else {
+              liveNarration=true;
+              log("⚠ Voice engine did not answer — narration will play live and may not record");
+            }
+          }catch(e){
+            liveNarration=true;
+            log("⚠ Narration bake failed ("+e.message+") — falling back to live speech");
+          }
         } else {
           try{
             let audioBlob=null;
@@ -3564,7 +3889,22 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           }catch(e){log("Audio load failed: "+e.message+" — video only");}
         }
       }
-      if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
+      if(audioBuffer){
+        audioSource=audioCtx.createBufferSource();
+        audioSource.buffer=audioBuffer;
+        // Automatic stereo — spread before it reaches the recorder, so the
+        // width is baked into the exported film, not just the monitor mix.
+        try{
+          const st=makeStereoChain(audioCtx,0.62);
+          audioSource.connect(st.input);
+          st.output.connect(audioDest);
+          st.output.connect(audioCtx.destination);
+          log("Stereo field applied \u2014 voice centred, ambience widened");
+        }catch(e){
+          audioSource.connect(audioDest);
+          audioSource.connect(audioCtx.destination);
+        }
+      }
       // Draw several real frames BEFORE capturing so the stream is definitely live
       for(let w=0;w<5;w++){
         ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
@@ -3582,7 +3922,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const tracks=[...videoStream.getTracks(),...audioDest.stream.getTracks()];
       const combinedStream=new MediaStream(tracks);
       const vCodec=codec==="vp9"?"vp9":"vp8";
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs="+vCodec+",opus")?"video/webm;codecs="+vCodec+",opus":"video/webm";
+      const mimeType=pickRecordMime(vCodec);
+      log("Recording format: "+(mimeType||"browser default")+" (."+mimeExt(mimeType)+")");
       // ── ADAPTIVE BITRATE — caps total memory so long films finish encoding ──
       // The end-of-render crash was memory: chunks pile up all render, then the
       // final Blob build doubles them. iPad Safari kills the tab (~1.4GB).
@@ -3593,7 +3934,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const safeBitrate=Math.floor(budgetBits/totalFilmSec);
       const bitrate=Math.min(requested,Math.max(2000000,safeBitrate));
       if(bitrate<requested)log("Adaptive bitrate: "+(bitrate/1000000).toFixed(1)+"Mbps for "+Math.round(totalFilmSec)+"s film — keeps memory safe to the end");
-      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:128000});
+      const recorder=makeRecorder(combinedStream,mimeType,{videoBitsPerSecond:bitrate,audioBitsPerSecond:128000});
+      if(!recorder){log("\u2717 This browser cannot record video at all.");alert("This browser cannot record video. Try Safari or Chrome with the tab in front.");setRendering(false);return;}
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       // Prime the canvas so captureStream has a real frame
@@ -3797,9 +4139,9 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       log("RENDER COMPLETE — "+(blob.size/1024/1024).toFixed(1)+"MB");
       // Save final render to IndexedDB — timeout-protected, never blocks completion
       try{
-        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
+        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+"."+mimeExt(mimeType);
         await Promise.race([
-          saveClipToDB("render_final",blob,renderName,"video/webm"),
+          saveClipToDB("render_final",blob,renderName,mimeType||"video/webm"),
           new Promise(r=>setTimeout(r,6000))
         ]);
       }catch(e){}
@@ -3892,7 +4234,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             <div style={{background:"#061406",border:"1px solid #22c55e",padding:"16px 20px",marginBottom:16}}>
               <div style={{color:"#22c55e",fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:12}}>RENDER COMPLETE</div>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <a href={renderUrl} download="MandaStrong_Film.webm" style={{...G("gold",false),padding:"12px 24px",textDecoration:"none",display:"inline-block",fontSize:12,letterSpacing:2}}>DOWNLOAD FILM</a>
+                <a href={renderUrl} download={"MandaStrong_Film."+__msLastExt} style={{...G("gold",false),padding:"12px 24px",textDecoration:"none",display:"inline-block",fontSize:12,letterSpacing:2}}>DOWNLOAD FILM</a>
                 <button onClick={()=>go(17)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>PREVIEW</button>
                 <button onClick={()=>go(18)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>EXPORT</button>
               </div>
@@ -3994,7 +4336,7 @@ function P17({ go, rendered, mediaLib }) {
 
 function P18({ rendered, mediaLib }) {
   const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
-  const dl=()=>{if(!vs){alert("No film yet — render first!");return;}const a=document.createElement("a");a.href=vs;a.download="MandaStrong_Film.webm";a.click();};
+  const dl=()=>{if(!vs){alert("No film yet — render first!");return;}const a=document.createElement("a");a.href=vs;a.download="MandaStrong_Film."+__msLastExt;a.click();};
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:780,margin:"0 auto"}}>
@@ -4311,8 +4653,8 @@ function P20() {
             </div>
 
             {sec("1. ACCEPTANCE OF TERMS",<>{p("By accessing or using MandaStrong Studio you agree to be legally bound by these Terms of Service. If you do not agree, do not use this platform. These terms apply to all users including free, trial, and paid subscribers.")}</>)}
-            {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Creator ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
-            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
+            {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Basic ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
+            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Basic and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
             {sec("4. AI-GENERATED CONTENT",<>{p("Content generated by MandaStrong Studio's AI tools is produced algorithmically. You are solely responsible for reviewing, editing, and verifying all AI-generated outputs before use. MandaStrong Studio makes no guarantees regarding the accuracy, appropriateness, or fitness for purpose of AI-generated content.")}{p("You agree not to use AI-generated content to produce material that is defamatory, illegal, harmful, or in violation of third-party rights.")}</>)}
             {sec("5. ACCEPTABLE USE",<>{p("You agree to use MandaStrong Studio only for lawful purposes. The following are strictly prohibited:")}{li(["Producing content that is defamatory, obscene, or harasses individuals","Infringing on third-party intellectual property rights","Attempting to reverse-engineer, copy, or redistribute the platform","Using the platform to generate spam, malware, or fraudulent content","Sharing your account credentials with third parties"])}</>)}
             {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. Full details available at MandaStrong1.Etsy.com.")}</>)}
@@ -4604,12 +4946,25 @@ function P24CharacterStudio({ onSave }) {
       <div style={{maxWidth:1100,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>CONSISTENCY ENGINE</div>
         <h1 style={{...H1,fontSize:26,marginBottom:6}}>CHARACTER STUDIO</h1>
+        <div style={{background:"linear-gradient(135deg,#0a0500,#1a0c00)",border:"2px solid "+GOLD,padding:"14px 18px",margin:"14px 0 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+          <div style={{fontSize:30,lineHeight:1}}>➕</div>
+          <div style={{flex:1,minWidth:220}}>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:15,fontWeight:900,letterSpacing:3}}>ADD YOUR OWN CHARACTERS</div>
+            <div style={{color:WHITE,fontSize:12,lineHeight:1.6,marginTop:3}}>
+              Build your own cast and reuse them across every film. Upload a photo, set the look and the voice, and each character keeps the same face in every scene you render.
+            </div>
+          </div>
+          <div style={{background:"#000",border:"1px solid "+GOLDDIM,padding:"7px 14px",textAlign:"center"}}>
+            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2}}>YOUR CAST</div>
+            <div style={{color:GOLD,fontSize:20,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{chars.length}</div>
+          </div>
+        </div>
         <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.7}}>Create reusable characters with full physical and costume details. Send a character's reference image to your Media Library, then upload on Page 8 to keep the same face across every scene. Hit COPY SCENE PROMPT to get a ready-to-paste prompt for any scene.</div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
           {/* Create / Edit panel */}
           <div style={{...Card(),border:"2px solid "+GOLD,maxHeight:"80vh",overflowY:"auto"}}>
-            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>{editId?"✏ EDIT CHARACTER":"✦ CREATE A CHARACTER"}</div>
+            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>{editId?"✏ EDIT CHARACTER":"➕ ADD YOUR OWN CHARACTER"}</div>
 
             {lbl("CHARACTER NAME")}
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Doxy, Ethan, Lily..." style={{...inp,marginBottom:4}}/>
@@ -4861,6 +5216,7 @@ export default function App() {
   const [savedNotice,setSavedNotice]=useState(false);
   const [showHistory,setShowHistory]=useState(false);
   const [showSaveModal,setShowSaveModal]=useState(false);
+  const [showAccount,setShowAccount]=useState(false);
 
   const go=p=>{setPage(p);window.scrollTo(0,0);try{localStorage.setItem("ms_page",JSON.stringify(p));}catch{}};
 
@@ -4991,8 +5347,9 @@ export default function App() {
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      <Header go={go} setMenu={setMenu}/>
-      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
+      <Header go={go} setMenu={setMenu} user={user} onAccount={()=>setShowAccount(true)}/>
+      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user} onAccount={()=>setShowAccount(true)}/>}
+      {showAccount&&<AccountPanel user={user} go={go} onClose={()=>setShowAccount(false)}/>}
       {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
       {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
