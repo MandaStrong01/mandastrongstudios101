@@ -3758,6 +3758,11 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   };
 
   const getAudioTrack=()=>{
+    // Track 1 is the audio track. Read it in placed order and take the first —
+    // never let a stray library item outrank what is on the timeline.
+    const placed=(timeline&&timeline[1])?timeline[1]:[];
+    const tPlaced=placed.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
+    if(tPlaced.length>0)return tPlaced[0];
     const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
     return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
@@ -3801,8 +3806,37 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       }
     }catch(e){console.warn("DB load failed",e);}
 
-    // Fall back to current mediaLib if DB empty
-    let clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
+    // ── ORDER AUTHORITY: THE TIMELINE ─────────────────────────────────────
+    // Storage hands clips back in key order, which is alphabetical, and it
+    // hands back clips that were never placed on the timeline. So storage is
+    // used ONLY to refresh each clip's blob. The running order is whatever
+    // was arranged on the timeline, and it is never re-sorted.
+    const freshLookup=new Map();
+    freshClips.forEach(c2=>{
+      if(c2.id!==undefined&&c2.id!==null) freshLookup.set("id:"+String(c2.id),c2);
+      if(c2.dbId!==undefined&&c2.dbId!==null) freshLookup.set("id:"+String(c2.dbId),c2);
+      if(c2.name) freshLookup.set("name:"+String(c2.name),c2);
+    });
+    const refreshClip=(a)=>{
+      const hit=freshLookup.get("id:"+String(a.id))
+             || freshLookup.get("id:"+String(a.dbId))
+             || freshLookup.get("name:"+String(a.name));
+      return hit ? {...a,url:hit.url,file:hit.file,dbId:hit.dbId} : a;
+    };
+
+    const timelineClips=Object.values(timeline||{}).flat()
+      .filter(a=>a&&a.type&&a.type.startsWith("video"));
+
+    let clips;
+    let orderedByTimeline=false;
+    if(timelineClips.length>0){
+      clips=timelineClips.map(refreshClip);
+      orderedByTimeline=true;
+    } else {
+      clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
+      log("No clips on the timeline — falling back to the media library");
+    }
+
     // ── EXCLUDE old rendered films and empty clips ──────────────────────────
     // A previously-rendered "MandaStrong_Film..." file in the library has no real
     // scene frames — including it makes the whole render come out 0.0MB.
@@ -3812,13 +3846,19 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(c2.file&&c2.file.size!==undefined&&c2.file.size<1000) return false; // skip empty blobs
       return true;
     });
-    // Sort scenes in order by leading number in the name (Scene 1, 2, 3...)
-    clips.sort((a,b)=>{
-      const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-      const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-      if(na!==nb)return na-nb;
-      return (a.name||"").localeCompare(b.name||"");
-    });
+
+    if(orderedByTimeline){
+      log("Timeline order locked — "+clips.length+" clips, exactly as arranged");
+      clips.forEach((c2,i)=>log("  "+(i+1)+". "+String(c2.name||"clip").slice(0,42)));
+    } else {
+      // Only when there was no timeline to obey: best-effort numeric ordering.
+      clips.sort((a,b)=>{
+        const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
+        const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
+        if(na!==nb)return na-nb;
+        return (a.name||"").localeCompare(b.name||"");
+      });
+    }
     const audioAsset=getAudioTrack();
     if(clips.length===0){alert("No video clips found. Generate clips on Page 8 first.");return;}
     log("Rendering "+clips.length+" scene clips (old render files excluded)");
