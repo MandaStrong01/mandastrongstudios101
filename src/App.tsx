@@ -25,59 +25,12 @@ const ENGINE_URL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate
 const ENGINE_KEY="msk_live_j-HsVOiMDEbwfqLInIsNTrnMreDvr-VKKbPNf21oink";
 const engineHeaders={"Content-Type":"application/json","x-engine-key":ENGINE_KEY};
 
-// ── RECORDER FORMAT ───────────────────────────────────────────────
-// iPad and iPhone Safari cannot record WebM at all. Asking it for WebM
-// produces an empty file — that is the "Render produced no video data"
-// fault. Try every real container and use the first this device accepts.
-// MP4 is preferred everywhere: it plays in Photos, iMovie and every editor.
-let __msLastExt = "webm";
-function pickRecordMime(preferCodec){
-  const c = preferCodec === "vp9" ? "vp9" : "vp8";
-  const candidates = [
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-    "video/mp4;codecs=h264,aac",
-    "video/mp4",
-    "video/webm;codecs=" + c + ",opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm"
-  ];
-  try{
-    if(typeof MediaRecorder === "undefined") return "";
-    for(let i=0;i<candidates.length;i++){
-      if(MediaRecorder.isTypeSupported(candidates[i])){
-        __msLastExt = candidates[i].indexOf("mp4") >= 0 ? "mp4" : "webm";
-        return candidates[i];
-      }
-    }
-  }catch(e){}
-  __msLastExt = "webm";
-  return ""; // empty = let the browser choose its own default
-}
-function mimeExt(m){ return (m && m.indexOf("mp4") >= 0) ? "mp4" : "webm"; }
-// Never let an unsupported mimeType kill the recorder — fall back to default.
-function makeRecorder(stream, mime, opts){
-  const o = Object.assign({}, opts || {});
-  if(mime) o.mimeType = mime;
-  let r = null;
-  try{ r = new MediaRecorder(stream, o); }
-  catch(e){
-    try{ r = new MediaRecorder(stream); }
-    catch(e2){ r = null; }
-  }
-  try{ if(r) bumpUsage("render",1); }catch(e){}
-  return r;
-}
-
 // The engine answers with .url; older builds looked for .output. Accept either.
 const pickEngineUrl=(d)=>{ if(!d||typeof d!=="object")return""; const v=d.url||d.output||d.video||""; return (typeof v==="string"&&v.indexOf("http")===0)?v:""; };
 
 async function engineCall(body){
   const res=await fetch(ENGINE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify(body)});
-  const d=await res.json();
-  try{ if(d&&!d.error) bumpUsage("gen",1); }catch(e){}
-  return d;
+  return res.json();
 }
 
 // ── CINEMA VOICE ENGINE ──────────────────────────────────────────
@@ -112,88 +65,15 @@ async function engineSpeak(text,meta){
   return "";
 }
 
-
-// ══════════════════════════════════════════════════════════════════
-// AUTOMATIC STEREO
-// Speech engines hand back a MONO file. Played flat it sits as a dot in
-// the middle of the head. This spreads it into a real stereo field: the
-// voice stays centred and intelligible, while two short delayed copies
-// are panned hard left and right underneath it. Applied automatically —
-// the user never has to switch anything on.
-// ══════════════════════════════════════════════════════════════════
-function makeStereoChain(ctx,width){
-  const w = typeof width==="number" ? Math.max(0,Math.min(1,width)) : 0.62;
-  const input  = ctx.createGain();
-  const output = ctx.createGain();
-  try{
-    // centre — carries the intelligibility
-    const dry = ctx.createGain(); dry.gain.value = 1 - (w*0.22);
-    input.connect(dry); dry.connect(output);
-
-    if(!ctx.createStereoPanner || !ctx.createDelay){
-      input.connect(output);
-      return {input,output};
-    }
-    // right side — short Haas delay
-    const dR = ctx.createDelay(0.1); dR.delayTime.value = 0.014;
-    const gR = ctx.createGain();     gR.gain.value      = 0.30*w;
-    const pR = ctx.createStereoPanner(); pR.pan.value   = 0.85;
-    input.connect(dR); dR.connect(gR); gR.connect(pR); pR.connect(output);
-
-    // left side — slightly longer, so the two never phase-cancel
-    const dL = ctx.createDelay(0.1); dL.delayTime.value = 0.021;
-    const gL = ctx.createGain();     gL.gain.value      = 0.26*w;
-    const pL = ctx.createStereoPanner(); pL.pan.value   = -0.85;
-    input.connect(dL); dL.connect(gL); gL.connect(pL); pL.connect(output);
-  }catch(e){
-    try{ input.connect(output); }catch(e2){}
-  }
-  return {input,output};
-}
-let __msStereoCtx = null;
-function stereoCtx(){
-  try{
-    if(!__msStereoCtx) __msStereoCtx = new (window.AudioContext||window.webkitAudioContext)();
-    if(__msStereoCtx.state==="suspended") __msStereoCtx.resume().catch(()=>{});
-    return __msStereoCtx;
-  }catch(e){ return null; }
-}
-
 function playEngineAudio(url,volume){
-  return new Promise(async (resolve)=>{
+  return new Promise((resolve)=>{
     try{
-      // Pull the file local first. A cross-origin element cannot be routed
-      // through Web Audio (it plays silent), so the blob step is what makes
-      // automatic stereo possible at all. If it fails we play flat instead.
-      let src=url, local=false;
-      try{
-        const r=await fetch(url);
-        const b=await r.blob();
-        src=URL.createObjectURL(b);
-        local=true;
-      }catch(e){}
-
-      const a=new Audio(src);
+      const a=new Audio(url);
       a.volume=typeof volume==="number"?Math.max(0,Math.min(1,volume)):1;
-      a.crossOrigin="anonymous";
       __msAudio=a;
-
-      if(local){
-        try{
-          const ctx=stereoCtx();
-          if(ctx){
-            const node=ctx.createMediaElementSource(a);
-            const st=makeStereoChain(ctx,0.62);
-            node.connect(st.input);
-            st.output.connect(ctx.destination);
-          }
-        }catch(e){}
-      }
-
-      const done=(v)=>{ try{ if(local) URL.revokeObjectURL(src); }catch(e){} resolve(v); };
-      a.onended=()=>done(true);
-      a.onerror=()=>done(false);
-      a.play().catch(()=>done(false));
+      a.onended=()=>resolve(true);
+      a.onerror=()=>resolve(false);
+      a.play().catch(()=>resolve(false));
     }catch(e){resolve(false);}
   });
 }
@@ -587,158 +467,7 @@ function SaveSessionModal({ onClose, onSave, currentPage, assetCount }) {
   );
 }
 
-
-// ══════════════════════════════════════════════════════════════════
-// ACCOUNT & USAGE
-// Every signed-up user gets their own panel: which plan they are on,
-// what they have used this month, and exactly what is left. On screen,
-// no file to open. Admin accounts are unlimited.
-// ══════════════════════════════════════════════════════════════════
-const PLAN_INFO={
-  "Guest":        {label:"GUEST",        price:"0",  renders:3,   gens:10,   storage:"1 GB",   perks:"Preview access",              next:"basic",  nextLabel:"BASIC"},
-  "Basic":        {label:"BASIC PLAN",   price:"20", renders:30,  gens:150,  storage:"10 GB",  perks:"100 AI tools · HD 1080p",     next:"pro",    nextLabel:"PRO"},
-  "Pro":          {label:"PRO PLAN",     price:"30", renders:90,  gens:500,  storage:"100 GB", perks:"300 AI tools · 4K export",    next:"studio", nextLabel:"STUDIO"},
-  "Studio":       {label:"STUDIO PLAN",  price:"50", renders:300, gens:2000, storage:"1 TB",   perks:"600+ AI tools · 8K export",   next:"",       nextLabel:""},
-  "Studio Trial": {label:"STUDIO TRIAL", price:"0",  renders:15,  gens:60,   storage:"1 TB",   perks:"600+ AI tools · 7-day trial", next:"studio", nextLabel:"STUDIO"}
-};
-function planKey(p){
-  const t=String(p||"Guest").toLowerCase();
-  if(t.indexOf("trial")>=0) return "Studio Trial";
-  if(t.indexOf("studio")>=0) return "Studio";
-  if(t.indexOf("pro")>=0) return "Pro";
-  if(t.indexOf("basic")>=0||t.indexOf("creator")>=0) return "Basic";
-  return "Guest";
-}
-function planOf(user){ return PLAN_INFO[planKey(user&&user.plan)]||PLAN_INFO["Guest"]; }
-function isUnlimited(user){ return !!(user&&user.isAdmin); }
-
-const USAGE_KEY="ms_usage";
-function usagePeriod(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
-function readUsage(){
-  const blank={period:usagePeriod(),renders:0,gens:0};
-  try{
-    const u=JSON.parse(localStorage.getItem(USAGE_KEY)||"null");
-    if(!u||u.period!==usagePeriod()) return blank;
-    return {period:u.period,renders:u.renders||0,gens:u.gens||0};
-  }catch(e){ return blank; }
-}
-function writeUsage(u){
-  try{ localStorage.setItem(USAGE_KEY,JSON.stringify(u)); }catch(e){}
-  try{ window.dispatchEvent(new Event("ms_usage_changed")); }catch(e){}
-}
-function bumpUsage(kind,n){
-  const u=readUsage();
-  if(kind==="render") u.renders+=(n||1); else u.gens+=(n||1);
-  writeUsage(u);
-}
-function useUsage(){
-  const [u,setU]=useState(readUsage);
-  useEffect(()=>{
-    const h=()=>setU(readUsage());
-    window.addEventListener("ms_usage_changed",h);
-    return()=>window.removeEventListener("ms_usage_changed",h);
-  },[]);
-  return u;
-}
-function renewalDate(){
-  const d=new Date(); const n=new Date(d.getFullYear(),d.getMonth()+1,1);
-  return n.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
-}
-
-function UsageBar({used,cap,label,unlimited}){
-  const pct = unlimited ? 100 : Math.min(100,Math.round((used/Math.max(1,cap))*100));
-  const col = unlimited ? GOLD : (pct>=90 ? "#ef4444" : pct>=70 ? "#f59e0b" : "#22c55e");
-  const left = Math.max(0,cap-used);
-  return (
-    <div style={{marginBottom:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5,gap:8,flexWrap:"wrap"}}>
-        <span style={{color:WHITE,fontSize:11,letterSpacing:2,fontWeight:700}}>{label}</span>
-        <span style={{color:col,fontSize:11,fontWeight:900,letterSpacing:1}}>
-          {unlimited ? "UNLIMITED" : (used+" USED  ·  "+left+" LEFT  ·  OF "+cap)}
-        </span>
-      </div>
-      <div style={{height:8,background:"#0a0a0a",border:"1px solid "+GOLDDIM}}>
-        <div style={{height:"100%",width:pct+"%",background:unlimited?("linear-gradient(90deg,"+GOLDDIM+","+GOLD+")"):col,transition:"width .35s"}}/>
-      </div>
-    </div>
-  );
-}
-
-// Compact strip — drops into the quick menu so the plan is never hidden
-function PlanStrip({user,onOpen}){
-  const usage=useUsage(); const p=planOf(user); const unl=isUnlimited(user);
-  const left = unl ? "∞" : Math.max(0,p.renders-usage.renders);
-  return (
-    <div onClick={onOpen} style={{background:"#0a0a0a",border:"1px solid "+GOLD,padding:"9px 10px",marginBottom:14,textAlign:"center",cursor:"pointer"}}>
-      <div style={{color:DIM,fontSize:9,letterSpacing:2}}>YOUR PLAN</div>
-      <div style={{color:GOLD,fontWeight:900,fontSize:14,fontFamily:"'Cinzel',serif",letterSpacing:2}}>{unl?"ADMIN":p.label}</div>
-      <div style={{color:WHITE,fontSize:10,letterSpacing:1,marginTop:3}}>{left} RENDERS LEFT</div>
-      <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2,marginTop:4}}>TAP FOR MY ACCOUNT ▸</div>
-    </div>
-  );
-}
-
-function AccountPanel({user,onClose,go}){
-  const usage=useUsage();
-  const p=planOf(user);
-  const unl=isUnlimited(user);
-  const name=(user&&user.name)||"Creator";
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.88)",overflowY:"auto",padding:"24px 14px"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{maxWidth:560,margin:"0 auto",background:"#050505",border:"2px solid "+GOLD,boxShadow:"0 0 40px "+GOLD+"44"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",borderBottom:"1px solid "+GOLDDIM}}>
-          <span style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:14,fontWeight:900,letterSpacing:3}}>MY ACCOUNT</span>
-          <button onClick={onClose} style={{background:"none",border:"none",color:GOLD,fontSize:22,cursor:"pointer",lineHeight:1}}>✕</button>
-        </div>
-
-        <div style={{padding:18}}>
-          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
-            <div style={{width:52,height:52,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontSize:24,fontWeight:900,color:"#000",flexShrink:0}}>
-              {String(name).charAt(0).toUpperCase()}
-            </div>
-            <div style={{minWidth:0}}>
-              <div style={{color:WHITE,fontSize:17,fontWeight:900,letterSpacing:1}}>{name}</div>
-              <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{unl?"ADMIN · UNLIMITED":p.label}</div>
-            </div>
-          </div>
-
-          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:18}}>
-            <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-              <div>
-                <div style={{color:DIM,fontSize:9,letterSpacing:2}}>PLAN</div>
-                <div style={{color:GOLD,fontSize:15,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{unl?"ADMIN":p.label}</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{color:DIM,fontSize:9,letterSpacing:2}}>MONTHLY</div>
-                <div style={{color:GOLD,fontSize:15,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{unl?"—":("$"+p.price)}</div>
-              </div>
-            </div>
-            <div style={{color:WHITE,fontSize:12,marginTop:10,letterSpacing:1}}>{p.perks}</div>
-            <div style={{color:WHITE,fontSize:12,marginTop:4,letterSpacing:1}}>Storage: {p.storage}</div>
-          </div>
-
-          <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:10,fontFamily:"'Cinzel',serif"}}>THIS MONTH</div>
-          <UsageBar label="FILM RENDERS"     used={usage.renders} cap={p.renders} unlimited={unl}/>
-          <UsageBar label="AI GENERATIONS"   used={usage.gens}    cap={p.gens}    unlimited={unl}/>
-          <div style={{color:DIM,fontSize:11,letterSpacing:1,marginBottom:18}}>
-            {unl ? "Admin account — no limits applied." : ("Allowance resets "+renewalDate()+".")}
-          </div>
-
-          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-            {!unl && p.next ? (
-              <button onClick={()=>window.open(STRIPE[p.next],"_blank")} style={{...G("gold",false),flex:1,minWidth:170}}>
-                UPGRADE TO {p.nextLabel}
-              </button>
-            ) : null}
-            <button onClick={()=>{onClose();go(4);}} style={{...G("out",false),flex:1,minWidth:150}}>PLANS & BILLING</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QAMenu({ go, onClose, user, onAccount }) {
+function QAMenu({ go, onClose, user }) {
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,display:"flex"}}>
       <div style={{width:256,background:"#050505",borderRight:"1px solid "+GOLD+"",height:"100vh",overflowY:"auto",padding:18}}>
@@ -749,7 +478,10 @@ function QAMenu({ go, onClose, user, onAccount }) {
         <div style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",padding:"9px 12px",marginBottom:10,textAlign:"center"}}>
           <div style={{color:"#000",fontWeight:900,fontSize:10,letterSpacing:3,fontFamily:"'Cinzel',serif"}}>MANDA STRONG STUDIO</div>
         </div>
-        <PlanStrip user={user} onOpen={()=>{onClose();if(onAccount)onAccount();}}/>
+        <div style={{background:"#0a0a0a",border:"1px solid "+GOLD,padding:"7px 10px",marginBottom:14,textAlign:"center"}}>
+          <div style={{color:DIM,fontSize:9,letterSpacing:2}}>PLAN</div>
+          <div style={{color:GOLD,fontWeight:900,fontSize:14,fontFamily:"'Cinzel',serif"}}>STUDIO</div>
+        </div>
         {NAV.map(i=>(
           <button key={i.p} onClick={()=>{go(i.p);onClose();}}
             style={{width:"100%",textAlign:"left",background:"none",border:"none",color:WHITE,padding:"8px",cursor:"pointer",fontSize:13,fontWeight:700,display:"block",marginBottom:1,letterSpacing:1}}
@@ -764,7 +496,7 @@ function QAMenu({ go, onClose, user, onAccount }) {
   );
 }
 
-function Header({ go, setMenu, user, onAccount }) {
+function Header({ go, setMenu }) {
   return (
     <header style={{position:"sticky",top:0,zIndex:500,background:"#000",borderBottom:"1px solid "+GOLD+"",padding:"0 16px",height:52,display:"flex",alignItems:"center",gap:12}}>
       <button onClick={()=>setMenu(true)} style={{background:"none",border:"1px solid "+GOLD,color:GOLD,width:34,height:34,cursor:"pointer",fontSize:16,flexShrink:0}}>☰</button>
@@ -779,18 +511,7 @@ function Header({ go, setMenu, user, onAccount }) {
       </div>
       <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
         <div style={{color:"#22c55e",fontSize:11,letterSpacing:2,fontWeight:900}}>● SYSTEM ONLINE</div>
-        <div onClick={()=>{if(onAccount)onAccount();}} title="My account, plan and usage"
-          style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
-          <div style={{textAlign:"right",lineHeight:1.15}}>
-            <div style={{color:GOLDDIM,fontSize:8,letterSpacing:2}}>MY ACCOUNT</div>
-            <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,fontFamily:"'Cinzel',serif",whiteSpace:"nowrap"}}>
-              {isUnlimited(user)?"ADMIN":planOf(user).label}
-            </div>
-          </div>
-          <div style={{width:36,height:36,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontSize:19,fontWeight:900,color:"#000",boxShadow:"0 0 18px "+GOLD+"77",flexShrink:0}}>
-            {String((user&&user.name)||"G").charAt(0).toUpperCase()}
-          </div>
-        </div>
+        <div onClick={()=>go(21)} style={{width:36,height:36,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:19,fontWeight:900,color:"#000",boxShadow:"0 0 18px "+GOLD+"77"}}>G</div>
       </div>
     </header>
   );
@@ -1548,14 +1269,13 @@ function MusicVideoStudio({ onClose, onSave }) {
       const ctx = canvas.getContext("2d");
 
       const fps=12;
-      const mimeType=pickRecordMime("vp9");
+      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
       const videoStream=canvas.captureStream(fps);
       let combinedStream=videoStream;
       if(audioDest){
         combinedStream=new MediaStream([...videoStream.getTracks(),...audioDest.stream.getTracks()]);
       }
-      const recorder=makeRecorder(combinedStream,mimeType,{videoBitsPerSecond:10000000});
-      if(!recorder){alert("This browser cannot record video. Try Safari or Chrome.");return;}
+      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:10000000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(Math.round(1000/fps));
@@ -1988,7 +1708,7 @@ function MusicVideoStudio({ onClose, onSave }) {
                 <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:3,marginBottom:10}}>EXPORT YOUR MUSIC VIDEO</div>
 
                 {/* Download */}
-                <a href={videoUrl} download={(config.title||"MusicVideo")+"_"+config.artist+".webm"}
+                <a href={videoUrl} download={(config.title||"MusicVideo")+"_"+config.artist+".webm"} target="_blank" rel="noopener noreferrer"
                   style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"12px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:12,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:8}}>
                   ⬇ DOWNLOAD VIDEO
                 </a>
@@ -2112,7 +1832,19 @@ function P6Voice({ onSave, setMediaLib }) {
   const [filterOrigin,setFilterOrigin]=useState("All"); const [speed,setSpeed]=useState(0.62);
   const [pitchV,setPitchV]=useState(0.86); const [pauseLen,setPauseLen]=useState(1600);
   const [volume,setVolume]=useState(1.0); const [sysVoices,setSysVoices]=useState([]);
+  const [myVoices,setMyVoices]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_my_voices")||"[]");}catch{return [];}});
+  const myVoiceInputRef=useRef(null);
   const chunksRef=useRef([]); const idxRef=useRef(0); const timerRef=useRef(null);
+  const addMyVoice=(file)=>{
+    if(!file)return;
+    const url=URL.createObjectURL(file);
+    const nv={id:"myvoice_"+Date.now(),name:(file.name||"My Voice").replace(/\.[^.]+$/,""),url,origin:"My Upload",gender:"—",age:"—",emoji:"🎙",style:"Your uploaded voice",desc:"A voice you added from your own audio file."};
+    const upd=[nv,...myVoices];
+    setMyVoices(upd);
+    try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}
+    setSelVoice(nv.id);
+  };
+  const delMyVoice=(id)=>{const upd=myVoices.filter(v=>v.id!==id);setMyVoices(upd);try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}};
 
   useEffect(()=>{
     const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
@@ -2246,6 +1978,23 @@ function P6Voice({ onSave, setMediaLib }) {
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..." style={{...inp,padding:"6px 10px",fontSize:11,height:30}}/>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 6px 80px"}}>
+            <input ref={myVoiceInputRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" style={{display:"none"}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(f)addMyVoice(f);e.target.value="";}}/>
+            <button onClick={()=>myVoiceInputRef.current&&myVoiceInputRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>＋ ADD YOUR OWN VOICE</button>
+            {myVoices.map(v=>(
+              <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+(selVoice===v.id?GOLD:GOLDDIM),cursor:"pointer"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:18}}>{v.emoji}</span>
+                    <div><div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900}}>{v.name}</div><div style={{color:GOLDDIM,fontSize:10}}>Your uploaded voice</div></div>
+                  </div>
+                  <div style={{display:"flex",gap:4,flexShrink:0}}>
+                    {v.url&&<button onClick={e=>{e.stopPropagation();const a=new Audio(v.url);a.play().catch(()=>{});}} style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>▶</button>}
+                    <button onClick={e=>{e.stopPropagation();delMyVoice(v.id);}} style={{background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"3px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>✕</button>
+                  </div>
+                </div>
+                {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>✓ SELECTED</div>}
+              </div>
+            ))}
             {filtered.map(v=>(
               <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+selVoice===v.id?GOLD:GOLDDIM,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
@@ -2353,7 +2102,15 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [refImages,setRefImages]=useState([]);
   const [renderStyle,setRenderStyle]=useState("photorealistic");
   const [genre,setGenre]=useState("");
+  const [targetMin,setTargetMin]=useState(0);
+  const [madeClips,setMadeClips]=useState([]);
+  const [gapPrompt,setGapPrompt]=useState(null);
+  const [gapBusy,setGapBusy]=useState(false);
   const addLog=(msg)=>setLog(p=>[...p,msg]);
+  const madeSeconds=madeClips.reduce((a,c)=>a+(c.duration||0),0);
+  const targetSeconds=targetMin*60;
+  const gapSeconds=Math.max(0,targetSeconds-madeSeconds);
+  const fmtMin=(s)=>{const m=Math.floor(s/60),ss=Math.round(s%60);return m+"m "+(ss<10?"0":"")+ss+"s";};
 
   const RENDER_STYLES=[
     {id:"photorealistic",label:"📷 Photorealistic"},
@@ -2615,10 +2372,9 @@ Write the drawFrame body now.`}]
 
     // ── STEP 3: Render all frames ──
     const fps=20;const totalFrames=duration*fps;
-    const mimeType=pickRecordMime("vp9");
+    const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
     const stream=canvas.captureStream(fps);
-    const recorder=makeRecorder(stream,mimeType,{videoBitsPerSecond:6000000});
-    if(!recorder){alert("This browser cannot record video. Try Safari or Chrome.");return;}
+    const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6000000});
     const chunks=[];
     recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     recorder.start(Math.round(1000/fps));
@@ -2678,7 +2434,7 @@ Write the drawFrame body now.`}]
     // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
     try{
       const autoId="scene_"+Date.now();
-      const autoName=(title||"Scene")+"_"+duration+"s."+mimeExt(mimeType);
+      const autoName=(title||"Scene")+"_"+duration+"s.webm";
       const saveResult=await Promise.race([
         safeSaveClipToDB(autoId,blob,autoName,"video/webm"),
         new Promise(r=>setTimeout(()=>r("timeout"),6000))
@@ -2690,6 +2446,14 @@ Write the drawFrame body now.`}]
         addLog("\u2713 Auto-saved to library");
       }
     }catch(e){addLog("Auto-save note: "+e.message);}
+    // Track this clip toward the target film length, then check the gap
+    try{
+      const newTotal=madeSeconds+duration;
+      setMadeClips(p=>[...p,{id:Date.now(),duration}]);
+      if(targetSeconds>0 && newTotal<targetSeconds){
+        setGapPrompt({have:newTotal,target:targetSeconds,gap:targetSeconds-newTotal});
+      }
+    }catch(e){}
     setGenerating(false);
   };
 
@@ -2706,6 +2470,33 @@ Write the drawFrame body now.`}]
 
   return (
     <div style={{minHeight:"100vh",background:"#000",color:WHITE,fontFamily:"'Rajdhani',sans-serif",paddingBottom:160}}>
+      {gapPrompt&&(
+        <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.94)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{width:"min(460px,95vw)",background:"#050505",border:"2px solid "+GOLD,padding:"24px 22px"}}>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900,letterSpacing:3,marginBottom:14,textAlign:"center"}}>⏳ FILL THE GAP?</div>
+            <p style={{color:WHITE,fontSize:14,lineHeight:1.7,margin:"0 0 18px",textAlign:"center"}}>
+              You have <b style={{color:GOLD}}>{fmtMin(gapPrompt.have)}</b> of your <b style={{color:GOLD}}>{fmtMin(gapPrompt.target)}</b> selection.
+              Would you like AI to create fill-in scenes to fill the remaining <b style={{color:GOLD}}>{fmtMin(gapPrompt.gap)}</b>?
+            </p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button disabled={gapBusy} onClick={()=>{
+                  const g=gapPrompt;setGapPrompt(null);
+                  if(!prompt.trim())setPrompt("Cinematic continuation scene that flows naturally from the previous shot, matching the film's mood, lighting and colour grade.");
+                  const fillSecs=Math.min(60,Math.max(5,g.gap));
+                  setDuration(fillSecs);
+                  setTimeout(()=>{generateVideo();},60);
+                }}
+                style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
+                ✓ YES, FILL IT
+              </button>
+              <button onClick={()=>setGapPrompt(null)}
+                style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
+                NO, I'M DONE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <canvas ref={canvasRef} style={{position:"fixed",right:8,bottom:8,width:160,height:90,opacity:1,pointerEvents:"none",zIndex:9999,border:"1px solid #e8c96d",background:"#000"}}/>
       <div style={{padding:"12px 20px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
@@ -2743,7 +2534,7 @@ Write the drawFrame body now.`}]
               <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:8}}>
                 {refImages.map((ri,i)=>(
                   <div key={i} style={{position:"relative"}}>
-                    {ri.isVideo
+                    {ri.isVideo&&ri.url
                       ?<video src={ri.url} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}} muted/>
                       :<img src={ri.url} alt={ri.name||"ref"} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}}/>
                     }
@@ -2763,19 +2554,20 @@ Write the drawFrame body now.`}]
                 e.currentTarget.style.border="2px dashed "+GOLDDIM;
                 e.currentTarget.style.background="transparent";
                 e.currentTarget.style.boxShadow="none";
-                const files=Array.from(e.dataTransfer.files);
+                if(refImages.length>=6){alert("Max 6 photos/videos");return;}
+                const files=Array.from(e.dataTransfer.files).slice(0,6-refImages.length);
                 setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               }}
               style={{border:"2px dashed "+GOLDDIM,padding:"16px 8px",textAlign:"center",marginBottom:6,transition:"border 0.15s, background 0.15s, box-shadow 0.15s",cursor:"copy",background:"transparent"}}>
               <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2,pointerEvents:"none"}}>⬆ DRAG & DROP PHOTOS OR VIDEOS HERE</div>
-              <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · unlimited files · drop zone lights up gold when ready</div>
+              <div style={{color:GOLDDIM,fontSize:9,marginTop:3,pointerEvents:"none"}}>JPG · PNG · MP4 · MOV · up to 6 files · drop zone lights up gold when ready</div>
             </div>
             <input ref={realityPhotoRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" multiple style={{display:"none"}} onChange={e=>{
-              const files=Array.from(e.target.files||[]);
+              const files=Array.from(e.target.files||[]).slice(0,6-refImages.length);
               setRefImages(p=>[...p,...files.map(f=>({url:URL.createObjectURL(f),name:f.name,isVideo:f.type.startsWith("video/")}))]);
               if(realityPhotoRef.current)realityPhotoRef.current.value="";
             }}/>
-            <button onClick={()=>{realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
+            <button onClick={()=>{if(refImages.length>=6){alert("Max 6 photos");return;}realityPhotoRef.current&&realityPhotoRef.current.click();}} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>
               📷 {refImages.length===0?"ADD PHOTOS / VIDEOS (UP TO 6)":"ADD MORE — "+refImages.length+"/6 LOADED"}
             </button>
             <a href="https://photos.google.com" target="_blank" rel="noopener noreferrer"
@@ -2847,6 +2639,18 @@ Write the drawFrame body now.`}]
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>TARGET FILM LENGTH</span>
+              <span style={{color:WHITE,fontSize:11,fontWeight:900}}>{targetMin>0?targetMin+" MIN":"OFF"}</span>
+            </div>
+            <input type="range" min={0} max={180} value={targetMin} onChange={e=>setTargetMin(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
+            {targetMin>0&&(
+              <div style={{color:GOLDDIM,fontSize:10,marginTop:6,letterSpacing:1}}>
+                Made so far: {fmtMin(madeSeconds)} of {targetMin}m · {gapSeconds>0?("gap "+fmtMin(gapSeconds)):"target reached ✓"}
+              </div>
+            )}
+          </div>
+          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
               <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>DURATION</span>
               <span style={{color:WHITE,fontSize:11,fontWeight:900}}>{duration} SECONDS</span>
             </div>
@@ -2879,7 +2683,7 @@ Write the drawFrame body now.`}]
           {videoUrl&&!generating&&(
             <div style={{padding:"10px 14px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",flexDirection:"column",gap:6}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                <a href={videoUrl} download={(title||"scene")+"_"+duration+"s.webm"}
+                <a href={videoUrl} download={(title||"scene")+"_"+duration+"s.webm"} target="_blank" rel="noopener noreferrer"
                   style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"8px",fontSize:10,textDecoration:"none",textAlign:"center",letterSpacing:1,fontWeight:900,fontFamily:"'Rajdhani',sans-serif",display:"block"}}>⬇ DOWNLOAD</a>
                 <button onClick={saveToLibrary}
                   style={{background:saved?"linear-gradient(135deg,#a07820,#e8c96d)":"transparent",border:"1px solid "+GOLD,color:saved?"#000":GOLD,padding:"8px",fontSize:10,cursor:"pointer",fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
@@ -3037,19 +2841,49 @@ function P3() {
   const [uploads, setUploads] = useState([null,null,null]);
   const [titles, setTitles] = useState(["","",""]);
   const [descs, setDescs] = useState(["","",""]);
+  const [loaded, setLoaded] = useState(false);
   const refs = [useRef(null),useRef(null),useRef(null)];
   const videoRefs = [useRef(null),useRef(null),useRef(null)];
 
-  const handleFile=(i,e)=>{
+  // Load saved proof-of-concept films from permanent storage on mount
+  useEffect(()=>{
+    let alive=true;
+    (async()=>{
+      try{
+        const t=JSON.parse(localStorage.getItem("ms_poc_titles")||'["","",""]');
+        const d=JSON.parse(localStorage.getItem("ms_poc_descs")||'["","",""]');
+        if(alive){setTitles(t);setDescs(d);}
+      }catch{}
+      const next=[null,null,null];
+      for(let i=0;i<3;i++){
+        try{
+          const rec=await loadClipFromDB("poc_"+i);
+          if(rec&&rec.blob){
+            next[i]={url:URL.createObjectURL(rec.blob),name:rec.name,type:rec.type,size:(rec.blob.size/1024/1024).toFixed(1)};
+          }
+        }catch{}
+      }
+      if(alive){setUploads(next);setLoaded(true);}
+    })();
+    return ()=>{alive=false;};
+  },[]);
+
+  const saveTitles=(arr)=>{try{localStorage.setItem("ms_poc_titles",JSON.stringify(arr));}catch{}};
+  const saveDescs=(arr)=>{try{localStorage.setItem("ms_poc_descs",JSON.stringify(arr));}catch{}};
+
+  const handleFile=async(i,e)=>{
     const f=e.target.files&&e.target.files[0];
     if(!f)return;
     const url=URL.createObjectURL(f);
-    setUploads(p=>{const n=[...p];n[i]={url,name:f.name,type:f.type,size:(f.size/1024/1024).toFixed(1)};return n;});
+    setUploads(p=>{const n=[...p];if(n[i])URL.revokeObjectURL(n[i].url);n[i]={url,name:f.name,type:f.type,size:(f.size/1024/1024).toFixed(1)};return n;});
+    // Persist the actual file to IndexedDB so it stays forever
+    try{await saveClipToDB("poc_"+i,f,f.name,f.type);}catch(err){alert("Could not save film "+(i+1)+" — storage may be full.");}
   };
-  const removeUpload=(i)=>{
+  const removeUpload=async(i)=>{
     setUploads(p=>{const n=[...p];if(n[i])URL.revokeObjectURL(n[i].url);n[i]=null;return n;});
-    setTitles(p=>{const n=[...p];n[i]="";return n;});
-    setDescs(p=>{const n=[...p];n[i]="";return n;});
+    setTitles(p=>{const n=[...p];n[i]="";saveTitles(n);return n;});
+    setDescs(p=>{const n=[...p];n[i]="";saveDescs(n);return n;});
+    try{await deleteClipFromDB("poc_"+i);}catch{}
   };
 
   const inp={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"8px 10px",color:WHITE,fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box"};
@@ -3059,7 +2893,8 @@ function P3() {
       <div style={{maxWidth:1100,margin:"0 auto"}}>
         <div style={{fontSize:12,color:GOLD,letterSpacing:4,marginBottom:8,fontWeight:700}}>SHOWCASE</div>
         <h1 style={{...H1,fontSize:30,marginBottom:6}}>PROOF OF CONCEPT</h1>
-        <div style={{color:GOLDDIM,fontSize:13,marginBottom:28,letterSpacing:1}}>Upload up to 3 films, trailers, or demo reels created with MandaStrong Studio.</div>
+        <div style={{color:GOLDDIM,fontSize:13,marginBottom:10,letterSpacing:1}}>Upload up to 3 films, trailers, or demo reels created with MandaStrong Studio.</div>
+        <div style={{color:"#22c55e",fontSize:11,marginBottom:24,letterSpacing:2,fontWeight:900}}>✓ SAVED AUTOMATICALLY — YOUR FILMS STAY ON THIS PAGE</div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20}}>
           {[0,1,2].map(i=>(
@@ -3094,12 +2929,12 @@ function P3() {
 
               {/* Title */}
               <div style={{color:GOLD,fontSize:9,letterSpacing:2,fontWeight:900,marginBottom:4}}>FILM TITLE</div>
-              <input value={titles[i]} onChange={e=>setTitles(p=>{const n=[...p];n[i]=e.target.value;return n;})}
+              <input value={titles[i]} onChange={e=>setTitles(p=>{const n=[...p];n[i]=e.target.value;saveTitles(n);return n;})}
                 placeholder="Enter film title..." style={{...inp,marginBottom:8}}/>
 
               {/* Description */}
               <div style={{color:GOLD,fontSize:9,letterSpacing:2,fontWeight:900,marginBottom:4}}>DESCRIPTION</div>
-              <textarea value={descs[i]} onChange={e=>setDescs(p=>{const n=[...p];n[i]=e.target.value;return n;})}
+              <textarea value={descs[i]} onChange={e=>setDescs(p=>{const n=[...p];n[i]=e.target.value;saveDescs(n);return n;})}
                 placeholder="Describe this film..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:10}}/>
 
               {/* Upload button */}
@@ -3146,24 +2981,15 @@ function P4({ go, setUser }) {
   const [email,setEmail]=useState(""); const [pass,setPass]=useState("");
   const [name,setName]=useState(""); const [re,setRe]=useState("");
   const [loginOk,setLoginOk]=useState(false);
-  const [gotPlan,setGotPlan]=useState("");
-  const startOn=(who,planName,isAdmin,link)=>{
-    const u={name:who,plan:planName,isAdmin:!!isAdmin};
-    setUser(u);
-    try{localStorage.setItem("ms_user",JSON.stringify(u));}catch(e){}
-    setGotPlan(planName);
-    if(link)window.open(link,"_blank");
-    setTimeout(()=>go(5),1700);
-  };
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
     const amandaEmails=["woolleya129@gmail.com"];
     const amandaPasswords=["Admin","MandaAdmin2026!","amandasox1970!!","admin","ADMIN"];
     const isAmanda=amandaEmails.includes(email)&&amandaPasswords.includes(pass);
     if(isAmanda){
-      setLoginOk(true);startOn("Amanda","Studio",true,"");
+      setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
     } else if(email==="test@mandastrong.com"&&pass==="Test2026"){
-      setLoginOk(true);startOn("Studio User","Studio",false,"");
+      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:false});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
       window.open(STRIPE.studio,"_blank");
       alert("To access MandaStrong Studio, please complete your subscription. You will be redirected to our secure payment page.");
@@ -3192,9 +3018,6 @@ function P4({ go, setUser }) {
             <input value={pass} onChange={e=>setPass(e.target.value)} type="password" placeholder="Password" style={{...inp,marginBottom:16}}/>
             {loginOk&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",marginBottom:8}}>
               <span style={{color:"#22c55e",fontWeight:900,fontSize:14,letterSpacing:2}}>✓ LOGIN SUCCESSFUL</span>
-              {gotPlan&&<div style={{color:WHITE,fontSize:12,letterSpacing:1,marginTop:5}}>
-                You are on the <b style={{color:GOLD}}>{planOf({plan:gotPlan}).label}</b> — {planOf({plan:gotPlan}).renders} renders and {planOf({plan:gotPlan}).gens} generations a month.
-              </div>}
             </div>}
             <button onClick={login} style={{...G("gold",false),width:"100%",padding:"12px"}}>{loginOk?"✓ ENTERING STUDIO...":"SIGN IN TO STUDIO"}</button>
           </div>
@@ -3204,13 +3027,7 @@ function P4({ go, setUser }) {
             <h2 style={{...H1,fontSize:18,marginBottom:18}}>CREATE ACCOUNT</h2>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your Name" style={inp}/>
             <input value={re} onChange={e=>setRe(e.target.value)} placeholder="Email address" style={{...inp,marginBottom:16}}/>
-            {gotPlan==="Studio Trial"&&<div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",marginBottom:10}}>
-              <span style={{color:"#22c55e",fontWeight:900,fontSize:13,letterSpacing:2}}>✓ ACCOUNT CREATED</span>
-              <div style={{color:WHITE,fontSize:12,letterSpacing:1,marginTop:5}}>
-                You are on the <b style={{color:GOLD}}>STUDIO TRIAL</b> — {PLAN_INFO["Studio Trial"].renders} renders and {PLAN_INFO["Studio Trial"].gens} generations included. Your usage is on the MY ACCOUNT button, top right.
-              </div>
-            </div>}
-            <button onClick={()=>startOn(name||"Creator","Studio Trial",false,STRIPE.studio)}
+            <button onClick={()=>{setUser({name:name||"Creator",plan:"Studio Trial",isAdmin:false});window.open(STRIPE.studio,"_blank");go(5);}}
               style={{width:"100%",padding:"12px",background:"#22c55e",border:"none",color:"#000",fontWeight:900,fontSize:13,cursor:"pointer",letterSpacing:2}}>START FREE TRIAL — $0</button>
           </div>
           <div style={{...Card(),textAlign:"center"}}>
@@ -3222,7 +3039,7 @@ function P4({ go, setUser }) {
         </div>
         <div style={{textAlign:"center",marginBottom:24,display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
           <button onClick={()=>{try{const m=JSON.parse(localStorage.getItem("ms_medialib")||"[]");const t=JSON.parse(localStorage.getItem("ms_timeline")||"{}");const u=JSON.parse(localStorage.getItem("ms_user")||"{}");const p=JSON.parse(localStorage.getItem("ms_page")||"5");if(m.length>0||Object.keys(t).length>0){if(u&&u.name)setUser(u);go(p);}else{alert("No saved project found.");}}catch(e){alert("Could not load project.");}}} style={{...G("gold",false),padding:"12px 32px"}}>📂 OPEN PROJECT</button>
-          <button onClick={()=>startOn("Creator","Guest",false,"")} style={{...G("out",false),padding:"12px 32px"}}>✦ NEW PROJECT</button>
+          <button onClick={()=>{setUser({name:"Creator",plan:"Guest",isAdmin:false});go(5);}} style={{...G("out",false),padding:"12px 32px"}}>✦ NEW PROJECT</button>
         </div>
         <h2 style={{...H1,fontSize:22,textAlign:"center",marginBottom:22}}>SUBSCRIPTION PLANS</h2>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
@@ -3295,10 +3112,9 @@ function MergeVideos({ onSave }) {
       canvas.width = 1920; canvas.height = 1080;
       const ctx = canvas.getContext("2d");
       const fps = 24;
-      const mimeType = pickRecordMime("vp9");
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
       const stream = canvas.captureStream(fps);
-      const recorder = makeRecorder(stream, mimeType, {videoBitsPerSecond:8000000});
-      if(!recorder){alert("This browser cannot record video. Try Safari or Chrome.");return;}
+      const recorder = new MediaRecorder(stream, {mimeType, videoBitsPerSecond:8000000});
       const chunks = [];
       recorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
       recorder.start(100);
@@ -3377,7 +3193,7 @@ function MergeVideos({ onSave }) {
       setProgress(100);
       log("✓ Merge complete — "+(blob.size/1024/1024).toFixed(1)+"MB · "+clips.length+" clips combined");
 
-      const fn = "MandaStrong_Merged_"+Date.now()+"."+mimeExt(mimeType);
+      const fn = "MandaStrong_Merged_"+Date.now()+".webm";
       try {
         const clipId = "merge_"+Date.now();
         await safeSaveClipToDB(clipId, blob, fn, "video/webm");
@@ -3441,7 +3257,7 @@ function MergeVideos({ onSave }) {
       {mergedUrl&&(
         <div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px"}}>
           <div style={{color:"#22c55e",fontWeight:900,fontSize:11,letterSpacing:2,marginBottom:6}}>✓ MERGED FILM SAVED TO MEDIA LIBRARY — READY FOR TIMELINE</div>
-          <a href={mergedUrl} download="MandaStrong_Merged.webm"
+          <a href={mergedUrl} download="MandaStrong_Merged.webm" target="_blank" rel="noopener noreferrer"
             style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none"}}>⬇ DOWNLOAD MERGED FILM</a>
         </div>
       )}
@@ -3451,10 +3267,22 @@ function MergeVideos({ onSave }) {
 
 function P11({ mediaLib, setMediaLib }) {
   const fileRef = useRef(null);
-  const onFiles = files => {
+  const onFiles = async files => {
     if(!files)return;
-    const n=Array.from(files).map(f=>({id:Date.now()+Math.random(),name:f.name,type:f.type,file:f,url:URL.createObjectURL(f)}));
-    setMediaLib(p=>[...p,...n]);
+    const arr=Array.from(files);
+    const added=[];
+    for(const f of arr){
+      // Large files: warn but still allow — IndexedDB handles big blobs fine
+      if(f.size>1024*1024*1024){ // >1GB
+        alert('"'+f.name+'" is very large ('+(f.size/1024/1024/1024).toFixed(1)+"GB). It may load slowly. For smoothest results keep single files under 1GB.");
+      }
+      const id=Date.now()+Math.random();
+      const asset={id,name:f.name,type:f.type,file:f,url:URL.createObjectURL(f),dbId:"upload_"+id};
+      // Persist to IndexedDB so it survives refresh and doesn't rely on holding the File in memory
+      try{await safeSaveClipToDB("upload_"+id,f,f.name,f.type);}catch(err){console.warn("upload persist failed",err);}
+      added.push(asset);
+    }
+    setMediaLib(p=>[...p,...added]);
   };
   return (
     <div style={{...Sp,padding:40}}>
@@ -3485,7 +3313,7 @@ function P11({ mediaLib, setMediaLib }) {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
               {mediaLib.map(a=>(
                 <div key={a.id} style={{...Card(),padding:8,position:"relative"}}>
-                  {a.type.startsWith("video")?<video src={a.url} style={{width:"100%",marginBottom:5}}/>:
+                  {a.type.startsWith("video")&&a.url?<video src={a.url} style={{width:"100%",marginBottom:5}}/>:
                    a.type.startsWith("image")?<img src={a.url} style={{width:"100%",marginBottom:5}} alt={a.name}/>:
                    <div style={{height:60,background:"#000",marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎵</div>}
                   <div style={{color:WHITE,fontSize:11,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.name}</div>
@@ -3584,6 +3412,27 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
             if(videoTrack.length>0)newTl[0]=videoTrack;
             if(audioTrack.length>0)newTl[1]=audioTrack;
             setTimeline(newTl);
+            // ── DURATION GAP CHECK — works across the whole slider, any length ──
+            const targetSec=(filmDuration||60)*60;
+            const filledSec=vTime; // total seconds of laid video clips
+            const gapSec=targetSec-filledSec;
+            const fmt=(s)=>{const m=Math.floor(s/60),ss=Math.round(s%60);return m+"m"+(ss?" "+ss+"s":"");};
+            if(gapSec>30){
+              const wantFill=window.confirm(
+                "You have "+fmt(filledSec)+" of a "+fmt(targetSec)+" selection.\n\n"+
+                "That leaves a gap of about "+fmt(gapSec)+".\n\n"+
+                "Would you like AI to create fill-in scenes to fill the gap?\n\n"+
+                "OK = generate a fill-scene prompt for Page 8.\nCancel = keep it as is."
+              );
+              if(wantFill){
+                const n=Math.max(1,Math.ceil(gapSec/60));
+                const prompt="Generate "+n+" additional cinematic fill scene"+(n>1?"s":"")+" (about "+fmt(gapSec)+" total) that match the tone, lighting and subject of this film, to bridge the gap to a "+fmt(targetSec)+" runtime. Keep the same color grade and style. 60 seconds each.";
+                try{navigator.clipboard.writeText(prompt);}catch{}
+                alert("✓ Fill-scene prompt copied.\n\nGo to Page 8 (Video Tools), paste it, and generate "+n+" more clip"+(n>1?"s":"")+" — then SYNC again.");
+                go(8);
+                return;
+              }
+            }
             alert("✓ All tracks synced in order — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
           }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⚡ SYNC ALL TRACKS</button>
           <button onClick={()=>go(16)} style={{...G("gold",false)}}>→ RENDER</button>
@@ -3592,7 +3441,7 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
         </div>
       </div>
       <div style={{background:"#000",height:100,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,border:"1px solid "+GOLDDIM}}>
-        {mediaLib[0]&&mediaLib[0].type.startsWith("video")?
+        {mediaLib[0]&&mediaLib[0].type.startsWith("video")&&mediaLib[0].url?
           <video src={mediaLib[0].url} style={{height:"100%",width:"100%",objectFit:"cover",opacity:.5}}/>:
           <div style={{textAlign:"center"}}>
             <div style={{fontSize:12,letterSpacing:3,color:WHITE,marginBottom:8}}>ADD MEDIA TO SEE PREVIEW</div>
@@ -3758,11 +3607,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   };
 
   const getAudioTrack=()=>{
-    // Track 1 is the audio track. Read it in placed order and take the first —
-    // never let a stray library item outrank what is on the timeline.
-    const placed=(timeline&&timeline[1])?timeline[1]:[];
-    const tPlaced=placed.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
-    if(tPlaced.length>0)return tPlaced[0];
     const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
     return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
@@ -3806,37 +3650,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       }
     }catch(e){console.warn("DB load failed",e);}
 
-    // ── ORDER AUTHORITY: THE TIMELINE ─────────────────────────────────────
-    // Storage hands clips back in key order, which is alphabetical, and it
-    // hands back clips that were never placed on the timeline. So storage is
-    // used ONLY to refresh each clip's blob. The running order is whatever
-    // was arranged on the timeline, and it is never re-sorted.
-    const freshLookup=new Map();
-    freshClips.forEach(c2=>{
-      if(c2.id!==undefined&&c2.id!==null) freshLookup.set("id:"+String(c2.id),c2);
-      if(c2.dbId!==undefined&&c2.dbId!==null) freshLookup.set("id:"+String(c2.dbId),c2);
-      if(c2.name) freshLookup.set("name:"+String(c2.name),c2);
-    });
-    const refreshClip=(a)=>{
-      const hit=freshLookup.get("id:"+String(a.id))
-             || freshLookup.get("id:"+String(a.dbId))
-             || freshLookup.get("name:"+String(a.name));
-      return hit ? {...a,url:hit.url,file:hit.file,dbId:hit.dbId} : a;
-    };
-
-    const timelineClips=Object.values(timeline||{}).flat()
-      .filter(a=>a&&a.type&&a.type.startsWith("video"));
-
-    let clips;
-    let orderedByTimeline=false;
-    if(timelineClips.length>0){
-      clips=timelineClips.map(refreshClip);
-      orderedByTimeline=true;
-    } else {
-      clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
-      log("No clips on the timeline — falling back to the media library");
-    }
-
+    // Fall back to current mediaLib if DB empty
+    let clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
     // ── EXCLUDE old rendered films and empty clips ──────────────────────────
     // A previously-rendered "MandaStrong_Film..." file in the library has no real
     // scene frames — including it makes the whole render come out 0.0MB.
@@ -3846,19 +3661,13 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(c2.file&&c2.file.size!==undefined&&c2.file.size<1000) return false; // skip empty blobs
       return true;
     });
-
-    if(orderedByTimeline){
-      log("Timeline order locked — "+clips.length+" clips, exactly as arranged");
-      clips.forEach((c2,i)=>log("  "+(i+1)+". "+String(c2.name||"clip").slice(0,42)));
-    } else {
-      // Only when there was no timeline to obey: best-effort numeric ordering.
-      clips.sort((a,b)=>{
-        const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-        const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-        if(na!==nb)return na-nb;
-        return (a.name||"").localeCompare(b.name||"");
-      });
-    }
+    // Sort scenes in order by leading number in the name (Scene 1, 2, 3...)
+    clips.sort((a,b)=>{
+      const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
+      const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
+      if(na!==nb)return na-nb;
+      return (a.name||"").localeCompare(b.name||"");
+    });
     const audioAsset=getAudioTrack();
     if(clips.length===0){alert("No video clips found. Generate clips on Page 8 first.");return;}
     log("Rendering "+clips.length+" scene clips (old render files excluded)");
@@ -3878,34 +3687,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(audioAsset){
         // If it's a text narration asset, speak it live via Web Speech API during render
         if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
-          // Narration used to be SPOKEN LIVE through the device speaker while
-          // recording. Speaker output is never part of the audio graph, so it
-          // could never be captured — that is why finished films came out
-          // silent. Now we render the voice to a real audio file first and
-          // feed it into the recorder, so it lands inside the film.
-          log("Narration: rendering voice through the Cinema Voice Engine...");
-          try{
-            const vObj=(typeof VOICE_CHARACTERS!=="undefined")?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
-            const vMeta={
-              voice:(vObj&&vObj.engineVoice)||audioAsset.voice||"",
-              gender:(vObj&&vObj.gender)||"",
-              origin:(vObj&&vObj.origin)||"",
-              speed:audioAsset.speed||(vObj&&vObj.rate)||1
-            };
-            const vUrl=await engineSpeak(audioAsset.text,vMeta);
-            if(vUrl){
-              const vResp=await fetch(vUrl);
-              const vArr=await vResp.arrayBuffer();
-              audioBuffer=await audioCtx.decodeAudioData(vArr);
-              log("✓ Narration baked into film: "+audioBuffer.duration.toFixed(1)+"s");
-            } else {
-              liveNarration=true;
-              log("⚠ Voice engine did not answer — narration will play live and may not record");
-            }
-          }catch(e){
-            liveNarration=true;
-            log("⚠ Narration bake failed ("+e.message+") — falling back to live speech");
-          }
+          liveNarration=true;
+          log("✓ Narration ready — will speak live during render");
         } else {
           try{
             let audioBlob=null;
@@ -3929,22 +3712,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           }catch(e){log("Audio load failed: "+e.message+" — video only");}
         }
       }
-      if(audioBuffer){
-        audioSource=audioCtx.createBufferSource();
-        audioSource.buffer=audioBuffer;
-        // Automatic stereo — spread before it reaches the recorder, so the
-        // width is baked into the exported film, not just the monitor mix.
-        try{
-          const st=makeStereoChain(audioCtx,0.62);
-          audioSource.connect(st.input);
-          st.output.connect(audioDest);
-          st.output.connect(audioCtx.destination);
-          log("Stereo field applied \u2014 voice centred, ambience widened");
-        }catch(e){
-          audioSource.connect(audioDest);
-          audioSource.connect(audioCtx.destination);
-        }
-      }
+      if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
       // Draw several real frames BEFORE capturing so the stream is definitely live
       for(let w=0;w<5;w++){
         ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
@@ -3962,8 +3730,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const tracks=[...videoStream.getTracks(),...audioDest.stream.getTracks()];
       const combinedStream=new MediaStream(tracks);
       const vCodec=codec==="vp9"?"vp9":"vp8";
-      const mimeType=pickRecordMime(vCodec);
-      log("Recording format: "+(mimeType||"browser default")+" (."+mimeExt(mimeType)+")");
+      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs="+vCodec+",opus")?"video/webm;codecs="+vCodec+",opus":"video/webm";
       // ── ADAPTIVE BITRATE — caps total memory so long films finish encoding ──
       // The end-of-render crash was memory: chunks pile up all render, then the
       // final Blob build doubles them. iPad Safari kills the tab (~1.4GB).
@@ -3974,8 +3741,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const safeBitrate=Math.floor(budgetBits/totalFilmSec);
       const bitrate=Math.min(requested,Math.max(2000000,safeBitrate));
       if(bitrate<requested)log("Adaptive bitrate: "+(bitrate/1000000).toFixed(1)+"Mbps for "+Math.round(totalFilmSec)+"s film — keeps memory safe to the end");
-      const recorder=makeRecorder(combinedStream,mimeType,{videoBitsPerSecond:bitrate,audioBitsPerSecond:128000});
-      if(!recorder){log("\u2717 This browser cannot record video at all.");alert("This browser cannot record video. Try Safari or Chrome with the tab in front.");setRendering(false);return;}
+      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:128000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       // Prime the canvas so captureStream has a real frame
@@ -4179,9 +3945,9 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       log("RENDER COMPLETE — "+(blob.size/1024/1024).toFixed(1)+"MB");
       // Save final render to IndexedDB — timeout-protected, never blocks completion
       try{
-        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+"."+mimeExt(mimeType);
+        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
         await Promise.race([
-          saveClipToDB("render_final",blob,renderName,mimeType||"video/webm"),
+          saveClipToDB("render_final",blob,renderName,"video/webm"),
           new Promise(r=>setTimeout(r,6000))
         ]);
       }catch(e){}
@@ -4274,7 +4040,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             <div style={{background:"#061406",border:"1px solid #22c55e",padding:"16px 20px",marginBottom:16}}>
               <div style={{color:"#22c55e",fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:12}}>RENDER COMPLETE</div>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <a href={renderUrl} download={"MandaStrong_Film."+__msLastExt} style={{...G("gold",false),padding:"12px 24px",textDecoration:"none",display:"inline-block",fontSize:12,letterSpacing:2}}>DOWNLOAD FILM</a>
+                <a href={renderUrl} download="MandaStrong_Film.webm" target="_blank" rel="noopener noreferrer" style={{...G("gold",false),padding:"12px 24px",textDecoration:"none",display:"inline-block",fontSize:12,letterSpacing:2}}>DOWNLOAD FILM</a>
                 <button onClick={()=>go(17)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>PREVIEW</button>
                 <button onClick={()=>go(18)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>EXPORT</button>
               </div>
@@ -4376,7 +4142,7 @@ function P17({ go, rendered, mediaLib }) {
 
 function P18({ rendered, mediaLib }) {
   const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
-  const dl=()=>{if(!vs){alert("No film yet — render first!");return;}const a=document.createElement("a");a.href=vs;a.download="MandaStrong_Film."+__msLastExt;a.click();};
+  const dl=()=>{if(!vs){alert("No film yet — render first!");return;}const a=document.createElement("a");a.href=vs;a.download="MandaStrong_Film.webm";a.target="_blank";a.rel="noopener noreferrer";a.click();};
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:780,margin:"0 auto"}}>
@@ -4693,8 +4459,8 @@ function P20() {
             </div>
 
             {sec("1. ACCEPTANCE OF TERMS",<>{p("By accessing or using MandaStrong Studio you agree to be legally bound by these Terms of Service. If you do not agree, do not use this platform. These terms apply to all users including free, trial, and paid subscribers.")}</>)}
-            {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Basic ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
-            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Basic and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
+            {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Creator ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
+            {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
             {sec("4. AI-GENERATED CONTENT",<>{p("Content generated by MandaStrong Studio's AI tools is produced algorithmically. You are solely responsible for reviewing, editing, and verifying all AI-generated outputs before use. MandaStrong Studio makes no guarantees regarding the accuracy, appropriateness, or fitness for purpose of AI-generated content.")}{p("You agree not to use AI-generated content to produce material that is defamatory, illegal, harmful, or in violation of third-party rights.")}</>)}
             {sec("5. ACCEPTABLE USE",<>{p("You agree to use MandaStrong Studio only for lawful purposes. The following are strictly prohibited:")}{li(["Producing content that is defamatory, obscene, or harasses individuals","Infringing on third-party intellectual property rights","Attempting to reverse-engineer, copy, or redistribute the platform","Using the platform to generate spam, malware, or fraudulent content","Sharing your account credentials with third parties"])}</>)}
             {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. Full details available at MandaStrong1.Etsy.com.")}</>)}
@@ -4887,7 +4653,7 @@ function HowToGuide() {
   );
 }
 
-function P24CharacterStudio({ onSave }) {
+function P24CharacterStudio({ onSave, go }) {
   const [chars,setChars]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_characters")||"[]");}catch{return [];}});
   const [name,setName]=useState("");
   const [voice,setVoice]=useState("james");
@@ -4918,7 +4684,21 @@ function P24CharacterStudio({ onSave }) {
     if(!f)return;
     setPhotoName(f.name);
     const reader=new FileReader();
-    reader.onload=ev=>setPhoto(ev.target.result);
+    reader.onload=ev=>{
+      // Downscale large photos so localStorage doesn't overflow and crash
+      const img=new Image();
+      img.onload=()=>{
+        const max=900;let{width:w,height:h}=img;
+        if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+        try{
+          const cv=document.createElement("canvas");cv.width=w;cv.height=h;
+          cv.getContext("2d").drawImage(img,0,0,w,h);
+          setPhoto(cv.toDataURL("image/jpeg",0.85));
+        }catch(err){setPhoto(ev.target.result);}
+      };
+      img.onerror=()=>setPhoto(ev.target.result);
+      img.src=ev.target.result;
+    };
     reader.readAsDataURL(f);
   };
 
@@ -4986,25 +4766,12 @@ function P24CharacterStudio({ onSave }) {
       <div style={{maxWidth:1100,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700,marginBottom:4}}>CONSISTENCY ENGINE</div>
         <h1 style={{...H1,fontSize:26,marginBottom:6}}>CHARACTER STUDIO</h1>
-        <div style={{background:"linear-gradient(135deg,#0a0500,#1a0c00)",border:"2px solid "+GOLD,padding:"14px 18px",margin:"14px 0 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-          <div style={{fontSize:30,lineHeight:1}}>➕</div>
-          <div style={{flex:1,minWidth:220}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:15,fontWeight:900,letterSpacing:3}}>ADD YOUR OWN CHARACTERS</div>
-            <div style={{color:WHITE,fontSize:12,lineHeight:1.6,marginTop:3}}>
-              Build your own cast and reuse them across every film. Upload a photo, set the look and the voice, and each character keeps the same face in every scene you render.
-            </div>
-          </div>
-          <div style={{background:"#000",border:"1px solid "+GOLDDIM,padding:"7px 14px",textAlign:"center"}}>
-            <div style={{color:GOLDDIM,fontSize:9,letterSpacing:2}}>YOUR CAST</div>
-            <div style={{color:GOLD,fontSize:20,fontWeight:900,fontFamily:"'Cinzel',serif"}}>{chars.length}</div>
-          </div>
-        </div>
         <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.7}}>Create reusable characters with full physical and costume details. Send a character's reference image to your Media Library, then upload on Page 8 to keep the same face across every scene. Hit COPY SCENE PROMPT to get a ready-to-paste prompt for any scene.</div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
           {/* Create / Edit panel */}
           <div style={{...Card(),border:"2px solid "+GOLD,maxHeight:"80vh",overflowY:"auto"}}>
-            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>{editId?"✏ EDIT CHARACTER":"➕ ADD YOUR OWN CHARACTER"}</div>
+            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>{editId?"✏ EDIT CHARACTER":"✦ CREATE A CHARACTER"}</div>
 
             {lbl("CHARACTER NAME")}
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Doxy, Ethan, Lily..." style={{...inp,marginBottom:4}}/>
@@ -5049,7 +4816,7 @@ function P24CharacterStudio({ onSave }) {
                 <button onClick={()=>{setPhoto(null);setPhotoName("");}} style={{position:"absolute",top:5,right:5,background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:900}}>✕</button>
               </div>
             ):(
-              <button onClick={()=>fileRef.current&&fileRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:12}}>📷 UPLOAD CHARACTER PHOTO</button>
+              <button onClick={()=>fileRef.current&&fileRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:12}}>🖼 CHOOSE FROM PHOTOS</button>
             )}
             <input ref={fileRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" style={{display:"none"}} onChange={handlePhoto}/>
 
@@ -5108,6 +4875,10 @@ function P24CharacterStudio({ onSave }) {
             )}
           </div>
         </div>
+        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginTop:30,paddingBottom:20}}>
+          <button onClick={()=>go&&go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
+          <button onClick={()=>{try{localStorage.removeItem("ms_user");}catch{}window.location.reload();}} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🚪 EXIT APP</button>
+        </div>
       </div>
     </div>
   );
@@ -5145,15 +4916,6 @@ function P23({ go }) {
   };
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
-      {/* background.mp4 restored at top of page */}
-      <div style={{width:"100%",maxHeight:"42vh",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#000",borderBottom:"1px solid "+GOLDDIM}}>
-        <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-          style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover"}}>
-          <source src="/background.mp4" type="video/mp4"/>
-          <source src="background.mp4" type="video/mp4"/>
-          <source src="/thatsallfolks.mp4" type="video/mp4"/>
-        </video>
-      </div>
       <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM</div>
@@ -5178,9 +4940,22 @@ function P23({ go }) {
           {howOpen&&<div style={{background:"#030200ee",border:"2px solid "+GOLD,borderTop:"none",marginBottom:28}}><HowToGuide/></div>}
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noreferrer" style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",color:"#000",padding:"16px 24px",fontWeight:900,fontSize:14,letterSpacing:3,textDecoration:"none",marginBottom:28,fontFamily:"'Cinzel',serif"}}>📚 HUMANITY FOR FUTURE AI — MANDASTRONG1.ETSY.COM</a>
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
-            <button onClick={exitApp} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🚪 EXIT APP</button>
+            <button onClick={()=>go(22)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>← BACK</button>
+            <button onClick={()=>go(24)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>NEXT →</button>
           </div>
+        </div>
+        <div style={{width:"100%",maxHeight:"42vh",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#000",borderTop:"1px solid "+GOLDDIM,marginTop:30}}>
+          <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
+            onLoadedMetadata={(e)=>{try{if(e.currentTarget.currentTime<0.1)e.currentTarget.currentTime=0.1;}catch{}}}
+            style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",background:"#000"}}>
+            <source src="/background.mp4" type="video/mp4"/>
+            <source src="background.mp4" type="video/mp4"/>
+            <source src="./background.mp4" type="video/mp4"/>
+            <source src="/background_5.mp4" type="video/mp4"/>
+            <source src="background_5.mp4" type="video/mp4"/>
+            <source src="./background_5.mp4" type="video/mp4"/>
+            <source src="/thatsallfolks.mp4" type="video/mp4"/>
+          </video>
         </div>
       </div>
     </div>
@@ -5191,6 +4966,9 @@ export default function App() {
   const [page,setPage]=useState(1);
   const [menu,setMenu]=useState(false);
   useEffect(()=>{
+    // Raise the storage ceiling so large uploads don't crash — ask the browser
+    // to make storage persistent (grants a much larger quota when accepted).
+    try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist().catch(()=>{});}).catch(()=>{});}}catch(e){}
     // Fonts
     const link=document.createElement("link");
     link.rel="stylesheet";
@@ -5256,7 +5034,6 @@ export default function App() {
   const [savedNotice,setSavedNotice]=useState(false);
   const [showHistory,setShowHistory]=useState(false);
   const [showSaveModal,setShowSaveModal]=useState(false);
-  const [showAccount,setShowAccount]=useState(false);
 
   const go=p=>{setPage(p);window.scrollTo(0,0);try{localStorage.setItem("ms_page",JSON.stringify(p));}catch{}};
 
@@ -5380,16 +5157,15 @@ export default function App() {
       case 21: return <P21/>;
       case 22: return <P22/>;
       case 23: return <P23 go={go}/>;
-      case 24: return <P24CharacterStudio onSave={saveAsset}/>;
+      case 24: return <P24CharacterStudio onSave={saveAsset} go={go}/>;
       default: return <P1 go={go}/>;
     }
   };
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      <Header go={go} setMenu={setMenu} user={user} onAccount={()=>setShowAccount(true)}/>
-      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user} onAccount={()=>setShowAccount(true)}/>}
-      {showAccount&&<AccountPanel user={user} go={go} onClose={()=>setShowAccount(false)}/>}
+      <Header go={go} setMenu={setMenu}/>
+      {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
       {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
       {showSaveModal&&<SaveSessionModal onClose={()=>setShowSaveModal(false)} onSave={doSave} currentPage={page} assetCount={mediaLib.length}/>}
       {savedNotice&&<div style={{position:"fixed",top:60,left:"50%",transform:"translateX(-50%)",background:GOLDDIM,color:"#000",padding:"10px 24px",fontWeight:900,fontSize:13,letterSpacing:2,zIndex:999}}>✓ PROJECT SAVED</div>}
