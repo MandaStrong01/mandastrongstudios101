@@ -3692,10 +3692,40 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       let audioSource=null,audioBuffer=null;
       let liveNarration=false;
       if(audioAsset){
-        // If it's a text narration asset, speak it live via Web Speech API during render
+        // NARRATION: bake through the Cinema Voice Engine so it RECORDS into the film.
+        // Device speech (speechSynthesis) plays out the speaker and never enters the
+        // captured audio graph, so on iPad the film came out silent / "voice unavailable".
+        // Fix: fetch real audio from engineSpeak, decode into THIS audioCtx, feed audioDest —
+        // the same path uploaded audio uses. Live speech remains only as a fallback.
         if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
-          liveNarration=true;
-          log("✓ Narration ready — will speak live during render");
+          try{
+            const vc=(typeof VOICE_CHARACTERS!=="undefined")?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
+            const meta={voice:vc?.engineVoice||"",gender:vc?.gender||"",origin:vc?.origin||"",speed:vc?.rate||0.9};
+            const narrChunks=buildChunks(audioAsset.text||"");
+            log("Baking narration through Cinema Voice Engine — "+narrChunks.length+" segment(s)...");
+            const decoded=[];
+            for(const c of narrChunks){
+              if(!c||!c.text) continue;
+              const u=await engineSpeak(c.text,meta);
+              if(!u) continue;
+              try{ const r=await fetch(u); const ab=await r.arrayBuffer(); decoded.push(await audioCtx.decodeAudioData(ab)); }catch(e){}
+            }
+            if(decoded.length){
+              const total=decoded.reduce((s,b)=>s+b.duration,0);
+              const merged=audioCtx.createBuffer(1,Math.max(1,Math.ceil(total*audioCtx.sampleRate)),audioCtx.sampleRate);
+              const out=merged.getChannelData(0);
+              let off=0;
+              for(const b of decoded){ out.set(b.getChannelData(0),Math.floor(off*audioCtx.sampleRate)); off+=b.duration; }
+              audioBuffer=merged;
+              log("✓ Narration baked from Cinema Voice Engine: "+total.toFixed(1)+"s");
+            } else {
+              liveNarration=true;
+              log("Engine narration unavailable — speaking live as fallback");
+            }
+          }catch(e){
+            liveNarration=true;
+            log("Narration bake error — live fallback: "+e.message);
+          }
         } else {
           try{
             let audioBlob=null;
@@ -3766,11 +3796,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         }catch(e){}
       },Math.round(1000/fps));
       if(audioSource)audioSource.start(0);
-      // Speak live narration text through speakers during render
+      // Live-speak fallback ONLY when the engine bake could not deliver audio.
       if(liveNarration&&audioAsset?.text){
-        const vc=typeof VOICE_CHARACTERS!=="undefined"?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
         speakText(audioAsset.voice||"blaze",audioAsset.text,null,null);
-        log("✓ Speaking narration live: "+(audioAsset.voice||"blaze"));
+        log("✓ Speaking narration live (fallback): "+(audioAsset.voice||"blaze"));
       }
       log("Recording started...");
       setProgress(5);
