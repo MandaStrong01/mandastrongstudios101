@@ -3616,7 +3616,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   const getAudioTrack=()=>{
     const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
-    return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
+    return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
   };
 
   const startRender=async()=>{
@@ -3646,12 +3646,22 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
     try{
       const dbClips=await getAllClipsFromDB();
       if(dbClips.length>0){
-        freshClips=dbClips.map(c2=>({
-          id:c2.id,name:c2.name,type:c2.type||"video/webm",
-          url:URL.createObjectURL(c2.blob),
-          file:new File([c2.blob],c2.name,{type:c2.type||"video/webm"}),
-          dbId:c2.id
-        }));
+        freshClips=[];
+        for(const c2 of dbClips){
+          const prev=(mediaLib||[]).find(m=>m.id===c2.id);
+          const entry={
+            id:c2.id,name:c2.name,type:c2.type||"video/webm",
+            url:URL.createObjectURL(c2.blob),
+            file:new File([c2.blob],c2.name,{type:c2.type||"video/webm"}),
+            dbId:c2.id,
+            text:prev?.text,
+            voice:prev?.voice
+          };
+          if(c2.type==="narration"&&!entry.text){
+            try{ entry.text=await c2.blob.text(); }catch(e){}
+          }
+          freshClips.push(entry);
+        }
         setMediaLib(freshClips);
         log("Loaded "+freshClips.length+" clips from storage");
       }
@@ -3675,7 +3685,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(na!==nb)return na-nb;
       return (a.name||"").localeCompare(b.name||"");
     });
-    const audioAsset=getAudioTrack();
+    let audioAsset = freshClips.length > 0
+      ? freshClips.find(a => a && a.type && (a.type.startsWith("audio") || a.type === "audio/narration" || a.type === "narration" || a.type === "audio/webm"))
+      : null;
+    if (!audioAsset) audioAsset = getAudioTrack();
     if(clips.length===0){alert("No video clips found. Generate clips on Page 8 first.");return;}
     log("Rendering "+clips.length+" scene clips (old render files excluded)");
     setRendering(true);setDone(false);setProgress(0);setRenderLog([]);setRenderUrl("");setCurrentClipIdx(-1);
@@ -4145,9 +4158,23 @@ function P17({ go, rendered, mediaLib }) {
       const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
       if(latest?.url) setVs(latest.url);
     });
+    return ()=>{ try{stopSpeaking(); }catch(e){} };
   },[rendered,mediaLib]);
   const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");};
-  const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
+  const narrAsset=(mediaLib||[]).find(a=>a&&a.type&&(a.type==="narration"||a.type==="audio/narration")&&a.text);
+  const togglePlay=()=>{
+    if(!videoRef.current)return;
+    if(isPlaying){
+      videoRef.current.pause();setIsPlaying(false);
+      try{stopSpeaking();}catch(e){}
+    }else{
+      videoRef.current.play();setIsPlaying(true);
+      if(narrAsset&&narrAsset.text){
+        try{stopSpeaking();}catch(e){}
+        setTimeout(()=>{try{speakText(narrAsset.voice||"blaze",narrAsset.text,null,null);}catch(e){}},300);
+      }
+    }
+  };
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:880,margin:"0 auto"}}>
