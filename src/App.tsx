@@ -1836,14 +1836,57 @@ function P6Voice({ onSave, setMediaLib }) {
   const [myVoices,setMyVoices]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_my_voices")||"[]");}catch{return [];}});
   const myVoiceInputRef=useRef(null);
   const chunksRef=useRef([]); const idxRef=useRef(0); const timerRef=useRef(null);
-  const addMyVoice=(file)=>{
+  const [recordingMine,setRecordingMine]=useState(false); const [recTime,setRecTime]=useState(0);
+  const micRef=useRef(null); const recTimerRef=useRef(null);
+  // Save your own voice AND keep the real audio in IndexedDB so it survives reload
+  // and can be baked into the film. (Previously only a blob: URL was kept, which
+  // died on refresh — that is why a recorded voice never actually played back.)
+  const addMyVoice=async(file)=>{
     if(!file)return;
+    const id="myvoice_"+Date.now();
     const url=URL.createObjectURL(file);
-    const nv={id:"myvoice_"+Date.now(),name:(file.name||"My Voice").replace(/\.[^.]+$/,""),url,origin:"My Upload",gender:"—",age:"—",emoji:"🎙",style:"Your uploaded voice",desc:"A voice you added from your own audio file."};
+    const nv={id,name:(file.name||"My Voice").replace(/\.[^.]+$/,""),url,dbId:id,origin:"My Upload",gender:"—",age:"—",emoji:"🎙",style:"Your recorded voice",desc:"Your own voice — plays back exactly as recorded."};
+    try{await safeSaveClipToDB(id,file,nv.name,"audio/myvoice");}catch(e){}
     const upd=[nv,...myVoices];
     setMyVoices(upd);
     try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}
-    setSelVoice(nv.id);
+    setSelVoice(id);
+  };
+  const startMyRecording=async()=>{
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(stream); micRef.current=mr; const chunks=[];
+      mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+      mr.onstop=async()=>{
+        const blob=new Blob(chunks,{type:"audio/webm"});
+        const f=new File([blob],"My Recording "+new Date().toLocaleTimeString()+".webm",{type:"audio/webm"});
+        await addMyVoice(f);
+        stream.getTracks().forEach(t=>t.stop());
+        setRecordingMine(false);setRecTime(0);
+      };
+      mr.start(100);setRecordingMine(true);setRecTime(0);
+      recTimerRef.current=setInterval(()=>setRecTime(t=>t+1),1000);
+    }catch(e){alert("Microphone access denied. Please allow microphone and try again.");}
+  };
+  const stopMyRecording=()=>{
+    if(micRef.current&&micRef.current.state!=="inactive")micRef.current.stop();
+    if(recTimerRef.current)clearInterval(recTimerRef.current);
+  };
+  // Save the SELECTED own-voice recording as the film's narration — real audio,
+  // not synthetic. Lands on the timeline audio track like any other clip.
+  const saveMyVoiceAsNarration=async()=>{
+    const mine=myVoices.find(v=>v.id===selVoice);
+    if(!mine){alert("Pick or record your own voice first, then save it as narration.");return;}
+    let blob=null;
+    try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)blob=st.blob;}catch(e){}
+    if(!blob&&mine.url){try{blob=await (await fetch(mine.url)).blob();}catch(e){}}
+    if(!blob){alert("Could not find that recording's audio — try recording again.");return;}
+    const id="narr_myvoice_"+Date.now();
+    const asset={id,name:"My Voice Narration - "+new Date().toLocaleTimeString(),type:"audio/myvoice",dbId:id,date:new Date().toISOString()};
+    await safeSaveClipToDB(id,blob,asset.name,"audio/myvoice");
+    if(onSave)onSave(asset);
+    if(setMediaLib)setMediaLib(p=>[...p,asset]);
+    setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);
   };
   const delMyVoice=(id)=>{const upd=myVoices.filter(v=>v.id!==id);setMyVoices(upd);try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}};
 
@@ -1980,7 +2023,19 @@ function P6Voice({ onSave, setMediaLib }) {
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 6px 80px"}}>
             <input ref={myVoiceInputRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" style={{display:"none"}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(f)addMyVoice(f);e.target.value="";}}/>
-            <button onClick={()=>myVoiceInputRef.current&&myVoiceInputRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>＋ ADD YOUR OWN VOICE</button>
+            {recordingMine?(
+              <div style={{display:"flex",alignItems:"center",gap:8,background:"#1a0000",border:"2px solid #ef4444",padding:"9px 12px",marginBottom:6}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444"}}/>
+                <span style={{color:"#ef4444",fontWeight:900,fontSize:11,letterSpacing:2,flex:1}}>RECORDING — {String(Math.floor(recTime/60)).padStart(2,"0")}:{String(recTime%60).padStart(2,"0")}</span>
+                <button onClick={stopMyRecording} style={{background:"#ef4444",border:"none",color:"#fff",padding:"5px 14px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2}}>■ STOP & SAVE</button>
+              </div>
+            ):(
+              <button onClick={startMyRecording} style={{width:"100%",background:"linear-gradient(135deg,#7a0000,#ef4444)",border:"none",color:"#fff",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>● RECORD MY VOICE NOW</button>
+            )}
+            <button onClick={()=>myVoiceInputRef.current&&myVoiceInputRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>＋ ADD YOUR OWN VOICE (FILE)</button>
+            {myVoices.some(v=>v.id===selVoice)&&(
+              <button onClick={saveMyVoiceAsNarration} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>🎙 USE MY VOICE AS NARRATION</button>
+            )}
             {myVoices.map(v=>(
               <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+(selVoice===v.id?GOLD:GOLDDIM),cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -3616,7 +3671,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   const getAudioTrack=()=>{
     const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
     if(tAudio.length>0)return tAudio[0];
-    return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
+    return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
   };
 
   const startRender=async()=>{
@@ -3646,22 +3701,12 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
     try{
       const dbClips=await getAllClipsFromDB();
       if(dbClips.length>0){
-        freshClips=[];
-        for(const c2 of dbClips){
-          const prev=(mediaLib||[]).find(m=>m.id===c2.id);
-          const entry={
-            id:c2.id,name:c2.name,type:c2.type||"video/webm",
-            url:URL.createObjectURL(c2.blob),
-            file:new File([c2.blob],c2.name,{type:c2.type||"video/webm"}),
-            dbId:c2.id,
-            text:prev?.text,
-            voice:prev?.voice
-          };
-          if(c2.type==="narration"&&!entry.text){
-            try{ entry.text=await c2.blob.text(); }catch(e){}
-          }
-          freshClips.push(entry);
-        }
+        freshClips=dbClips.map(c2=>({
+          id:c2.id,name:c2.name,type:c2.type||"video/webm",
+          url:URL.createObjectURL(c2.blob),
+          file:new File([c2.blob],c2.name,{type:c2.type||"video/webm"}),
+          dbId:c2.id
+        }));
         setMediaLib(freshClips);
         log("Loaded "+freshClips.length+" clips from storage");
       }
@@ -3685,10 +3730,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(na!==nb)return na-nb;
       return (a.name||"").localeCompare(b.name||"");
     });
-    let audioAsset = freshClips.length > 0
-      ? freshClips.find(a => a && a.type && (a.type.startsWith("audio") || a.type === "audio/narration" || a.type === "narration" || a.type === "audio/webm"))
-      : null;
-    if (!audioAsset) audioAsset = getAudioTrack();
+    const audioAsset=getAudioTrack();
     if(clips.length===0){alert("No video clips found. Generate clips on Page 8 first.");return;}
     log("Rendering "+clips.length+" scene clips (old render files excluded)");
     setRendering(true);setDone(false);setProgress(0);setRenderLog([]);setRenderUrl("");setCurrentClipIdx(-1);
@@ -4158,23 +4200,9 @@ function P17({ go, rendered, mediaLib }) {
       const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
       if(latest?.url) setVs(latest.url);
     });
-    return ()=>{ try{stopSpeaking(); }catch(e){} };
   },[rendered,mediaLib]);
   const fmt=s=>{const m=Math.floor(s/60);const sc=Math.floor(s%60);return String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0");};
-  const narrAsset=(mediaLib||[]).find(a=>a&&a.type&&(a.type==="narration"||a.type==="audio/narration")&&a.text);
-  const togglePlay=()=>{
-    if(!videoRef.current)return;
-    if(isPlaying){
-      videoRef.current.pause();setIsPlaying(false);
-      try{stopSpeaking();}catch(e){}
-    }else{
-      videoRef.current.play();setIsPlaying(true);
-      if(narrAsset&&narrAsset.text){
-        try{stopSpeaking();}catch(e){}
-        setTimeout(()=>{try{speakText(narrAsset.voice||"blaze",narrAsset.text,null,null);}catch(e){}},300);
-      }
-    }
-  };
+  const togglePlay=()=>{if(!videoRef.current)return;if(isPlaying){videoRef.current.pause();setIsPlaying(false);}else{videoRef.current.play();setIsPlaying(true);}};
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:880,margin:"0 auto"}}>
