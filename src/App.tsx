@@ -293,6 +293,7 @@ let currentUtterance = null;
 
 function speakText(voiceId, txt, onStart, onEnd) {
   if (!txt||!txt.trim()) return;
+  if (typeof window === "undefined" || !window.speechSynthesis) { if(onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   currentUtterance = null;
   const clean = txt
@@ -1637,8 +1638,4 @@ function MusicVideoStudio({ onClose, onSave }) {
 
                 <button onClick={generateVideo} disabled={generating}
                   style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"18px",fontSize:14,letterSpacing:3,cursor:generating?"not-allowed":"pointer",fontWeight:900,fontFamily:"'Rajdhani',sans-serif",opacity:generating?0.7:1,marginBottom:10}}>
-                  {generating?"⟳ RENDERING... "+renderProgress+"%":"🎬 GENERATE MUSIC VIDEO"}
-                </button>
-                {generating&&(
-                  <div>
- 
+                  {generating?"⟳ RENDERING... "+renderProgress+"%":"🎬 GENERATE M
