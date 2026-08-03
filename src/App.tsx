@@ -1532,19 +1532,8 @@ function MusicVideoStudio({ onClose, onSave }) {
                   style={{...inp,height:160,resize:"vertical",lineHeight:1.8,border:"1px solid "+GOLD}}
                 />
                 {label("DURATION")}
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                  {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
-                    <button key={d} onClick={()=>set("duration",d)}
-                      style={{background:config.duration===d?GOLD:"#111",border:"1px solid "+(config.duration===d?"#000":GOLDDIM),color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
-                      {d}
-                    </button>
-                  ))}
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <input type="range" min={1} max={60} value={parseInt(config.duration)||3}
-                    onChange={e=>set("duration",e.target.value+" Minutes")}
-                    style={{flex:1,accentColor:GOLD}}/>
-                  <span style={{color:GOLD,fontSize:12,fontWeight:900,letterSpacing:1,minWidth:82,textAlign:"right"}}>{parseInt(config.duration)||3} MIN</span>
+                <div style={{color:GOLDDIM,fontSize:11,lineHeight:1.7,padding:"8px 12px",border:"1px solid "+GOLDDIM,background:"#0a0a0a",marginBottom:8}}>
+                  🎵 The video automatically matches the length of your song. Upload or record your track on the SONG step and the film runs exactly as long as the music.
                 </div>
               </div>
             )}
@@ -2207,6 +2196,21 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [log,setLog]=useState([]);
   const [videoUrl,setVideoUrl]=useState("");
   const [saved,setSaved]=useState(false);
+  // ── BACKGROUND MUSIC ──────────────────────────────────────────
+  const [addMusic,setAddMusic]=useState(false);
+  const [musicTrack,setMusicTrack]=useState("");
+  const MUSIC_LIBRARY=[
+    {id:"epic",     label:"⚔️ Epic / Trailer",       url:"https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3"},
+    {id:"drama",    label:"🎭 Drama / Powerful",     url:"https://cdn.pixabay.com/audio/2023/01/29/audio_5bf2f9f5b0.mp3"},
+    {id:"emotional",label:"💧 Emotional / Piano",    url:"https://cdn.pixabay.com/audio/2021/11/25/audio_00fa5593f3.mp3"},
+    {id:"ambient",  label:"🌌 Ambient / Cinematic",  url:"https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1bab.mp3"},
+    {id:"uplifting",label:"☀️ Uplifting / Hopeful",   url:"https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3"},
+    {id:"tension",  label:"🎯 Tension / Suspense",    url:"https://cdn.pixabay.com/audio/2022/03/10/audio_d1718ab41b.mp3"},
+    {id:"warm",     label:"🕯️ Warm / Reflective",     url:"https://cdn.pixabay.com/audio/2021/08/09/audio_54ca0ffa52.mp3"},
+    {id:"inspiring",label:"🌅 Inspiring / Anthemic",  url:"https://cdn.pixabay.com/audio/2022/10/25/audio_946bc8a627.mp3"},
+    {id:"sad",      label:"🌧️ Sad / Melancholy",      url:"https://cdn.pixabay.com/audio/2022/10/18/audio_31a1f6f2a6.mp3"},
+    {id:"action",   label:"💥 Action / Driving",      url:"https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3"},
+  ];
   const [refMedia,setRefMedia]=useState(null);
   const [refMediaType,setRefMediaType]=useState("");
   const [refDataUrl,setRefDataUrl]=useState(null);
@@ -2485,7 +2489,29 @@ Write the drawFrame body now.`}]
     const fps=20;const totalFrames=duration*fps;
     const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
     const stream=canvas.captureStream(fps);
+    // ── BACKGROUND MUSIC — mix chosen track under the render ──
+    let musicCtx=null, musicSource=null;
+    if(addMusic&&musicTrack){
+      try{
+        const track=MUSIC_LIBRARY.find(m=>m.id===musicTrack);
+        if(track){
+          addLog("Loading background music: "+track.label+"...");
+          const resp=await fetch(track.url);
+          const arr=await resp.arrayBuffer();
+          musicCtx=new (window.AudioContext||window.webkitAudioContext)();
+          const buf=await musicCtx.decodeAudioData(arr);
+          const dest=musicCtx.createMediaStreamDestination();
+          musicSource=musicCtx.createBufferSource();
+          musicSource.buffer=buf; musicSource.loop=true;
+          const gain=musicCtx.createGain(); gain.gain.value=0.35;
+          musicSource.connect(gain); gain.connect(dest);
+          dest.stream.getAudioTracks().forEach(tk=>stream.addTrack(tk));
+          addLog("✓ Background music ready — mixing into film");
+        }
+      }catch(e){ addLog("Music note: "+e.message+" — rendering without music"); musicCtx=null; musicSource=null; }
+    }
     const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6000000});
+    if(musicSource){ try{ musicSource.start(0); }catch(e){} }
     const chunks=[];
     recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     recorder.start(Math.round(1000/fps));
@@ -2537,6 +2563,8 @@ Write the drawFrame body now.`}]
         else{finish();}
       }catch(e){finish();}
     });
+    if(musicSource){ try{ musicSource.stop(); }catch(e){} }
+    if(musicCtx){ try{ musicCtx.close(); }catch(e){} }
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
@@ -2767,6 +2795,34 @@ Write the drawFrame body now.`}]
             </div>
             <input type="range" min={5} max={300} value={duration} onChange={e=>setDuration(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
           </div>
+          {/* ── ADD BACKGROUND MUSIC? ─────────────────────────────── */}
+          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>ADD BACKGROUND MUSIC?</span>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>setAddMusic(true)}
+                  style={{background:addMusic?GOLD:"#111",border:"1px solid "+(addMusic?"#000":GOLDDIM),color:addMusic?"#000":WHITE,padding:"5px 16px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1}}>Y</button>
+                <button onClick={()=>{setAddMusic(false);setMusicTrack("");}}
+                  style={{background:!addMusic?GOLD:"#111",border:"1px solid "+(!addMusic?"#000":GOLDDIM),color:!addMusic?"#000":WHITE,padding:"5px 16px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1}}>N</button>
+              </div>
+            </div>
+            {addMusic&&(
+              <div style={{marginTop:12}}>
+                <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,marginBottom:8}}>CHOOSE A TRACK</div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <select value={musicTrack} onChange={e=>setMusicTrack(e.target.value)}
+                    style={{flex:1,background:"#000",border:"1px solid "+GOLD,color:WHITE,padding:"9px 12px",fontSize:12,fontWeight:900,fontFamily:"'Rajdhani',sans-serif",outline:"none",cursor:"pointer"}}>
+                    <option value="">— Select background music —</option>
+                    {MUSIC_LIBRARY.map(m=>(<option key={m.id} value={m.id} style={{background:"#000",color:WHITE}}>{m.label}</option>))}
+                  </select>
+                  <button onClick={()=>{const m=MUSIC_LIBRARY.find(x=>x.id===musicTrack);if(!m)return;try{const a=new Audio(m.url);a.volume=0.5;a.play().catch(()=>{});setTimeout(()=>{try{a.pause();}catch(e){}},6000);}catch(e){}}}
+                    disabled={!musicTrack} title="Preview 6 seconds"
+                    style={{background:musicTrack?"none":"#111",border:"1px solid "+GOLDDIM,color:musicTrack?GOLD:"#555",padding:"9px 14px",cursor:musicTrack?"pointer":"not-allowed",fontSize:12,fontWeight:900}}>▶ PREVIEW</button>
+                </div>
+                {!musicTrack&&<div style={{color:"#e0a020",fontSize:10,marginTop:8,letterSpacing:1}}>Pick a track from the menu, or press N to render without music.</div>}
+              </div>
+            )}
+          </div>
           <button onClick={generateVideo} disabled={generating||!prompt.trim()}
             style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",width:"100%",padding:"20px",fontSize:15,letterSpacing:3,cursor:generating||!prompt.trim()?"not-allowed":"pointer",fontWeight:900,fontFamily:"'Rajdhani',sans-serif",opacity:generating||!prompt.trim()?0.5:1}}>
             {generating?"⟳ MANDASTRONG ENGINE RENDERING... "+progress+"%":"🎬 GENERATE SCENE"}
@@ -2870,25 +2926,28 @@ function P1({ go }) {
       </div>
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-          <button onClick={()=>{
-            // Detect device and trigger correct install method
+          <button onClick={async()=>{
             const ua = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua);
+            const isIOS = /iphone|ipad|ipod/.test(ua) || (/(macintosh)/.test(ua) && navigator.maxTouchPoints>1);
             const isAndroid = /android/.test(ua);
-            const isMobile = isIOS || isAndroid;
-            const isTablet = /ipad/.test(ua) || (isAndroid && !/mobile/.test(ua));
-
+            const isStandalone = (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
+            if(isStandalone){
+              alert("✓ MandaStrong Studio is already installed on this device.\n\nYou're using the installed app right now. Look for the gold M icon on your home screen to open it any time.");
+              return;
+            }
             if(window.deferredInstallPrompt){
-              // Chrome/Edge/Android — native install prompt
-              window.deferredInstallPrompt.prompt();
-              window.deferredInstallPrompt.userChoice.then(()=>{window.deferredInstallPrompt=null;});
+              try{
+                window.deferredInstallPrompt.prompt();
+                const choice=await window.deferredInstallPrompt.userChoice;
+                window.deferredInstallPrompt=null;
+                if(choice&&choice.outcome==="accepted") alert("✓ Installing MandaStrong Studio to your home screen. Look for the gold M icon.");
+              }catch(e){ alert("To install: use your browser menu → 'Add to Home Screen' or 'Install App'."); }
             } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ↑ at the bottom\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe app will open full screen, sized to your device.");
+              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ⬆ (Safari, at the bottom or top)\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe gold M icon will appear on your home screen and open full screen.\n\n(Note: on iPhone/iPad this only works in the Safari browser, not Chrome.)");
             } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in your browser\n2. Tap 'Add to Home Screen' or 'Install App'\n3. Tap Install\n\nThe app will open full screen on your device.");
+              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in Chrome (top right)\n2. Tap 'Add to Home screen' or 'Install app'\n3. Tap Install\n\nThe gold M icon will appear on your home screen and open full screen.");
             } else {
-              // Desktop — look for install icon in address bar
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser address bar\n2. Click it and select Install\n\nOr use Chrome/Edge for the best experience.\nThe app auto-sizes to your screen.");
+              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser's address bar (right side)\n2. Click it and select Install\n\nOr open your browser menu and choose 'Install MandaStrong Studio'.\nChrome or Edge give the best result.");
             }
           }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
@@ -3713,6 +3772,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   const [fps,setFps]=useState(30);
   const [codec,setCodec]=useState("vp9");
   const [currentClipIdx,setCurrentClipIdx]=useState(-1);
+  // ── GAP-FILL CHOICE (Y = generate extra scenes, N = stretch clips) ──
+  const [gapFill,setGapFill]=useState(false);
   const canvasRef=useRef(null);
 
   const log=(msg)=>setRenderLog(p=>[...p,msg]);
@@ -4035,8 +4096,26 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const targetTotal = sliderSecs>0 ? sliderSecs : narrationSecs;
       let perClipTarget = 0; // 0 = use each clip's natural duration
       if(targetTotal>0 && clips.length>0){
-        perClipTarget = Math.max(targetTotal / clips.length, 3);
-        log("Gap-fill: film "+(targetTotal/60).toFixed(1)+" min ÷ "+clips.length+" clips ≈ "+perClipTarget.toFixed(1)+"s each ("+(sliderSecs>0?"duration slider":"narration")+" is master)");
+        if(gapFill){
+          let naturalTotal=0;
+          for(const c of clips){ const m=(c.name||"").match(/(\d+)s/); naturalTotal += m?parseInt(m[1]):30; }
+          const gap = targetTotal - naturalTotal;
+          if(gap > 5){
+            const fillCount = Math.ceil(gap/30);
+            log("Fill-in: generating "+fillCount+" extra scene"+(fillCount!==1?"s":"")+" to reach "+(targetTotal/60).toFixed(1)+" min");
+            const seeds=clips.length?clips.map(c=>(c.name||"scene").replace(/\.[^.]+$/,"").replace(/_/g,"")):["cinematic scene"];
+            for(let f=0;f<fillCount;f++){
+              const seed=seeds[f%seeds.length]||"cinematic establishing scene";
+              clips.push({ name:"fill_"+(f+1)+"_"+seed+"_30s.webm", type:"video/webm", __fill:true });
+            }
+            log("Fill-in ON — film built from "+clips.length+" scenes (real + generated)");
+          } else {
+            log("Fill-in ON — footage already covers the target, nothing to add");
+          }
+        } else {
+          perClipTarget = Math.max(targetTotal / clips.length, 3);
+          log("Stretch mode: film "+(targetTotal/60).toFixed(1)+" min ÷ "+clips.length+" clips ≈ "+perClipTarget.toFixed(1)+"s each");
+        }
       }
 
       for(let ci=0;ci<clips.length;ci++){
@@ -4264,12 +4343,35 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             <div style={{background:"#061406",border:"1px solid #22c55e",padding:"16px 20px",marginBottom:16}}>
               <div style={{color:"#22c55e",fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:12}}>RENDER COMPLETE</div>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <a href={renderUrl} download="MandaStrong_Film.webm" target="_blank" rel="noopener noreferrer" style={{...G("gold",false),padding:"12px 24px",textDecoration:"none",display:"inline-block",fontSize:12,letterSpacing:2}}>DOWNLOAD FILM</a>
+                <button onClick={()=>{
+                  try{
+                    const a=document.createElement("a");
+                    a.href=renderUrl; a.download="MandaStrong_Film_"+Date.now()+".webm"; a.rel="noopener noreferrer";
+                    document.body.appendChild(a); a.click();
+                    setTimeout(()=>{try{document.body.removeChild(a);}catch(e){}},1000);
+                    log("✓ Download started — check your device's Downloads");
+                  }catch(e){ try{window.open(renderUrl,"_blank");}catch(e2){} log("Opened film in new tab — long-press to save"); }
+                }} style={{...G("gold",false),padding:"12px 24px",fontSize:12,letterSpacing:2,cursor:"pointer"}}>⬇ DOWNLOAD FILM</button>
                 <button onClick={()=>go(17)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>PREVIEW</button>
                 <button onClick={()=>go(18)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>EXPORT</button>
               </div>
             </div>
           )}
+          {/* ── FILL IN THE GAPS? ─────────────────────────────────── */}
+          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"14px 16px",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>FILL IN THE GAPS WITH EXTRA SCENES?</div>
+                <div style={{color:GOLDDIM,fontSize:10,marginTop:4,lineHeight:1.6}}>If your clips are shorter than {filmDuration||60} min, choose Y to generate extra scenes so the film reaches full length. Choose N to stretch the clips you have.</div>
+              </div>
+              <div style={{display:"flex",gap:6,flexShrink:0,marginLeft:12}}>
+                <button onClick={()=>setGapFill(true)}
+                  style={{background:gapFill?GOLD:"#111",border:"1px solid "+(gapFill?"#000":GOLDDIM),color:gapFill?"#000":WHITE,padding:"6px 18px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:1}}>Y</button>
+                <button onClick={()=>setGapFill(false)}
+                  style={{background:!gapFill?GOLD:"#111",border:"1px solid "+(!gapFill?"#000":GOLDDIM),color:!gapFill?"#000":WHITE,padding:"6px 18px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:1}}>N</button>
+              </div>
+            </div>
+          </div>
           <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"18px 20px",marginBottom:16}}>
             <button onClick={startRender} disabled={rendering||clips.length===0}
               style={{...G("gold",false),width:"100%",padding:"18px",fontSize:14,letterSpacing:3,opacity:rendering||clips.length===0?0.5:1,marginBottom:10}}>
@@ -5186,8 +5288,101 @@ function P23({ go }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+// CINEMATIC INTRO — black shiny gold doors that open to reveal the app
+// One giant M spans both doors (splits when they part). Wordmark, tagline,
+// ENTER button and URL sit in the lower area. ~6 seconds. Synthesized music.
+// ══════════════════════════════════════════════════════════════════
+function IntroDoors({ onEnter }){
+  const [phase,setPhase]=useState("closed");
+  const playChime=()=>{
+    try{
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      const now=ctx.currentTime;
+      const notes=[110,164.81,220,329.63,440];
+      notes.forEach((f,i)=>{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type=i<2?"sine":"triangle"; o.frequency.value=f;
+        const t0=now+i*0.18;
+        g.gain.setValueAtTime(0,t0);
+        g.gain.linearRampToValueAtTime(0.16,t0+0.25);
+        g.gain.exponentialRampToValueAtTime(0.001,t0+3.2);
+        o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0+3.4);
+      });
+      const sh=ctx.createOscillator(); const sg=ctx.createGain();
+      sh.type="sine"; sh.frequency.value=880;
+      sg.gain.setValueAtTime(0,now+0.5);
+      sg.gain.linearRampToValueAtTime(0.05,now+1.2);
+      sg.gain.exponentialRampToValueAtTime(0.001,now+3.5);
+      sh.connect(sg); sg.connect(ctx.destination); sh.start(now+0.5); sh.stop(now+3.6);
+      setTimeout(()=>{try{ctx.close();}catch(e){}},4200);
+    }catch(e){}
+  };
+  const enter=()=>{
+    if(phase!=="closed")return;
+    playChime(); setPhase("opening");
+    setTimeout(()=>setPhase("gone"),3200);
+    setTimeout(()=>{ if(onEnter)onEnter(); },4200);
+  };
+  const opening=phase==="opening"||phase==="gone";
+  const halfM=(side)=>(
+    <svg viewBox={side==="left"?"0 0 150 200":"150 0 150 200"} width="min(40vw,320px)" height="min(56vh,420px)"
+      preserveAspectRatio={side==="left"?"xMaxYMid meet":"xMinYMid meet"}
+      style={{filter:"drop-shadow(0 0 30px rgba(232,201,109,0.5))",overflow:"visible",marginTop:"-16vh"}}>
+      <defs>
+        <linearGradient id={"goldM"+side} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff6d0"/><stop offset="0.35" stopColor="#e8c96d"/>
+          <stop offset="0.7" stopColor="#a07820"/><stop offset="1" stopColor="#5a3f10"/>
+        </linearGradient>
+      </defs>
+      <text x="150" y="162" textAnchor="middle" fontFamily="Georgia,serif" fontSize="230" fontWeight="900" fill={"url(#goldM"+side+")"}>M</text>
+    </svg>
+  );
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:100000,background:"#000",overflow:"hidden",
+      opacity:phase==="gone"?0:1,transition:"opacity 1s ease",pointerEvents:phase==="gone"?"none":"auto"}}>
+      <div style={{position:"absolute",top:0,left:0,width:"50%",height:"100%",
+        background:"linear-gradient(100deg,#050505 0%,#1a1305 30%,#2a2008 45%,#0a0803 60%,#000 100%)",
+        borderRight:"1px solid "+GOLD,boxShadow:"inset -40px 0 80px rgba(0,0,0,0.9), inset 0 0 120px rgba(232,201,109,0.08)",
+        transform:opening?"perspective(1600px) rotateY(-105deg)":"perspective(1600px) rotateY(0deg)",
+        transformOrigin:"left center",transition:"transform 3s cubic-bezier(0.7,0,0.3,1)",
+        display:"flex",alignItems:"center",justifyContent:"flex-end",overflow:"hidden"}}>
+        {halfM("left")}
+      </div>
+      <div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",
+        background:"linear-gradient(260deg,#050505 0%,#1a1305 30%,#2a2008 45%,#0a0803 60%,#000 100%)",
+        borderLeft:"1px solid "+GOLD,boxShadow:"inset 40px 0 80px rgba(0,0,0,0.9), inset 0 0 120px rgba(232,201,109,0.08)",
+        transform:opening?"perspective(1600px) rotateY(105deg)":"perspective(1600px) rotateY(0deg)",
+        transformOrigin:"right center",transition:"transform 3s cubic-bezier(0.7,0,0.3,1)",
+        display:"flex",alignItems:"center",justifyContent:"flex-start",overflow:"hidden"}}>
+        {halfM("right")}
+      </div>
+      <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",
+        width:opening?"5px":"2px",height:opening?"100%":"0%",
+        background:"linear-gradient(180deg,#fff6d0,#e8c96d,#a07820)",
+        boxShadow:"0 0 30px 6px rgba(232,201,109,0.8)",
+        transition:"height 0.9s ease-out, width 0.9s ease-out",zIndex:5}}/>
+      <div style={{position:"absolute",left:0,right:0,bottom:"7%",display:"flex",flexDirection:"column",alignItems:"center",
+        zIndex:6,opacity:opening?0:1,transition:"opacity 0.7s",pointerEvents:opening?"none":"auto"}}>
+        <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,5.5vw,50px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 30px rgba(232,201,109,0.6)"}}>MANDASTRONG</div>
+        <div style={{fontFamily:"'Cinzel',serif",color:WHITE,fontSize:"clamp(11px,2vw,18px)",letterSpacing:14,marginTop:4}}>STUDIO</div>
+        <div style={{color:GOLDDIM,fontSize:"clamp(8px,1.4vw,11px)",letterSpacing:3,marginTop:12,textAlign:"center"}}>CINEMA INTELLIGENCE PLATFORM · 600+ AI TOOLS · UP TO 3-HOUR FILMS</div>
+        <button onClick={enter}
+          style={{marginTop:22,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",
+          padding:"16px 52px",fontSize:15,fontWeight:900,letterSpacing:4,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",
+          boxShadow:"0 0 40px rgba(232,201,109,0.6)",borderRadius:0}}>
+          ▶ ENTER
+        </button>
+        <div style={{color:GOLDDIM,fontSize:11,letterSpacing:3,marginTop:16}}>mandastrong01.bolt.host</div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [page,setPage]=useState(1);
+  // ── CINEMATIC INTRO — gold doors open to reveal the app ──
+  const [showIntro,setShowIntro]=useState(true);
   const [menu,setMenu]=useState(false);
   useEffect(()=>{
     // Raise the storage ceiling so large uploads don't crash — ask the browser
@@ -5388,6 +5583,7 @@ export default function App() {
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
+      {showIntro&&<IntroDoors onEnter={()=>setShowIntro(false)}/>}
       <Header go={go} setMenu={setMenu}/>
       {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
       {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
