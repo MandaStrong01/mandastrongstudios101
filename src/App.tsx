@@ -1,4 +1,4 @@
-// @ts-nocheck
+ @ts-nocheck
 import { useState, useRef, useEffect } from "react";
 
 // IndexedDB helpers for persistent clip storage
