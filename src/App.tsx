@@ -304,7 +304,6 @@ function speakText(voiceId, txt, onStart, onEnd) {
     .replace(/([.!?])\s+([A-Z])/g,"$1 $2")
     .slice(0,200000);
   const doSpeak = () => {
-    if (typeof window === "undefined" || !window.speechSynthesis) { if (typeof onEnd === "function") onEnd(); return; }
     const allVoices = window.speechSynthesis.getVoices();
     const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
       ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
@@ -386,9 +385,8 @@ function speakText(voiceId, txt, onStart, onEnd) {
     };
     speakNext();
   };
-  if (typeof window === "undefined" || !window.speechSynthesis) { if (typeof onEnd === "function") onEnd(); return; }
   if(window.speechSynthesis.getVoices().length===0){
-    if(typeof window!=="undefined"&&window.speechSynthesis){window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };}
+    window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
   } else { doSpeak(); }
 }
 
@@ -580,9 +578,6 @@ function ToolPanel({ tool, onClose, onSave }) {
   const isWritingTool = ["Script to Movie","Text to Script","Script to Screenplay","Prompt to Story","Feature Film Script","Short Film Script","Documentary Script","Plot Generator","Story Outline","Beat Sheet Builder","Character Bio Writer","Logline Generator","Synopsis Writer","Scene Writer","Dialogue Generator","Narration Writer","Voiceover Script"].includes(tool);
   const [mode, setMode] = useState(isVoice?"voice":(isVideoTool||isImageTool||isWritingTool)?"ai":"upload");
   const [describe, setDescribe] = useState("");
-  const [s2mProducer, setS2mProducer] = useState("");
-  const [s2mProduction, setS2mProduction] = useState("");
-  const [s2mWired, setS2mWired] = useState(false);
   const [result, setResult] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -723,17 +718,8 @@ function ToolPanel({ tool, onClose, onSave }) {
         )}
         {mode==="ai"&&(
           <div style={{marginBottom:14}}>
-            {tool==="Script to Movie"&&(
-              <div style={{marginBottom:14,padding:14,background:"#050500",border:"1px solid "+GOLD}}>
-                <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>PRODUCER</div>
-                <textarea value={s2mProducer} onChange={e=>setS2mProducer(e.target.value)} placeholder="Director / producer instructions, tone, style, cast, look..." style={{...inp,height:70,resize:"none",lineHeight:1.5,marginBottom:12}}/>
-                <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900,marginBottom:6}}>PRODUCTION NOTES</div>
-                <textarea value={s2mProduction} onChange={e=>setS2mProduction(e.target.value)} placeholder="Duration, pacing, music, aspect ratio, delivery notes..." style={{...inp,height:70,resize:"none",lineHeight:1.5,marginBottom:12}}/>
-                <button onClick={()=>{try{localStorage.setItem("ms_render_brief",JSON.stringify({producer:s2mProducer,describe,production:s2mProduction}));setS2mWired(true);setTimeout(()=>setS2mWired(false),2500);}catch(e){}}} style={{...G("gold",false),width:"100%",padding:"12px",fontSize:12,letterSpacing:2}}>{s2mWired?"✓ WIRED INTO RENDER":"⚙ WIRE INTO RENDER"}</button>
-              </div>
-            )}
             <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:4}}>
-              {tool==="Script to Movie"?"DESCRIBE":isVideoTool?"DESCRIBE YOUR SCENE OR FILM IDEA":isImageTool?"DESCRIBE YOUR IMAGE":isWritingTool?"DESCRIBE YOUR STORY OR SCRIPT":"DESCRIBE WHAT YOU WANT"}
+              {isVideoTool?"DESCRIBE YOUR SCENE OR FILM IDEA":isImageTool?"DESCRIBE YOUR IMAGE":isWritingTool?"DESCRIBE YOUR STORY OR SCRIPT":"DESCRIBE WHAT YOU WANT"}
             </div>
             <textarea value={describe} onChange={e=>setDescribe(e.target.value)}
               placeholder={isVideoTool?"e.g. A lone astronaut walks across a red planet at sunset...":isImageTool?"e.g. Portrait of a warrior queen at golden hour...":isWritingTool?"e.g. A documentary about veterans mental health...":"Describe what you want from "+tool+"..."}
@@ -1794,7 +1780,6 @@ function MusicVideoStudio({ onClose, onSave }) {
 }
 
 const VOICE_CHARACTERS = [
-  {id:"amanda",name:"Amanda",emoji:"⭐",gender:"Female",age:"Adult",origin:"Owner",region:"Studio",style:"Founder · Your Voice",pitch:1.0,rate:0.85,desc:"MandaStrong Studio founder. Your own narration voice.",isOwner:true},
   {id:"james",name:"James",emoji:"🎩",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Sarcastic · Deadpan · Witty",pitch:0.86,rate:0.62,desc:"Dry British wit. Devastating things said with complete calm."},
   {id:"aurora",name:"Aurora",emoji:"🌅",gender:"Female",age:"Adult",origin:"British",region:"London",style:"Warm · Documentary · Authoritative",pitch:1.08,rate:0.80,desc:"Calm authority. The voice you trust completely."},
   {id:"edward",name:"Edward",emoji:"🎭",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Theatrical · Grand · Classical",pitch:0.85,rate:0.75,desc:"Shakespearean gravitas. Every sentence carved in stone."},
@@ -1899,21 +1884,57 @@ function P6Voice({ onSave, setMediaLib }) {
     if(micRef.current&&micRef.current.state!=="inactive")micRef.current.stop();
     if(recTimerRef.current)clearInterval(recTimerRef.current);
   };
-  // Save the SELECTED own-voice recording as the film's narration — real audio,
-  // not synthetic. Lands on the timeline audio track like any other clip.
+  // ── USE MY VOICE AS NARRATION ───────────────────────────────────
+  // The complete chain, one button:
+  //  1. Take the user's own-voice recording (their read of the first paragraph).
+  //  2. Clone it through the engine if it isn't already cloned.
+  //  3. Have the engine read the WHOLE narration script (the box) in that
+  //     cloned voice — not just the raw recording.
+  //  4. Save the finished spoken narration to the Media Library AND drop it on
+  //     the timeline audio track, in order, so SYNC keeps it in place.
+  const [narrating,setNarrating]=useState(false);
   const saveMyVoiceAsNarration=async()=>{
     const mine=myVoices.find(v=>v.id===selVoice);
-    if(!mine){alert("Pick or record your own voice first, then save it as narration.");return;}
-    let blob=null;
-    try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)blob=st.blob;}catch(e){}
-    if(!blob&&mine.url){try{blob=await (await fetch(mine.url)).blob();}catch(e){}}
-    if(!blob){alert("Could not find that recording's audio — try recording again.");return;}
-    const id="narr_myvoice_"+Date.now();
-    const asset={id,name:"My Voice Narration - "+new Date().toLocaleTimeString(),type:"audio/myvoice",dbId:id,date:new Date().toISOString()};
-    await safeSaveClipToDB(id,blob,asset.name,"audio/myvoice");
-    if(onSave)onSave(asset);
-    if(setMediaLib)setMediaLib(p=>[...p,asset]);
-    setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);
+    if(!mine){alert("Record your voice first (read the first paragraph), then pick it and press USE MY VOICE AS NARRATION.");return;}
+    const script=(text||"").trim();
+    if(!script){alert("Paste or write your full narration script in YOUR NARRATION SCRIPT first — the engine will read the whole thing in your voice.");return;}
+    setNarrating(true);
+    try{
+      // 1+2 — make sure we have a cloned voice id for this recording.
+      let voiceId=mine.clonedVoiceId||mine.engineVoice;
+      if(!voiceId){
+        let sample=null;
+        try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)sample=st.blob;}catch(e){}
+        if(!sample&&mine.url){try{sample=await (await fetch(mine.url)).blob();}catch(e){}}
+        if(!sample){setNarrating(false);alert("Could not find your recording's audio — record the first paragraph again, then try.");return;}
+        const dataUri=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(sample);});
+        voiceId=await engineCloneVoice(dataUri);
+        if(!voiceId){setNarrating(false);alert("Voice clone did not complete. Check the engine has credit, then try again.");return;}
+        const upd=myVoices.map(v=>v.id===mine.id?{...v,clonedVoiceId:voiceId,engineVoice:voiceId,desc:"Your cloned voice — the engine narrates the full script in your voice.",style:"Your cloned voice"}:v);
+        setMyVoices(upd);
+        try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}
+      }
+      // 3 — engine reads the WHOLE script in the cloned voice, chunk by chunk,
+      //     and we stitch the returned audio into one narration file.
+      const meta={voice:voiceId,gender:mine.gender||"",origin:mine.origin||"",speed:speed*0.9};
+      const chunks=buildChunks(script).filter(c=>c&&c.text);
+      const parts=[];
+      for(const c of chunks){
+        const url=await engineSpeak(c.text,meta);
+        if(url){try{parts.push(await (await fetch(url)).blob());}catch(e){}}
+      }
+      if(!parts.length){setNarrating(false);alert("The engine could not render the narration. Check engine credit and try again.");return;}
+      const blob=new Blob(parts,{type:parts[0].type||"audio/mpeg"});
+      // 4 — save to Media Library + timeline audio track, in order.
+      const id="narr_myvoice_"+Date.now();
+      const asset={id,name:"My Voice Narration - "+new Date().toLocaleTimeString(),type:"audio/myvoice",dbId:id,date:new Date().toISOString()};
+      await safeSaveClipToDB(id,blob,asset.name,"audio/myvoice");
+      if(onSave)onSave(asset);
+      if(setMediaLib)setMediaLib(p=>[...p,asset]);
+      setNarrating(false);
+      setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);
+      alert("✓ Your voice narrated the full script and saved to the Media Library. It will sync onto the timeline in order.");
+    }catch(e){setNarrating(false);alert("Narration failed — try again.");}
   };
   const delMyVoice=(id)=>{const upd=myVoices.filter(v=>v.id!==id);setMyVoices(upd);try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}};
 
@@ -1946,8 +1967,8 @@ function P6Voice({ onSave, setMediaLib }) {
   };
 
   useEffect(()=>{
-    const load=()=>{ if(typeof window==="undefined"||!window.speechSynthesis){return;} setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"))); };
-    load(); if(typeof window!=="undefined"&&window.speechSynthesis){window.speechSynthesis.onvoiceschanged=load;}
+    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
+    load(); window.speechSynthesis.onvoiceschanged=load;
     return()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);};
   },[]);
 
@@ -1968,7 +1989,7 @@ function P6Voice({ onSave, setMediaLib }) {
   const selected=mineSel||VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
   const pickSysVoice=(vc)=>{
-    const allRaw=sysVoices.length?sysVoices:((typeof window!=="undefined"&&window.speechSynthesis)?window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")):[]);
+    const allRaw=sysVoices.length?sysVoices:window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
     if(!allRaw.length)return null;
     // ── QUALITY FIRST — use Enhanced/Premium/Siri/Neural voices when present ──
     const isHiQ=(v)=>/premium|enhanced|siri|neural|natural|online|multilingual/i.test((v.name||"")+" "+(v.voiceURI||""));
@@ -2023,7 +2044,7 @@ function P6Voice({ onSave, setMediaLib }) {
       utt.onerror=()=>{idxRef.current=idx+1;next();};
       window.speechSynthesis.speak(utt);
     };
-    if(typeof window==="undefined"||!window.speechSynthesis){setTimeout(next,50);} else { window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);}; }
+    window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);};
   };
 
   // Engine voice first. Identical on every device. Device voice only if the engine cannot deliver.
@@ -2093,7 +2114,7 @@ function P6Voice({ onSave, setMediaLib }) {
             )}
             <button onClick={()=>myVoiceInputRef.current&&myVoiceInputRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>＋ ADD YOUR OWN VOICE (FILE)</button>
             {myVoices.some(v=>v.id===selVoice)&&(
-              <button onClick={saveMyVoiceAsNarration} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>🎙 USE MY VOICE AS NARRATION</button>
+              <button onClick={saveMyVoiceAsNarration} disabled={narrating} style={{width:"100%",background:narrating?"#2a1200":"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:narrating?GOLD:"#000",padding:"11px",cursor:narrating?"wait":"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>{narrating?"⟳ CLONING & NARRATING…":"🎙 USE MY VOICE AS NARRATION"}</button>
             )}
             {myVoices.map(v=>(
               <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+(selVoice===v.id?GOLD:GOLDDIM),cursor:"pointer"}}>
@@ -2316,19 +2337,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     }catch(e){}
     addLog("MandaStrong Cinema Engine — reading your scene...");
     setProgress(5);
-    // ── Script-to-Movie brief: if wired from Page 5, prepend it to the scene prompt ──
-    let briefPrefix="";
-    try{
-      const raw=localStorage.getItem("ms_render_brief");
-      if(raw){
-        const b=JSON.parse(raw);
-        const parts=[];
-        if(b.producer&&b.producer.trim())parts.push("DIRECTOR/PRODUCER: "+b.producer.trim());
-        if(b.production&&b.production.trim())parts.push("PRODUCTION NOTES: "+b.production.trim());
-        if(parts.length)briefPrefix=parts.join("\n")+"\n\nSCENE: ";
-      }
-    }catch(e){}
-    const enginePrompt=(briefPrefix+prompt).trim();
 
     // ══════════════════════════════════════════════════════════════════
     // MANDASTRONG CINEMA ENGINE — REAL PHOTOREALISTIC VIDEO
@@ -2338,7 +2346,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     try{
       addLog("Cinema Engine — synthesising photorealistic footage...");
       setProgress(12);
-      const engineUrl=await engineRender(enginePrompt,{
+      const engineUrl=await engineRender(prompt.trim(),{
         duration,
         image:refDataUrl||"",
         onTick:(i)=>{ setProgress(Math.min(88,12+i*2)); addLog("Cinema Engine rendering — "+Math.min(88,12+i*2)+"%"); }
@@ -3268,7 +3276,7 @@ function P4({ go, setUser }) {
         <div style={{marginTop:40,padding:"28px 24px",background:"#050500",border:"2px solid "+GOLD,textAlign:"center",boxShadow:"0 0 24px "+GOLD+"22"}}>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:900,marginBottom:6}}>NEED MORE RENDERS?</div>
           <h3 style={{...H1,fontSize:20,marginBottom:8}}>BUY RENDER CREDITS</h3>
-          <p style={{color:WHITE,fontSize:13,lineHeight:1.7,maxWidth:520,margin:"0 auto 18px"}}>You've already had your usage replaced once. To top up again, purchase extra usage credits here — pay once, use them for renders and generations whenever you're ready, and they never expire. Proceeds from MandaStrong1.Etsy.com are donated to humanitarian causes.</p>
+          <p style={{color:WHITE,fontSize:13,lineHeight:1.7,maxWidth:520,margin:"0 auto 18px"}}>Top up your account with extra render credits — pay once, render when you're ready. Credits never expire.</p>
           <button onClick={()=>window.open(STRIPE.studio,"_blank")} style={{...G("gold",false),padding:"14px 44px",fontSize:14}}>💳 BUY CREDITS</button>
         </div>
       </div>
@@ -3594,18 +3602,13 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setTracks(p=>[...p,"TRACK "+p.length+1])} style={{...G("out",true)}}>+ ADD TRACK</button>
           <button onClick={()=>{
-            // Auto-populate tracks from media library and sync — sorted in correct order
-            // Sort by leading number in name (Scene 1, Scene 2, etc.), then by name, then by id/timestamp
-            const sortClips=(clips)=>{
-              return clips.slice().sort((a,b)=>{
-                const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-                const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-                if(na!==nb)return na-nb;
-                const cmp=(a.name||"").localeCompare(b.name||"");
-                if(cmp!==0)return cmp;
-                return (a.id||0)-(b.id||0);
-              });
-            };
+            // Auto-populate tracks from media library and sync — KEEP THE ORDER
+            // THE CLIPS WERE MADE / ADDED IN. No alphabetizing, no name-number
+            // sorting. Media Library is already in creation order, so we keep it
+            // exactly as-is; the only tiebreak is the id/timestamp, which is also
+            // creation order. This is what makes clip 1, clip 2, clip 3 stay in
+            // the order the user generated them.
+            const sortClips=(clips)=>clips.slice();
             const videoAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||(a.type.includes("webm")&&!a.type.startsWith("audio")))));
             const audioAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration")));
             // Assign sequential start times so clips play in order
@@ -4818,7 +4821,7 @@ function P20() {
             {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
             {sec("4. AI-GENERATED CONTENT",<>{p("Content generated by MandaStrong Studio's AI tools is produced algorithmically. You are solely responsible for reviewing, editing, and verifying all AI-generated outputs before use. MandaStrong Studio makes no guarantees regarding the accuracy, appropriateness, or fitness for purpose of AI-generated content.")}{p("You agree not to use AI-generated content to produce material that is defamatory, illegal, harmful, or in violation of third-party rights.")}</>)}
             {sec("5. ACCEPTABLE USE",<>{p("You agree to use MandaStrong Studio only for lawful purposes. The following are strictly prohibited:")}{li(["Producing content that is defamatory, obscene, or harasses individuals","Infringing on third-party intellectual property rights","Attempting to reverse-engineer, copy, or redistribute the platform","Using the platform to generate spam, malware, or fraudulent content","Sharing your account credentials with third parties"])}</>)}
-            {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. Full details available at MandaStrong1.Etsy.com.")}</>)}
+            {sec("6. SOCIAL MISSION",<>{p("A meaningful portion of all subscription proceeds is donated to veterans mental health initiatives and school anti-bullying programmes. These are not marketing statements — they are the founding mission of this platform. All proceeds made from MandaStrong1.Etsy.com will be donated to humanitarian causes.")}</>)}
             {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
             {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
@@ -5242,48 +5245,60 @@ function P24CharacterStudio({ onSave, go }) {
 function P23({ go }) {
   const bgRef = useRef(null);
   const [howOpen, setHowOpen] = useState(false);
-  const [vidNeedsTap, setVidNeedsTap] = useState(false);
   useEffect(()=>{
     const v=bgRef.current;
     if(!v)return;
     v.muted=true;
     v.defaultMuted=true;
-    v.loop=true;
+    v.loop=false;
     v.playsInline=true;
     v.preload="auto";
-    try{v.load();}catch{}
-    const tryPlay=()=>{
-      const p=v.play();
-      if(p&&p.then){p.then(()=>setVidNeedsTap(false)).catch(()=>setVidNeedsTap(true));}
+    // Ocean/background clip at the top. Plays ONCE for ~15 seconds, then freezes
+    // on its last frame (no endless loop). Nudge play only if it stalls early.
+    let stopTimer=null;
+    const tryPlay=()=>{v.play().catch(()=>{});};
+    const startClock=()=>{
+      if(stopTimer)return;
+      stopTimer=setTimeout(()=>{try{v.pause();}catch{}},15000); // hard 15s cap
     };
-    tryPlay();
-    if(v.readyState>=2){tryPlay();}
-    v.addEventListener("loadeddata",tryPlay);
-    v.addEventListener("canplay",tryPlay);
-    v.addEventListener("canplaythrough",tryPlay);
-    v.addEventListener("pause",tryPlay);
+    const onPlay=()=>startClock();
+    if(v.readyState>=4){tryPlay();}
+    else{v.addEventListener("canplaythrough",tryPlay,{once:true});}
+    v.addEventListener("play",onPlay);
     v.addEventListener("stalled",tryPlay);
     v.addEventListener("waiting",tryPlay);
     return()=>{
-      v.removeEventListener("loadeddata",tryPlay);
-      v.removeEventListener("canplay",tryPlay);
+      if(stopTimer)clearTimeout(stopTimer);
       v.removeEventListener("canplaythrough",tryPlay);
-      v.removeEventListener("pause",tryPlay);
+      v.removeEventListener("play",onPlay);
       v.removeEventListener("stalled",tryPlay);
       v.removeEventListener("waiting",tryPlay);
     };
   },[]);
-  const tapPlayVideo=()=>{const v=bgRef.current;if(!v)return;v.muted=true;v.play().then(()=>setVidNeedsTap(false)).catch(()=>{});};
   const exitApp = () => {
     try{localStorage.removeItem("ms_user");}catch{}
     window.location.reload();
   };
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
-      <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
-        <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
+      <div style={{position:"relative",zIndex:1,padding:"30px 0 80px"}}>
+        <div style={{maxWidth:880,margin:"0 auto",textAlign:"center",padding:"0 24px"}}>
           <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:28}}>THAT'S ALL FOLKS</h1>
+          {/* ── VIDEO UNDER THE TITLE — plays ~15s once ── */}
+          <div style={{width:"100%",maxHeight:"42vh",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#000",marginBottom:28}}>
+            <video ref={bgRef} autoPlay playsInline muted preload="auto"
+              onLoadedMetadata={(e)=>{try{if(e.currentTarget.currentTime<0.1)e.currentTarget.currentTime=0.1;}catch{}}}
+              style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",background:"#000"}}>
+              <source src="/background.mp4" type="video/mp4"/>
+              <source src="background.mp4" type="video/mp4"/>
+              <source src="./background.mp4" type="video/mp4"/>
+              <source src="/background_5.mp4" type="video/mp4"/>
+              <source src="background_5.mp4" type="video/mp4"/>
+              <source src="./background_5.mp4" type="video/mp4"/>
+              <source src="/thatsallfolks.mp4" type="video/mp4"/>
+            </video>
+          </div>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
           <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500ee",border:"2px solid "+GOLD}}>
             <div style={{color:GOLD,fontWeight:900,fontSize:14,letterSpacing:3,marginBottom:16,textAlign:"center"}}>✦ A SPECIAL THANK YOU ✦</div>
@@ -5308,22 +5323,6 @@ function P23({ go }) {
             <button onClick={()=>go(24)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>NEXT →</button>
           </div>
         </div>
-        <div style={{width:"100%",maxHeight:"42vh",overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",background:"#000",borderTop:"1px solid "+GOLDDIM,marginTop:30}}>
-          <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-            onLoadedMetadata={(e)=>{try{if(e.currentTarget.currentTime<0.1)e.currentTarget.currentTime=0.1;}catch{}}}
-            style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",background:"#000"}}>
-            <source src="/background.mp4" type="video/mp4"/>
-            <source src="background.mp4" type="video/mp4"/>
-            <source src="./background.mp4" type="video/mp4"/>
-            <source src="/background_5.mp4" type="video/mp4"/>
-            <source src="background_5.mp4" type="video/mp4"/>
-            <source src="./background_5.mp4" type="video/mp4"/>
-            <source src="/thatsallfolks.mp4" type="video/mp4"/>
-          </video>
-          {vidNeedsTap&&(
-            <button onClick={tapPlayVideo} style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.45)",border:"none",color:GOLD,fontSize:16,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Cinzel',serif",display:"flex",alignItems:"center",justifyContent:"center"}}>▶ TAP TO PLAY</button>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -5340,48 +5339,65 @@ function IntroDoors({ onEnter }){
     try{
       const ctx=new (window.AudioContext||window.webkitAudioContext)();
       const now=ctx.currentTime;
-      // deeper / mysterious sub-drone bed (E minor) — dark cinematic
-      [41.2,61.7].forEach((f,i)=>{
-        const d=ctx.createOscillator(); const dg=ctx.createGain();
-        d.type="sine"; d.frequency.value=f;
-        dg.gain.setValueAtTime(0,now);
-        dg.gain.linearRampToValueAtTime(0.14,now+0.8+i*0.2);
-        dg.gain.exponentialRampToValueAtTime(0.001,now+6);
-        d.connect(dg); dg.connect(ctx.destination); d.start(now); d.stop(now+6.2);
+      // ── CINEMATIC INTRO CUE (~7s) ──────────────────────────────────
+      // A film-opening swell: deep sub-bass drone, a slow rising D-minor
+      // chord that blooms, a distant high shimmer, and a low bell that
+      // resolves the phrase. Warm reverb-style tail via long release.
+      const master=ctx.createGain();
+      master.gain.value=0.9;
+      master.connect(ctx.destination);
+      // gentle low-pass so it feels warm/orchestral, not buzzy
+      const lp=ctx.createBiquadFilter();
+      lp.type="lowpass"; lp.frequency.value=2600; lp.Q.value=0.6;
+      lp.connect(master);
+
+      // 1) Sub-bass drone — the cinematic foundation
+      [36.71,55].forEach((f,i)=>{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type="sine"; o.frequency.value=f;
+        g.gain.setValueAtTime(0,now);
+        g.gain.linearRampToValueAtTime(i?0.10:0.16,now+1.4);
+        g.gain.setValueAtTime(i?0.10:0.16,now+4.2);
+        g.gain.exponentialRampToValueAtTime(0.001,now+7);
+        o.connect(g); g.connect(lp); o.start(now); o.stop(now+7.2);
       });
-      // slow minor rising line
-      const notes=[82.41,98,123.47,164.81,196];
-      notes.forEach((f,i)=>{
+
+      // 2) Slow rising D-minor swell — the emotional lift (D–F–A–D)
+      const chord=[146.83,174.61,220,293.66];
+      chord.forEach((f,i)=>{
         const o=ctx.createOscillator(); const g=ctx.createGain();
         o.type=i<2?"sine":"triangle"; o.frequency.value=f;
-        const t0=now+0.4+i*0.5;
+        const t0=now+0.6+i*0.5;
         g.gain.setValueAtTime(0,t0);
-        g.gain.linearRampToValueAtTime(0.13,t0+0.4);
-        g.gain.exponentialRampToValueAtTime(0.001,t0+2.6);
-        o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0+2.8);
+        g.gain.linearRampToValueAtTime(0.11,t0+1.1);
+        g.gain.exponentialRampToValueAtTime(0.001,t0+4.6);
+        o.connect(g); g.connect(lp); o.start(t0); o.stop(t0+4.8);
       });
-      // distant shimmer
+
+      // 3) Distant high shimmer — cinematic air on top
       const sh=ctx.createOscillator(); const sg=ctx.createGain();
-      sh.type="sine"; sh.frequency.value=659;
-      sg.gain.setValueAtTime(0,now+1.4);
-      sg.gain.linearRampToValueAtTime(0.035,now+2.4);
-      sg.gain.exponentialRampToValueAtTime(0.001,now+5.5);
-      sh.connect(sg); sg.connect(ctx.destination); sh.start(now+1.4); sh.stop(now+5.6);
-      // low resolving bell
+      sh.type="sine"; sh.frequency.value=1174.66;
+      sg.gain.setValueAtTime(0,now+1.6);
+      sg.gain.linearRampToValueAtTime(0.045,now+2.8);
+      sg.gain.exponentialRampToValueAtTime(0.001,now+6.4);
+      sh.connect(sg); sg.connect(master); sh.start(now+1.6); sh.stop(now+6.6);
+
+      // 4) Low resolving bell — lands the phrase
       const bell=ctx.createOscillator(); const bg=ctx.createGain();
-      bell.type="triangle"; bell.frequency.value=164.81;
+      bell.type="triangle"; bell.frequency.value=146.83;
       bg.gain.setValueAtTime(0,now+3.4);
-      bg.gain.linearRampToValueAtTime(0.16,now+3.7);
-      bg.gain.exponentialRampToValueAtTime(0.001,now+6);
-      bell.connect(bg); bg.connect(ctx.destination); bell.start(now+3.4); bell.stop(now+6.2);
-      setTimeout(()=>{try{ctx.close();}catch(e){}},6600);
+      bg.gain.linearRampToValueAtTime(0.14,now+3.7);
+      bg.gain.exponentialRampToValueAtTime(0.001,now+7);
+      bell.connect(bg); bg.connect(lp); bell.start(now+3.4); bell.stop(now+7.2);
+
+      setTimeout(()=>{try{ctx.close();}catch(e){}},7600);
     }catch(e){}
   };
   const enter=()=>{
     if(phase!=="closed")return;
     playChime(); setPhase("opening");
-    setTimeout(()=>setPhase("gone"),3600);
-    setTimeout(()=>{ if(onEnter)onEnter(); },4600);
+    setTimeout(()=>setPhase("gone"),3200);
+    setTimeout(()=>{ if(onEnter)onEnter(); },4200);
   };
   const opening=phase==="opening"||phase==="gone";
   const halfM=(side)=>(
