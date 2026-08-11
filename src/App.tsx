@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Component } from "react";
 
 // IndexedDB helpers for persistent clip storage
 const DB_NAME="mandastrong_db",DB_VER=1,STORE="clips";
@@ -15,140 +15,6 @@ async function proxyFetch(body){
     clearTimeout(timeout);
     return res.json();
   }catch(e){clearTimeout(timeout);throw e;}
-}
-
-// ══════════════════════════════════════════════════════════════════
-// MANDASTRONG ENGINE — real photorealistic footage
-// Single shared client. Every studio page renders through this.
-// ══════════════════════════════════════════════════════════════════
-const ENGINE_URL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate-video";
-const ENGINE_KEY="msk_live_j-HsVOiMDEbwfqLInIsNTrnMreDvr-VKKbPNf21oink";
-const engineHeaders={"Content-Type":"application/json","x-engine-key":ENGINE_KEY};
-
-// The engine answers with .url; older builds looked for .output. Accept either.
-const pickEngineUrl=(d)=>{ if(!d||typeof d!=="object")return""; const v=d.url||d.output||d.video||""; return (typeof v==="string"&&v.indexOf("http")===0)?v:""; };
-
-async function engineCall(body){
-  const res=await fetch(ENGINE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify(body)});
-  return res.json();
-}
-
-// ── CINEMA VOICE ENGINE ──────────────────────────────────────────
-// Server-side speech. Same voice on every device — iPad, Galaxy, HP.
-const VOICE_URL="https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/generate-voice";
-let __msAudio=null;
-
-async function engineSpeak(text,meta){
-  meta=meta||{};
-  try{
-    const res=await fetch(VOICE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify({
-      text:String(text||"").slice(0,3500),
-      voice:meta.voice||"",
-      gender:meta.gender||"",
-      origin:meta.origin||"",
-      speed:meta.speed||1
-    })});
-    let d=await res.json();
-    let url=pickEngineUrl(d);
-    if(url) return url;
-    if(d&&d.id){
-      for(let i=0;i<40;i++){
-        await new Promise(r=>setTimeout(r,1500));
-        const p=await fetch(VOICE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify({id:d.id})});
-        const pd=await p.json();
-        url=pickEngineUrl(pd);
-        if(url) return url;
-        if(pd&&(pd.status==="failed"||pd.status==="canceled")) return "";
-      }
-    }
-  }catch(e){}
-  return "";
-}
-
-// ── HIDDEN: mint a personal cloned voice from a sample recording ──
-// Sends the sample to the engine's clone core and returns an opaque
-// MandaStrong voice id. Store it; later pass it as meta.voice to speak
-// in the cloned voice. Provider is never surfaced.
-async function engineCloneVoice(sample){
-  try{
-    const res=await fetch(VOICE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify({clone:true,sample:String(sample||"")})});
-    let d=await res.json();
-    if(d&&d.voice_id) return d.voice_id;
-    if(d&&d.id){
-      for(let i=0;i<40;i++){
-        await new Promise(r=>setTimeout(r,1500));
-        const p=await fetch(VOICE_URL,{method:"POST",headers:engineHeaders,body:JSON.stringify({id:d.id})});
-        const pd=await p.json();
-        if(pd&&pd.voice_id) return pd.voice_id;
-        if(pd&&(pd.status==="failed"||pd.status==="canceled")) return "";
-      }
-    }
-  }catch(e){}
-  return "";
-}
-
-function playEngineAudio(url,volume){
-  return new Promise((resolve)=>{
-    try{
-      const a=new Audio(url);
-      a.volume=typeof volume==="number"?Math.max(0,Math.min(1,volume)):1;
-      __msAudio=a;
-      a.onended=()=>resolve(true);
-      a.onerror=()=>resolve(false);
-      a.play().catch(()=>resolve(false));
-    }catch(e){resolve(false);}
-  });
-}
-
-function stopEngineAudio(){
-  try{ if(__msAudio){ __msAudio.pause(); __msAudio.currentTime=0; __msAudio=null; } }catch(e){}
-}
-
-// Health check — tells you if the engine has a provider key installed.
-async function engineStatus(){
-  try{ const r=await fetch(ENGINE_URL); return await r.json(); }catch(e){ return {ok:false,message:"Engine unreachable"}; }
-}
-
-// Starts one render and polls until the footage lands.
-// Returns a playable URL, or "" if the engine could not deliver.
-async function engineRender(prompt,opts){
-  opts=opts||{};
-  try{
-    const body={prompt:String(prompt||"").slice(0,1800),duration:opts.duration||5,aspect_ratio:opts.aspect_ratio||"16:9",cheap_only:true};
-    if(opts.image)body.image=opts.image;
-    const started=await engineCall(body);
-    if(!started||started.error)return "";
-    let url=pickEngineUrl(started);
-    const pid=started.id;
-    if(!url&&!pid)return "";
-    for(let i=0;i<100&&!url&&pid;i++){
-      await new Promise(r=>setTimeout(r,3000));
-      if(opts.onTick)opts.onTick(i);
-      const pd=await engineCall({id:pid});
-      if(pd&&pd.status==="failed")return "";
-      url=pickEngineUrl(pd);
-    }
-    return url||"";
-  }catch(e){ return ""; }
-}
-
-// Renders several shots at once. Much faster than one after another.
-async function engineRenderMany(prompts,opts){
-  const results=await Promise.all(prompts.map(p=>engineRender(p,opts)));
-  return results.filter(Boolean);
-}
-
-// Pulls footage into the browser so canvas can draw it without tainting.
-async function engineToLocalVideo(url){
-  try{
-    const res=await fetch(url);
-    const blob=await res.blob();
-    const v=document.createElement("video");
-    v.src=URL.createObjectURL(blob);
-    v.muted=true; v.loop=true; v.playsInline=true; v.crossOrigin="anonymous";
-    await new Promise((res2)=>{ v.onloadeddata=()=>res2(null); v.onerror=()=>res2(null); setTimeout(()=>res2(null),15000); });
-    return v;
-  }catch(e){ return null; }
 }
 const saveClipToDB=async(id,blob,name,type)=>{try{const db=await openDB();const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put({id,blob,name,type});await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=j;});}catch(e){console.warn("DB save failed",e);}};
 const loadClipFromDB=async(id)=>{try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).get(id);req.onsuccess=()=>res(req.result);req.onerror=rej;});}catch(e){return null;}};
@@ -173,7 +39,7 @@ const autoPruneClips=async(keepNewest)=>{
     const all=await getAllClipsFromDB();
     if(all.length<=keepNewest)return 0;
     // Oldest first by timestamp embedded in id (Date.now-based ids sort correctly as strings of similar length)
-    const sortable=all.filter(c=>c.id!=="render_final"&&!String(c.id).startsWith("poc_"));
+    const sortable=all.filter(c=>c.id!=="render_final");
     sortable.sort((a,b)=>{
       const na=parseInt(String(a.id).replace(/\D/g,""))||0;
       const nb=parseInt(String(b.id).replace(/\D/g,""))||0;
@@ -189,19 +55,12 @@ const autoPruneClips=async(keepNewest)=>{
 const safeSaveClipToDB=async(id,blob,name,type)=>{
   try{
     const s=await getStorageStatus();
-    if(s.pct>0.95){ 
-      // Only prune if extremely full and only delete render_final files, not user source clips
-      try{
-        const clips=await getAllClipsFromDB();
-        const oldRenders=clips.filter(c=>String(c.id).includes("render_final_old"));
-        for(const c of oldRenders){await deleteClipFromDB(c.id);}
-      }catch(e){}
-    }
+    if(s.pct>0.8){ await autoPruneClips(8); }
     await saveClipToDB(id,blob,name,type);
     return true;
   }catch(e){
-    // If it still failed, try once more without deleting anything
-    try{ await saveClipToDB(id,blob,name,type); return true; }
+    // If it still failed, prune hard and retry once
+    try{ await autoPruneClips(4); await saveClipToDB(id,blob,name,type); return true; }
     catch(e2){ return false; }
   }
 };
@@ -233,7 +92,6 @@ const autoFreeStorage=async()=>{
     let freed=0;
     for(const c of sorted){
       if(c.id==="render_final")continue; // never delete the finished film
-      if(String(c.id).startsWith("poc_"))continue; // never delete showcase proof-of-concept films
       await deleteClipFromDB(c.id);
       freed++;
       pct=await getStoragePct();
@@ -249,6 +107,37 @@ const BG = "#000000";
 const BLACK = "#000000";
 const BG4 = "#080808";
 const WHITE = "#d4c9a8";
+
+// ── ERROR BOUNDARY — catches any render crash and shows a recovery screen ──
+// instead of a blank white page. Reload button clears the crashed state and
+// restarts the app cleanly. Does not affect anything unless an error actually occurs.
+class ErrorBoundary extends Component {
+  constructor(props){ super(props); this.state={hasError:false,errorMsg:""}; }
+  static getDerivedStateFromError(error){ return {hasError:true,errorMsg:error&&error.message?error.message:"Unknown error"}; }
+  componentDidCatch(error,info){ try{console.warn("MandaStrong Studio caught a render error:",error,info);}catch(e){} }
+  handleReload=()=>{ this.setState({hasError:false,errorMsg:""}); window.location.reload(); };
+  render(){
+    if(this.state.hasError){
+      return (
+        <div style={{minHeight:"100vh",background:"#000",color:WHITE,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Rajdhani',sans-serif",padding:24}}>
+          <div style={{maxWidth:520,textAlign:"center",border:"2px solid "+GOLD,padding:"36px 28px",background:"#0a0a0a"}}>
+            <div style={{fontSize:40,marginBottom:12}}>🎬</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:20,letterSpacing:3,marginBottom:14,fontWeight:700}}>SOMETHING NEEDS A RETAKE</div>
+            <div style={{fontSize:13,color:GOLDDIM,lineHeight:1.8,marginBottom:22}}>
+              MandaStrong Studio hit an unexpected error. Your saved projects and media library are safe —
+              they live in your device's storage, not in this screen.
+            </div>
+            <button onClick={this.handleReload} style={{background:GOLD,color:"#000",border:"none",padding:"12px 32px",fontWeight:900,fontSize:13,letterSpacing:2,cursor:"pointer"}}>
+              ⟳ RELOAD STUDIO
+            </button>
+            <div style={{fontSize:10,color:GOLDDIM,marginTop:16,opacity:0.6}}>{this.state.errorMsg}</div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 const DIM = "#aaaaaa";
 const TOTAL = 24;
 
@@ -293,7 +182,6 @@ let currentUtterance = null;
 
 function speakText(voiceId, txt, onStart, onEnd) {
   if (!txt||!txt.trim()) return;
-  if (typeof window === "undefined" || !window.speechSynthesis) { if(onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   currentUtterance = null;
   const clean = txt
@@ -304,7 +192,6 @@ function speakText(voiceId, txt, onStart, onEnd) {
     .replace(/([.!?])\s+([A-Z])/g,"$1 $2")
     .slice(0,200000);
   const doSpeak = () => {
-    if (typeof window === "undefined" || !window.speechSynthesis) { if (typeof onEnd === "function") onEnd(); return; }
     const allVoices = window.speechSynthesis.getVoices();
     const voiceChar = typeof VOICE_CHARACTERS !== "undefined"
       ? VOICE_CHARACTERS.find(v=>v.id===voiceId) : null;
@@ -315,45 +202,28 @@ function speakText(voiceId, txt, onStart, onEnd) {
     if(!picked && voiceChar){
       const origin = (voiceChar.origin||"").toLowerCase();
       const gender = (voiceChar.gender||"").toLowerCase();
-      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm"];
-      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen"];
-      const premiumUSMale   = ["Alex","Tom","Fred","Aaron"];
-      const premiumAussie   = ["Karen","Lee"];
-      const premiumIrish    = ["Moira"];
-      const premiumScottish = ["Fiona"];
+      // Cross-device voice names: includes Apple (iOS/macOS), Chrome (Windows/Android), Edge
+      const premiumBritish  = ["Daniel","Oliver","Arthur","George","Malcolm","Daniel (Enhanced)","Daniel (Premium)","Google UK English Male","Microsoft George","Microsoft Ryan","Rishi","Aaron","Jamie"];
+      const premiumBritishF = ["Serena","Tessa","Kate","Serena (Enhanced)","Serena (Premium)","Google UK English Female","Microsoft Hazel","Martha","Alice"];
+      const premiumUSFemale = ["Samantha","Ava","Victoria","Karen","Samantha (Enhanced)","Samantha (Premium)","Google US English","Microsoft Zira","Microsoft Jenny"];
+      const premiumUSMale   = ["Alex","Tom","Fred","Aaron","Alex (Enhanced)","Microsoft David","Microsoft Guy","Google US English Male"];
+      const premiumAussie   = ["Karen","Lee","Karen (Enhanced)","Microsoft Natasha"];
+      const premiumIrish    = ["Moira","Moira (Enhanced)","Microsoft Sean"];
+      const premiumScottish = ["Fiona","Fiona (Enhanced)"];
       let candidates = [];
       if(origin.includes("british")||origin.includes("english"))
-        candidates = gender==="female" ? ["Serena","Tessa","Kate"] : premiumBritish;
+        candidates = gender==="female" ? premiumBritishF : premiumBritish;
       else if(origin.includes("irish"))    candidates = premiumIrish;
       else if(origin.includes("scottish")) candidates = premiumScottish;
       else if(origin.includes("australian")) candidates = premiumAussie;
       else if(gender==="female") candidates = premiumUSFemale;
       else candidates = premiumUSMale;
-    // ── QUALITY FIRST: always prefer the highest-quality voice the device has ──
-    // Enhanced / Premium / Siri / Neural / Natural voices sound dramatically better.
-    const isHiQ = (v) => {
-      const n = (v.name||"") + " " + (v.voiceURI||"");
-      return /premium|enhanced|siri|neural|natural|online|multilingual/i.test(n);
-    };
-    const hiQVoices = allVoices.filter(v=>v.lang&&v.lang.startsWith("en")&&isHiQ(v));
-    const pool = hiQVoices.length ? hiQVoices : allVoices;
-
-    for(const name of candidates){
-        picked = pool.find(v=>v.name.includes(name)) || allVoices.find(v=>v.name.includes(name));
+      for(const name of candidates){
+        picked = allVoices.find(v=>v.name.includes(name));
         if(picked) break;
       }
-      // Nothing matched by name — take the best-quality voice matching gender/accent
-      if(!picked && hiQVoices.length){
-        const fem = /female|samantha|ava|serena|zoe|karen|moira|fiona|tessa|kate|victoria|nicky|allison|susan/i;
-        const wantFemale = gender==="female";
-        picked = hiQVoices.find(v=>wantFemale ? fem.test(v.name) : !fem.test(v.name)) || hiQVoices[0];
-      }
     }
-    // Final fallbacks — still prefer quality
-    if(!picked){
-      const anyHiQ = allVoices.filter(v=>v.lang&&v.lang.startsWith("en")&&isHiQ(v));
-      picked = anyHiQ[0] || allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
-    }
+    if(!picked) picked = allVoices.find(v=>v.lang&&v.lang.startsWith("en"));
     if(!picked && allVoices.length) picked = allVoices[0];
 
     const pitch = voiceChar ? voiceChar.pitch : 1.0;
@@ -386,9 +256,8 @@ function speakText(voiceId, txt, onStart, onEnd) {
     };
     speakNext();
   };
-  if (typeof window === "undefined" || !window.speechSynthesis) { if (typeof onEnd === "function") onEnd(); return; }
   if(window.speechSynthesis.getVoices().length===0){
-    if(typeof window!=="undefined"&&window.speechSynthesis){window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };}
+    window.speechSynthesis.onvoiceschanged=()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
   } else { doSpeak(); }
 }
 
@@ -403,56 +272,42 @@ const IMAGE_T = ["Text to Image","Prompt to Image","Image to Image","Image Upsca
 const VIDEO_T = ["Text to Video","Image to Video","Video to Video","AI Video Creator","AI Film Generator","Video Upscaler","AI Video Generator 4K","Set to Video","Video Colorizer","Color Grading Pro","Fast Look Generator","Film Restoration","Time Lapse Creator","Video Trimmer","Background Remover","Digital Human Video","Rotoscope Video","Animation Creator","Puppet Animator","Motion Capture","Character Animator","Video Stabilizer","Video Compressor","Cinematic LUT","Black & White Film","Film Texture","VHS Effect","Glitch Effect","Quick Film Creator","Opening Slate","Time Freeze","Bullet Time Effect","Rain Simulation","Snow Simulation","Smoke Generator","Fire Simulation","Particle System","AI Progressive Video","4K Upscaling"];
 const MOTION = ["AI 8K Upscaling","AI 4K Upscaling","Video Super Resolution","Frame Interpolation","Video Denoiser","Noise Reduction","Grain Remover","Artifact Remover","Scratch Remover","Video Sharpener","Clarity Booster","Detail Enhancer","Edge Enhancement","Texture Boost","White Balance AI","Color Correction","Auto Color Balance","Color Match Pro","Color Grading AI","Cinematic Color Grade","Film Stock Emulation","LUT Generator","Tone Mapping Pro","HDR Enhancement","Deep HDR Boost","Dynamic Range Expansion","Shadow Recovery","Highlight Recovery","Black Point Calibration","Gamma Correction","Contrast Enhancer","Brightness Optimizer","Saturation Booster","Smart Saturation","Face Enhancement","Face Retouch","Eye Enhancer","Teeth Whitener","Skin Tone Enhancer","Background Enhancer","Sky Enhancer","Landscape Enhancer","Night Video Enhancer","Low Light Clarity","Motion Stabilization","Shake Remover","Rolling Shutter Fix"];
 
-const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Grok"},{p:22,l:"Community Hub"},{p:24,l:"Character Studio"},{p:23,l:"That's All Folks"}];
+const NAV = [{p:1,l:"Home"},{p:2,l:"Platform"},{p:3,l:"Examples"},{p:4,l:"Login / Pricing"},{p:5,l:"Writing Tools"},{p:6,l:"Voice Tools"},{p:7,l:"Image Tools"},{p:8,l:"Video Tools"},{p:9,l:"Motion & VFX"},{p:10,l:"Enhancement"},{p:11,l:"Upload Media"},{p:12,l:"Editor Suite"},{p:13,l:"Timeline Editor"},{p:14,l:"Enhancement Studio"},{p:15,l:"Audio Mixer"},{p:16,l:"Render Engine"},{p:17,l:"Film Preview"},{p:18,l:"Export & Distribute"},{p:19,l:"Tutorials"},{p:20,l:"Terms & Disclaimer"},{p:21,l:"Agent Claude"},{p:22,l:"Community Hub"},{p:24,l:"Character Studio"},{p:23,l:"That's All Folks"}];
 
-function ProjectHistoryModal({ onClose, onResume, initialTab }) {
+function ProjectHistoryModal({ onClose, onResume }) {
   const [history,setHistory]=useState([]);
-  const [tab,setTab]=useState(initialTab||"in_progress");
   useEffect(()=>{try{setHistory(JSON.parse(localStorage.getItem("ms_project_history")||"[]"));}catch{};},[]);
   const del=(idx)=>{const u=history.filter((_,i)=>i!==idx);setHistory(u);localStorage.setItem("ms_project_history",JSON.stringify(u));};
-  const filtered=history.filter(h=>(h.status||"in_progress")===tab);
-  const inProgressCount=history.filter(h=>(h.status||"in_progress")==="in_progress").length;
-  const completedCount=history.filter(h=>h.status==="completed").length;
   return (
     <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.96)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{width:"min(620px,95vw)",background:"#050505",border:"2px solid "+GOLD,maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
+      <div style={{width:"min(580px,95vw)",background:"#050505",border:"2px solid "+GOLD,maxHeight:"82vh",display:"flex",flexDirection:"column"}}>
         <div style={{background:"linear-gradient(135deg,#0a0500,#050200)",borderBottom:"1px solid "+GOLD+"",padding:"16px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:17,fontWeight:900,letterSpacing:4}}>📂 YOUR PROJECTS</div>
-            <div style={{color:WHITE,fontSize:10,letterSpacing:3,marginTop:3}}>OPEN A WORK IN PROGRESS OR REVISIT A FINISHED FILM</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:17,fontWeight:900,letterSpacing:4}}>📂 MY PROJECTS</div>
+            <div style={{color:WHITE,fontSize:10,letterSpacing:3,marginTop:3}}>CONTINUE WHERE YOU LEFT OFF</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"1px solid "+GOLD,color:GOLD,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
         </div>
-        <div style={{display:"flex",borderBottom:"1px solid "+GOLDDIM,flexShrink:0}}>
-          <button onClick={()=>setTab("in_progress")} style={{flex:1,background:tab==="in_progress"?"#1a0800":"transparent",border:"none",borderBottom:tab==="in_progress"?"2px solid "+GOLD:"none",color:tab==="in_progress"?GOLD:DIM,padding:"12px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⟳ OPEN PROJECT ({inProgressCount})</button>
-          <button onClick={()=>setTab("completed")} style={{flex:1,background:tab==="completed"?"#1a0800":"transparent",border:"none",borderBottom:tab==="completed"?"2px solid "+GOLD:"none",color:tab==="completed"?GOLD:DIM,padding:"12px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>✓ MY PROJECTS ({completedCount})</button>
-        </div>
         <div style={{flex:1,overflowY:"auto",padding:18}}>
-          {filtered.length===0?(
+          {history.length===0?(
             <div style={{textAlign:"center",padding:"40px 20px",color:GOLDDIM}}>
-              <div style={{fontSize:34,marginBottom:10}}>{tab==="in_progress"?"⟳":"✓"}</div>
-              <div style={{fontSize:12,letterSpacing:2,marginBottom:8}}>{tab==="in_progress"?"No projects in progress.":"No completed projects yet."}</div>
-              <div style={{fontSize:11,color:DIM,lineHeight:1.7}}>{tab==="in_progress"?<span>Hit 💾 SAVE PROJECT with<br/>status IN PROGRESS to save your work.</span>:<span>Mark a project COMPLETED<br/>when your film is finished.</span>}</div>
+              <div style={{fontSize:34,marginBottom:10}}>📂</div>
+              <div style={{fontSize:12,letterSpacing:2,marginBottom:8}}>No saved sessions yet.</div>
+              <div style={{fontSize:11,color:DIM,lineHeight:1.7}}>Hit 💾 SAVE PROJECT in the footer<br/>to save your current session.</div>
             </div>
-          ):[...filtered].reverse().map((h,i)=>{
-            const originalIdx=history.indexOf(h);
-            return (
-              <div key={i} style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2}}>{h.name||"Untitled Session"}</div>
-                    <span style={{background:tab==="completed"?"#0a2010":"#20180a",color:tab==="completed"?"#22c55e":GOLD,fontSize:9,letterSpacing:2,padding:"2px 8px",fontWeight:900}}>{tab==="completed"?"COMPLETED":"IN PROGRESS"}</span>
-                  </div>
-                  <div style={{color:DIM,fontSize:10,letterSpacing:1}}>{h.date} · Page {h.page} · {h.assetCount} asset{h.assetCount!==1?"s":""}</div>
-                  {h.note&&<div style={{color:WHITE,fontSize:11,marginTop:4,fontStyle:"italic"}}>{h.note}</div>}
-                </div>
-                <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  <button onClick={()=>onResume(h)} style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",padding:"8px 18px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>{tab==="completed"?"👁 REVISIT":"▶ CONTINUE"}</button>
-                  <button onClick={()=>del(originalIdx)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"5px 10px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕</button>
-                </div>
+          ):[...history].reverse().map((h,i)=>(
+            <div key={i} style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{flex:1}}>
+                <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:3}}>{h.name||"Untitled Session"}</div>
+                <div style={{color:DIM,fontSize:10,letterSpacing:1}}>{h.date} · Page {h.page} · {h.assetCount} asset{h.assetCount!==1?"s":""}</div>
+                {h.note&&<div style={{color:WHITE,fontSize:11,marginTop:4,fontStyle:"italic"}}>{h.note}</div>}
               </div>
-            );
-          })}
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button onClick={()=>onResume(h)} style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",padding:"8px 18px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>▶ CONTINUE PROJECT</button>
+                <button onClick={()=>del(history.length-1-i)} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"5px 10px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>✕</button>
+              </div>
+            </div>
+          ))}
         </div>
         {history.length>0&&(
           <div style={{borderTop:"1px solid "+GOLDDIM+"",padding:"10px 18px",flexShrink:0}}>
@@ -467,26 +322,19 @@ function ProjectHistoryModal({ onClose, onResume, initialTab }) {
 function SaveSessionModal({ onClose, onSave, currentPage, assetCount }) {
   const [name,setName]=useState("Session — "+new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));
   const [note,setNote]=useState("");
-  const [status,setStatus]=useState("in_progress");
   const inp2={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"9px 12px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   return (
     <div style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{width:"min(440px,92vw)",background:"#050505",border:"2px solid "+GOLD,padding:22}}>
+      <div style={{width:"min(400px,92vw)",background:"#050505",border:"2px solid "+GOLD,padding:22}}>
         <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:15,fontWeight:900,letterSpacing:3,marginBottom:4}}>💾 SAVE SESSION</div>
         <div style={{color:DIM,fontSize:10,marginBottom:14}}>Page {currentPage} · {assetCount} assets in library</div>
         <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>PROJECT NAME</div>
         <input value={name} onChange={e=>setName(e.target.value)} style={{...inp2,marginBottom:10}}/>
         <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>NOTE (OPTIONAL)</div>
-        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Done chapters 1-5, continuing from 6..." style={{...inp2,marginBottom:12}}/>
-        <div style={{color:GOLD,fontSize:10,letterSpacing:3,marginBottom:5}}>STATUS</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:16}}>
-          <button onClick={()=>setStatus("in_progress")} style={{background:status==="in_progress"?GOLD:"#111",border:"1px solid "+(status==="in_progress"?"#000":GOLDDIM),color:status==="in_progress"?"#000":WHITE,padding:"9px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⟳ IN PROGRESS</button>
-          <button onClick={()=>setStatus("completed")} style={{background:status==="completed"?GOLD:"#111",border:"1px solid "+(status==="completed"?"#000":GOLDDIM),color:status==="completed"?"#000":WHITE,padding:"9px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>✓ COMPLETED</button>
-        </div>
-        <div style={{color:DIM,fontSize:10,marginBottom:12,lineHeight:1.5}}>{status==="in_progress"?"Will appear in OPEN PROJECT (still working on it)":"Will appear in MY PROJECTS (finished films)"}</div>
+        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Done chapters 1-5, continuing from 6..." style={{...inp2,marginBottom:16}}/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           <button onClick={onClose} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>CANCEL</button>
-          <button onClick={()=>onSave(name,note,status)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>💾 SAVE</button>
+          <button onClick={()=>onSave(name,note)} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>💾 SAVE</button>
         </div>
       </div>
     </div>
@@ -547,8 +395,7 @@ function Footer({ page, go, onSave, onHistory }) {
   return (
     <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:400,background:"#000",borderTop:"1px solid "+GOLD+"",padding:"6px 20px 8px",display:"flex",flexDirection:"column",gap:4}}>
       <div style={{textAlign:"center"}}>
-        <span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700}}>MANDASTRONG STUDIO · PROFESSIONAL CINEMA SYNTHESIS · MandaStrong1.Etsy.com</span>
-        {page===1&&<span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700,opacity:0.75}}> · CREATED 2025</span>}
+        <span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700}}>MANDASTRONG STUDIO 2026 · PROFESSIONAL CINEMA SYNTHESIS · MandaStrong1.Etsy.com</span>
       </div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
         <button onClick={()=>go(Math.max(1,page-1))} disabled={page===1} style={{...G("out",true),opacity:page===1?0.3:1}}>◀ BACK</button>
@@ -580,9 +427,6 @@ function ToolPanel({ tool, onClose, onSave }) {
   const isWritingTool = ["Script to Movie","Text to Script","Script to Screenplay","Prompt to Story","Feature Film Script","Short Film Script","Documentary Script","Plot Generator","Story Outline","Beat Sheet Builder","Character Bio Writer","Logline Generator","Synopsis Writer","Scene Writer","Dialogue Generator","Narration Writer","Voiceover Script"].includes(tool);
   const [mode, setMode] = useState(isVoice?"voice":(isVideoTool||isImageTool||isWritingTool)?"ai":"upload");
   const [describe, setDescribe] = useState("");
-  const [s2mProducer, setS2mProducer] = useState("");
-  const [s2mProduction, setS2mProduction] = useState("");
-  const [s2mWired, setS2mWired] = useState(false);
   const [result, setResult] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -721,35 +565,7 @@ function ToolPanel({ tool, onClose, onSave }) {
             <button onClick={saveAsset} style={{...G("gold",false),marginTop:8,width:"100%",padding:"12px"}}>SAVE TO MEDIA LIBRARY</button>
           </div>
         )}
-        {mode==="ai"&&tool==="Script to Movie"&&(
-          <div style={{marginBottom:14}}>
-            <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:2}}>🎬 SCRIPT TO MOVIE</div>
-            <div style={{color:GOLDDIM,fontSize:11,lineHeight:1.6,marginBottom:12}}>Fill the three boxes, then WIRE INTO RENDER — the video generator on Page 8 uses them to drive every scene.</div>
-            <div style={{color:GOLD,fontSize:11,letterSpacing:2,fontWeight:900,marginBottom:3}}>🎬 PRODUCER</div>
-            <textarea value={s2mProducer} onChange={e=>setS2mProducer(e.target.value)} placeholder="Producer's directions — vision, mood, casting, overall intent..." style={{...inp,height:80,resize:"vertical",lineHeight:1.6,marginBottom:10}}/>
-            <div style={{color:GOLD,fontSize:11,letterSpacing:2,fontWeight:900,marginBottom:3}}>🎞 DESCRIBE</div>
-            <textarea value={describe} onChange={e=>setDescribe(e.target.value)} placeholder="Describe your film — scene by scene, what happens on screen..." style={{...inp,height:80,resize:"vertical",lineHeight:1.6,marginBottom:10}}/>
-            <div style={{color:GOLD,fontSize:11,letterSpacing:2,fontWeight:900,marginBottom:3}}>🎥 PRODUCTION NOTES</div>
-            <textarea value={s2mProduction} onChange={e=>setS2mProduction(e.target.value)} placeholder="Production notes — shots, camera moves, lighting, locations, timing..." style={{...inp,height:80,resize:"vertical",lineHeight:1.6,marginBottom:10}}/>
-            <button onClick={runAI} disabled={loading||!describe.trim()} style={{...G("gold",false),width:"100%",padding:"13px",opacity:loading||!describe.trim()?0.5:1,fontSize:13,letterSpacing:2,marginBottom:8}}>{loading?"⟳ CREATING...":"✍ WRITE SCRIPT ✦"}</button>
-            <button onClick={()=>{
-              const brief=(s2mProducer.trim()?"PRODUCER DIRECTION:\n"+s2mProducer.trim()+"\n\n":"")+(describe.trim()?"SCENE DESCRIPTION:\n"+describe.trim()+"\n\n":"")+(s2mProduction.trim()?"PRODUCTION NOTES:\n"+s2mProduction.trim()+"\n":"");
-              if(!brief.trim()){alert("Fill in at least one box first.");return;}
-              try{localStorage.setItem("ms_render_brief",JSON.stringify({producer:s2mProducer.trim(),describe:describe.trim(),production:s2mProduction.trim(),brief,ts:Date.now()}));}catch(e){}
-              const id="brief_"+Date.now();
-              if(onSave)onSave({id,name:"SCRIPT-TO-MOVIE BRIEF — "+new Date().toLocaleDateString(),type:"document",docKind:"brief",text:brief,date:new Date().toISOString(),renderBrief:true});
-              setS2mWired(true);setTimeout(()=>setS2mWired(false),4000);
-            }} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px",cursor:"pointer",fontSize:13,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⚡ WIRE INTO RENDER — DRIVE THE VIDEO GENERATOR</button>
-            {s2mWired&&<div style={{color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:1,marginTop:10,textAlign:"center"}}>✓ WIRED — Page 8 will use your Producer, Describe &amp; Production notes.</div>}
-            {result&&(
-              <div style={{marginTop:14}}>
-                <textarea value={result} onChange={e=>setResult(e.target.value)} style={{...inp,height:140,resize:"none",lineHeight:1.7}}/>
-                <button onClick={saveAsset} style={{...G("gold",false),marginTop:8,width:"100%",padding:"12px"}}>GENERATE & SAVE</button>
-              </div>
-            )}
-          </div>
-        )}
-        {mode==="ai"&&tool!=="Script to Movie"&&(
+        {mode==="ai"&&(
           <div style={{marginBottom:14}}>
             <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:4}}>
               {isVideoTool?"DESCRIBE YOUR SCENE OR FILM IDEA":isImageTool?"DESCRIBE YOUR IMAGE":isWritingTool?"DESCRIBE YOUR STORY OR SCRIPT":"DESCRIBE WHAT YOU WANT"}
@@ -774,74 +590,6 @@ function ToolPanel({ tool, onClose, onSave }) {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── PAGE 5 WRITING BOXES — Producer Directions / Script / Production Directions
-function WritingBoxes({ onSave }) {
-  const BOXES=[
-    {key:"producer",title:"PRODUCER",icon:"🎬",hint:"Vision, tone, casting, the feeling the film should leave behind.",ph:"Producer's directions — vision, mood, casting, overall intent..."},
-    {key:"describe",title:"DESCRIBE",icon:"🎞",hint:"Describe the film scene by scene — what happens, what we see.",ph:"Describe your film — scene by scene, what happens on screen..."},
-    {key:"production",title:"PRODUCTION NOTES",icon:"🎥",hint:"Shots, camera moves, lighting, locations, timing.",ph:"Production notes — shots, camera moves, lighting, locations, timing..."},
-  ];
-  const [docs,setDocs]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_writing_boxes")||"{}");}catch{return {};}});
-  const [saved,setSaved]=useState("");
-  const [wiring,setWiring]=useState(false);
-  const [wired,setWired]=useState(false);
-  const set=(k,v)=>setDocs(p=>{const n={...p,[k]:v};try{localStorage.setItem("ms_writing_boxes",JSON.stringify(n));}catch{}return n;});
-  const saveBox=async(b)=>{
-    const body=(docs[b.key]||"").trim();
-    if(!body){alert("Write something in "+b.title+" first, then save it.");return;}
-    const id="doc_"+b.key+"_"+Date.now();
-    const asset={id,name:b.title+" — "+new Date().toLocaleDateString(),type:"document",docKind:b.key,text:body,date:new Date().toISOString()};
-    try{await safeSaveClipToDB(id,new Blob([body],{type:"text/plain"}),asset.name,"document");}catch(e){}
-    if(onSave)onSave(asset);
-    setSaved(b.key);setTimeout(()=>setSaved(""),2500);
-  };
-  // ── WIRE INTO RENDER ──────────────────────────────────────────────
-  // Combine the three boxes into a single director brief and store it as
-  // ms_render_brief. The video generator (Page 8) reads this brief and
-  // prepends it to every scene render so Producer + Describe + Production
-  // all drive the actual output.
-  const wireToRender=async()=>{
-    const producer=(docs.producer||"").trim();
-    const describe=(docs.describe||"").trim();
-    const production=(docs.production||"").trim();
-    if(!producer&&!describe&&!production){alert("Fill in at least one box first.");return;}
-    setWiring(true);
-    const brief=
-      (producer?"PRODUCER DIRECTION:\n"+producer+"\n\n":"")+
-      (describe?"SCENE DESCRIPTION:\n"+describe+"\n\n":"")+
-      (production?"PRODUCTION NOTES:\n"+production+"\n":"");
-    try{
-      localStorage.setItem("ms_render_brief",JSON.stringify({producer,describe,production,brief,ts:Date.now()}));
-    }catch(e){}
-    // Also drop a project-brief document into the media library / timeline
-    const id="brief_"+Date.now();
-    const asset={id,name:"SCRIPT-TO-MOVIE BRIEF — "+new Date().toLocaleDateString(),type:"document",docKind:"brief",text:brief,date:new Date().toISOString(),renderBrief:true};
-    try{await safeSaveClipToDB(id,new Blob([brief],{type:"text/plain"}),asset.name,"document");}catch(e){}
-    if(onSave)onSave(asset);
-    setTimeout(()=>{setWiring(false);setWired(true);setTimeout(()=>setWired(false),4000);},500);
-  };
-  const ta={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"12px 14px",color:WHITE,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif",lineHeight:1.8,height:150,resize:"vertical"};
-  return (
-    <div style={{padding:"0 12px 16px"}}>
-      <div style={{color:GOLD,fontSize:13,letterSpacing:3,fontWeight:900,margin:"6px 2px 4px"}}>🎬 SCRIPT TO MOVIE</div>
-      <div style={{color:GOLDDIM,fontSize:11,letterSpacing:1,margin:"0 2px 12px"}}>Fill the three boxes, then WIRE INTO RENDER — the video generator on Page 8 uses them to drive every scene. Each box also saves to your Media Library &amp; timeline.</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
-        {BOXES.map(b=>(
-          <div key={b.key} style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 16px",display:"flex",flexDirection:"column"}}>
-            <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:3}}>{b.icon} {b.title}</div>
-            <div style={{color:GOLDDIM,fontSize:11,lineHeight:1.6,marginBottom:8}}>{b.hint}</div>
-            <textarea value={docs[b.key]||""} onChange={e=>set(b.key,e.target.value)} placeholder={b.ph} style={ta}/>
-            <button onClick={()=>saveBox(b)} style={{marginTop:10,background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"9px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>💾 SAVE TO MEDIA LIBRARY</button>
-            {saved===b.key&&<div style={{color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:1,marginTop:8,textAlign:"center"}}>✓ SAVED</div>}
-          </div>
-        ))}
-      </div>
-      <button onClick={wireToRender} disabled={wiring} style={{marginTop:14,width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"15px",cursor:"pointer",fontSize:14,fontWeight:900,letterSpacing:3,fontFamily:"'Rajdhani',sans-serif"}}>{wiring?"⟳ WIRING...":"⚡ WIRE INTO RENDER — DRIVE THE VIDEO GENERATOR"}</button>
-      {wired&&<div style={{color:"#22c55e",fontSize:12,fontWeight:900,letterSpacing:1,marginTop:10,textAlign:"center"}}>✓ WIRED — Page 8 will now use your Producer, Describe &amp; Production notes on every scene.</div>}
     </div>
   );
 }
@@ -972,7 +720,6 @@ function MusicVideoStudio({ onClose, onSave }) {
       videoStyle:"Cinematic Narrative", colorGrade:"Cinematic Teal & Orange",
       effects:["Slow Motion","Film Grain","Vignette"],
       cuts:"Long Takes", aspectRatio:"16:9", duration:"3 Minutes",
-      durationMin:0, stereo:true,
       visualDesc:"", lipSync:true, refMedia:null,
     };
   });
@@ -1011,13 +758,9 @@ function MusicVideoStudio({ onClose, onSave }) {
       setRenderProgress(4);
 
       // ── BEAT ANALYSIS ─────────────────────────────────────────────
-      // ── DURATION ── single source of truth is the slider (config.durationMin).
-      // 0 = AUTO: match the audio length. Above 0 = fixed length that overrides.
-      let totalDur = 180;
-      const overrideMin = Number(config.durationMin)||0;
-      const overrideSec = overrideMin>0 ? overrideMin*60 : 0;
-      if(overrideSec>0){ totalDur = overrideSec; addLog("Duration: locked to "+overrideMin+" min ("+overrideSec+"s)"); }
-      else { addLog("Duration: AUTO — will match the song length"); }
+      const durationMap = {"2 Minutes":120,"3 Minutes":180,"4 Minutes":240,"5 Minutes":300};
+      let totalDur = Math.max(30, Number(durationMap[config.duration])||180);
+      if(!isFinite(totalDur)||isNaN(totalDur)) totalDur = 180;
       let beatGrid = [];
       let audioCtx = null, audioDest = null, audioSource = null;
 
@@ -1026,7 +769,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           audioCtx = new (window.AudioContext||window.webkitAudioContext)();
           const ab = await audioFile.arrayBuffer();
           const buf = await audioCtx.decodeAudioData(ab);
-          if(overrideSec>0){ totalDur = overrideSec; } else { totalDur = buf.duration; }
+          totalDur = buf.duration;
           // Energy-based beat detection
           const data = buf.getChannelData(0);
           const sr = buf.sampleRate;
@@ -1046,23 +789,13 @@ function MusicVideoStudio({ onClose, onSave }) {
           audioDest = audioCtx.createMediaStreamDestination();
           audioSource = audioCtx.createBufferSource();
           audioSource.buffer = buf;
-          if(overrideSec>buf.duration+0.5){ audioSource.loop=true; addLog("Song ("+buf.duration.toFixed(1)+"s) will loop to fill "+overrideSec+"s"); }
           const gain = audioCtx.createGain(); gain.gain.value=0.92;
-          if(config.stereo!==false && audioCtx.createStereoPanner){
-            addLog("🔊 Stereo sound ON — baking full stereo field into the film");
-            const wet=audioCtx.createGain(); wet.gain.value=0.5;
-            audioSource.connect(gain); gain.connect(audioDest); gain.connect(audioCtx.destination);
-            [[-0.85,0.014],[0.85,0.021]].forEach(([pan,dl])=>{
-              const d=audioCtx.createDelay(); d.delayTime.value=dl;
-              const p=audioCtx.createStereoPanner(); p.pan.value=pan;
-              gain.connect(d); d.connect(p); p.connect(wet);
-            });
-            wet.connect(audioDest); wet.connect(audioCtx.destination);
-          } else {
-            addLog("Mono sound — stereo toggle off");
-            audioSource.connect(gain); gain.connect(audioDest); gain.connect(audioCtx.destination);
-          }
-          if(overrideSec>0){ totalDur = overrideSec; } else { totalDur = buf.duration; }
+          // Stereo panner — adds width to the mix
+          const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+          if(panner){ panner.pan.value=0; audioSource.connect(gain); gain.connect(panner); panner.connect(audioDest); panner.connect(audioCtx.destination); }
+          else { audioSource.connect(gain); gain.connect(audioDest); gain.connect(audioCtx.destination); }
+          // Lock totalFrames to exact audio duration so video ends with audio
+          totalDur = buf.duration;
         }catch(e){ addLog("Audio: "+e.message); audioCtx=null; }
       } else {
         addLog("No audio — generating "+totalDur+"s visual");
@@ -1086,56 +819,13 @@ function MusicVideoStudio({ onClose, onSave }) {
       const hasGuitar = /guitar|musician|fingerpick/.test(pr);
       const isSilhouette = /silhouette|back to camera|facing away/.test(pr);
 
-      // Load reference image if user uploaded one — Reality Engine base
-      let refImgEl = null;
-      if(config.refMedia){
-        try{
-          refImgEl = await new Promise((resolve)=>{
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = ()=>resolve(img);
-            img.onerror = ()=>resolve(null);
-            img.src = config.refMedia;
-            setTimeout(()=>resolve(refImgEl||null), 5000);
-          });
-          if(refImgEl) addLog("✓ Reference image loaded — Reality Engine base active");
-        }catch(e){}
-      }
-
       const renderFn = (ctx, W, H, t, sec, totalSec, beatNow) => {
         const pulse = beatNow ? 1.02 : 1.0;
         ctx.save();
         ctx.translate(W/2, H/2);
         ctx.scale(pulse + t*0.04, pulse + t*0.04);
         ctx.translate(-W/2, -H/2);
-
-        // ── REALITY ENGINE — if user uploaded a reference image, use it as photorealistic base
-        if(refImgEl){
-          // Cover the full frame with the reference image
-          const imgR = refImgEl.width / refImgEl.height;
-          const canR = W / H;
-          let dw, dh, dx, dy;
-          if(imgR > canR){
-            dh = H;
-            dw = H * imgR;
-            dx = (W - dw) / 2;
-            dy = 0;
-          } else {
-            dw = W;
-            dh = W / imgR;
-            dx = 0;
-            dy = (H - dh) / 2;
-          }
-          // Subtle Ken Burns pan across the reference image for movement
-          const panX = Math.sin(sec * 0.08) * W * 0.02;
-          const panY = Math.cos(sec * 0.06) * H * 0.015;
-          ctx.drawImage(refImgEl, dx + panX, dy + panY, dw, dh);
-          // Warm cinematic overlay + vignette handled by post-processing later
-          // Skip procedural sky/water/room drawing when we have real photo base
-          ctx.restore();
-          return;
-        }
-        // SKY (fallback for when no reference image is uploaded)
+        // SKY
         if(isSpace){
           const sky=ctx.createLinearGradient(0,0,0,H);
           sky.addColorStop(0,"rgb(1,1,8)"); sky.addColorStop(1,"rgb(3,3,18)");
@@ -1326,79 +1016,6 @@ function MusicVideoStudio({ onClose, onSave }) {
         ctx.restore();
       };
 
-      // ══════════════════════════════════════════════════════════════
-      // MANDASTRONG ENGINE — real footage, not drawn shapes
-      // The shot list renders in parallel, then the canvas below
-      // composites it with your grade, your beats and your audio.
-      // If the engine can't deliver, the built-in renderer still runs.
-      // ══════════════════════════════════════════════════════════════
-      let engineClips=[];
-      try{
-        const shotCount=Math.min(4,Math.max(3,Math.round(totalDur/45))); // capped at 4 to protect render spend
-        const ANGLES=[
-          "wide establishing shot, full scene visible",
-          "medium shot, subject centred in frame",
-          "slow push in, shallow depth of field",
-          "close detail shot, hands and texture",
-          "low angle looking up, dramatic",
-          "slow lateral tracking shot",
-          "framed from behind, subject facing away",
-          "wide static held frame, atmospheric"
-        ];
-        const look=[config.videoStyle,config.colorGrade,(config.effects||[]).join(", ")].filter(Boolean).join(", ");
-        const shots=[];
-        for(let i=0;i<shotCount;i++){
-          shots.push(sceneDesc+". "+ANGLES[i%ANGLES.length]+". "+look+". Photorealistic, cinematic, natural motion, 35mm film, no text, no captions.");
-        }
-        addLog("Cinema Engine \u2014 rendering "+shotCount+" photorealistic shots...");
-        setRenderProgress(8);
-        let done=0;
-        const ar=(config.aspectRatio||"").indexOf("9:16")===0?"9:16":"16:9";
-        const seedImg=(typeof config.refMedia==="string"&&config.refMedia.indexOf("data:")===0)?config.refMedia:"";
-        const urls=await Promise.all(shots.map(s=>engineRender(s,{duration:5,aspect_ratio:ar,image:seedImg})
-          .then(u=>{ done++; addLog("Shot "+done+"/"+shotCount+(u?" \u2713":" \u2014 unavailable")); setRenderProgress(Math.min(26,8+done*2)); return u; })));
-        const good=urls.filter(Boolean);
-        if(good.length){
-          addLog("Loading footage into the compositor...");
-          const vids=await Promise.all(good.map(u=>engineToLocalVideo(u)));
-          engineClips=vids.filter(Boolean);
-          for(const v of engineClips){ try{ await v.play(); }catch(e){} }
-          addLog("\u2713 "+engineClips.length+" live shots ready \u2014 compositing with your grade and beats");
-        } else {
-          const diag=await engineStatus();
-          addLog((diag&&diag.ok===false?("Cinema Engine: "+(diag.message||"unavailable")):"Engine returned no footage")+" \u2014 using built-in renderer");
-        }
-      }catch(e){ addLog("Cinema Engine offline \u2014 using built-in renderer"); }
-
-      // Shot length follows the editing style you picked on Step 2
-      const CUTLEN={"Fast Cuts / High Energy":1.1,"Slow & Deliberate":5.5,"Long Takes":8,"Beat-Synced Cuts":0,"Montage Style":2.2};
-      const shotLen=CUTLEN[config.cuts]!==undefined?CUTLEN[config.cuts]:4;
-      const cutPoints=[];
-      if(shotLen===0&&beatGrid.length){
-        let lastCut=-99;
-        beatGrid.forEach(b=>{ if(b-lastCut>1.4){ cutPoints.push(b); lastCut=b; } });
-      }
-      const clipAt=(sec)=>{
-        if(!engineClips.length)return null;
-        if(cutPoints.length){
-          let n=0;
-          for(let i=0;i<cutPoints.length;i++){ if(sec>=cutPoints[i]) n=i+1; }
-          return engineClips[n%engineClips.length];
-        }
-        return engineClips[Math.floor(sec/shotLen)%engineClips.length];
-      };
-      // Fills the frame without squashing. Slight overscan so the
-      // parallax drift never exposes a black edge.
-      const drawClip=(c,v,W2,H2)=>{
-        if(!v||!v.videoWidth)return false;
-        const vr=v.videoWidth/v.videoHeight, cr=W2/H2;
-        let dw,dh;
-        if(vr>cr){ dh=H2; dw=H2*vr; } else { dw=W2; dh=W2/vr; }
-        dw*=1.08; dh*=1.08;
-        c.drawImage(v,(W2-dw)/2,(H2-dh)/2,dw,dh);
-        return true;
-      };
-
       setRenderProgress(30);
       addLog("Rendering "+totalDur.toFixed(0)+"s film at 12fps...");
 
@@ -1409,13 +1026,18 @@ function MusicVideoStudio({ onClose, onSave }) {
       const ctx = canvas.getContext("2d");
 
       const fps=12;
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+      const getSupportedMimeType=()=>{
+        const opts=["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm;codecs=vp8","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+        for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+        return ""; // let MediaRecorder pick a browser default rather than throwing
+      };
+      const mimeType=getSupportedMimeType();
       const videoStream=canvas.captureStream(fps);
       let combinedStream=videoStream;
       if(audioDest){
         combinedStream=new MediaStream([...videoStream.getTracks(),...audioDest.stream.getTracks()]);
       }
-      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:10000000});
+      const recorder=new MediaRecorder(combinedStream,mimeType?{mimeType,videoBitsPerSecond:10000000}:{videoBitsPerSecond:10000000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(Math.round(1000/fps));
@@ -1443,12 +1065,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           ctx.save();
           ctx.translate(-drift*0.3,0);
 
-          try{
-            const liveClip=clipAt(sec);
-            if(!(liveClip&&drawClip(ctx,liveClip,W,H))){
-              renderFn(ctx,W,H,t,sec,totalDur,beatNow);
-            }
-          }
+          try{ renderFn(ctx,W,H,t,sec,totalDur,beatNow); }
           catch(e){
             // Graceful fallback — keep rendering
             const bg=ctx.createLinearGradient(0,0,0,H);
@@ -1517,8 +1134,9 @@ function MusicVideoStudio({ onClose, onSave }) {
       addLog("Cutting to final...");
       await new Promise(r=>setTimeout(r,600));
       if(audioSource){try{audioSource.stop(audioCtx?audioCtx.currentTime:0);}catch(e){}}
-      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,4000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
-      const blob=new Blob(chunks,{type:mimeType});
+      recorder.stop();
+      await new Promise(r=>{recorder.onstop=r;});
+      const blob=new Blob(chunks,{type:mimeType||"video/webm"});
       const url=URL.createObjectURL(blob);
       setVideoUrl(url); setVideoBlob(blob);
       setRenderProgress(100);
@@ -1612,29 +1230,9 @@ function MusicVideoStudio({ onClose, onSave }) {
                 {label("GENRE")}{sel("genre",GENRES)}
                 {label("MOOD")}{sel("mood",MOODS)}
                 {label("TEMPO")}{sel("tempo",TEMPOS)}
-                {label("⬆ UPLOAD YOUR SONG — OR RECORD IT BELOW")}
-                <div style={{background:"#000",border:"2px dashed "+(audioFile?GOLD:GOLDDIM),padding:"18px 12px",cursor:"pointer",transition:"all .2s"}}
-                  onClick={()=>audioInputRef.current&&audioInputRef.current.click()}
-                  onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#0a0500";}}
-                  onDragLeave={e=>{e.currentTarget.style.borderColor=audioFile?GOLD:GOLDDIM;e.currentTarget.style.background="#000";}}
-                  onDrop={e=>{
-                    e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#000";
-                    const f=e.dataTransfer.files&&e.dataTransfer.files[0];
-                    if(f&&f.type.startsWith("audio/")){setAudioFile(f);setAudioUrl(URL.createObjectURL(f));setAudioName(f.name);}
-                    else if(f){alert("Please drop an audio file — MP3, WAV or M4A.");}
-                  }}>
-                  <div style={{color:audioFile?"#22c55e":GOLD,fontWeight:900,fontSize:13,letterSpacing:2,textAlign:"center"}}>
-                    {audioFile?"✓ "+audioName:"⬆ DRAG & DROP YOUR SONG HERE"}
-                  </div>
-                  <div style={{color:GOLDDIM,fontSize:10,marginTop:4,textAlign:"center",letterSpacing:1}}>{audioFile?"Tap to replace":"or tap to browse — MP3 · WAV · M4A"}</div>
-                </div>
-                <input ref={audioInputRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" style={{display:"none"}} onChange={handleAudioUpload}/>
                 <RecordYourOwnSong onRecorded={(blob,name)=>{setAudioFile(blob);const u=URL.createObjectURL(blob);setAudioUrl(u);setAudioName(name);}}/>
-                {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:6}}>✕ REMOVE AUDIO</button>}
-                <div onClick={()=>set("stereo",!config.stereo)} style={{display:"flex",alignItems:"center",gap:10,marginTop:14,padding:"10px 12px",background:"#0a0a0a",border:"1px solid "+(config.stereo?GOLD:GOLDDIM),cursor:"pointer"}}>
-                  <div style={{width:20,height:20,borderRadius:4,border:"2px solid "+(config.stereo?GOLD:GOLDDIM),background:config.stereo?GOLD:"transparent",color:"#000",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{config.stereo?"✓":""}</div>
-                  <div><div style={{color:config.stereo?GOLD:WHITE,fontWeight:900,fontSize:12,letterSpacing:1}}>🔊 USE STEREO SOUND</div><div style={{color:GOLDDIM,fontSize:10,marginTop:1}}>Full stereo width baked into the exported video</div></div>
-                </div>
+                {audioFile&&<div style={{color:"#22c55e",fontSize:11,fontWeight:900,letterSpacing:2,marginTop:6}}>✓ {audioName}</div>}
+                {audioFile&&<button onClick={()=>{setAudioFile(null);setAudioUrl("");setAudioName("");}} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",padding:"3px 10px",cursor:"pointer",fontSize:10,fontWeight:900,marginTop:4}}>✕ REMOVE AUDIO</button>}
               </div>
             )}
 
@@ -1669,22 +1267,17 @@ function MusicVideoStudio({ onClose, onSave }) {
                   style={{...inp,height:160,resize:"vertical",lineHeight:1.8,border:"1px solid "+GOLD}}
                 />
                 {label("DURATION")}
-                <div style={{padding:"12px 14px",border:"1px solid "+GOLD,background:"#0a0a0a",marginBottom:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <span style={{color:GOLDDIM,fontSize:11,fontWeight:900,letterSpacing:2}}>FILM LENGTH</span>
-                    <span style={{color:GOLD,fontSize:13,fontWeight:900}}>{config.durationMin>0?(config.durationMin+" min"):"AUTO — match song"}</span>
-                  </div>
-                  <input type="range" min={0} max={180} step={1} value={config.durationMin||0}
-                    onChange={e=>set("durationMin",+e.target.value)}
-                    style={{width:"100%",accentColor:GOLD}}/>
-                  <div style={{display:"flex",justifyContent:"space-between",color:GOLDDIM,fontSize:9,letterSpacing:1,marginTop:2}}>
-                    <span>0 (AUTO)</span><span>90 min</span><span>180 min</span>
-                  </div>
-                  <div style={{color:config.durationMin>0?GOLD:GOLDDIM,fontSize:11,lineHeight:1.7,marginTop:8}}>
-                    {config.durationMin>0
-                      ? "⏱ This overrides the song length — the film will run exactly "+config.durationMin+" minute"+(config.durationMin===1?"":"s")+", looping or trimming the audio to fit."
-                      : "🎵 At 0 the video automatically matches your song's length. Drag right to set a fixed length (up to 180 minutes) that overrides the music."}
-                  </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].map(d=>(
+                    <button key={d} onClick={()=>set("duration",d)}
+                      style={{background:config.duration===d?GOLD:"#111",border:"1px solid "+(config.duration===d?"#000":GOLDDIM),color:config.duration===d?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
+                      {d}
+                    </button>
+                  ))}
+                  <button onClick={()=>{const v=prompt("Enter duration in minutes (1-60):","10");if(v&&!isNaN(+v)&&+v>0)set("duration",v+" Minutes");}}
+                    style={{background:!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration)?GOLD:"#111",border:"1px solid "+((!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration))?"#000":GOLDDIM),color:(!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration))?"#000":WHITE,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:900}}>
+                    {!["2 Minutes","3 Minutes","4 Minutes","5 Minutes"].includes(config.duration)?config.duration:"CUSTOM"}
+                  </button>
                 </div>
               </div>
             )}
@@ -1721,7 +1314,7 @@ function MusicVideoStudio({ onClose, onSave }) {
                   style={{width:"100%",background:"#000",border:"1px solid "+GOLD,padding:"12px",color:WHITE,fontSize:13,outline:"none",fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box",height:130,resize:"vertical",lineHeight:1.8,marginBottom:10}}
                 />
 
-                {/* Reference image upload with drag & drop */}
+                {/* Reference image upload */}
                 {label("⬆ UPLOAD REFERENCE IMAGE (OPTIONAL)")}
                 {config.refMedia?(
                   <div style={{position:"relative",marginBottom:10}}>
@@ -1730,40 +1323,22 @@ function MusicVideoStudio({ onClose, onSave }) {
                     <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:3}}>✓ REFERENCE LOADED</div>
                   </div>
                 ):(
-                  <div>
-                    <div
-                      onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#1a0800";}}
-                      onDragLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="#0a0500";}}
-                      onDrop={e=>{
-                        e.preventDefault();
-                        e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="#0a0500";
-                        const f=e.dataTransfer.files&&e.dataTransfer.files[0];
-                        if(f&&(f.type.startsWith("image/")||f.type.startsWith("video/"))){
-                          set("refMedia",URL.createObjectURL(f));
-                        }
-                      }}
-                      onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
-                      style={{background:"#0a0500",border:"2px dashed "+GOLDDIM,padding:"18px 10px",textAlign:"center",cursor:"pointer",marginBottom:6,transition:"all .2s"}}>
-                      <div style={{color:GOLD,fontSize:14,fontWeight:900,letterSpacing:2,marginBottom:4}}>⬆ DRAG & DROP HERE</div>
-                      <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2}}>or click to browse — JPG · PNG · MP4</div>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
-                      <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
-                        style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
-                        📷 UPLOAD PHOTO
-                      </button>
-                      <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
-                        style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
-                        📁 UPLOAD FILE
-                      </button>
-                    </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                      style={{background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                      📷 UPLOAD PHOTO
+                    </button>
+                    <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*,video/*";inp.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)set("refMedia",URL.createObjectURL(f));};inp.click();}}
+                      style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,color:WHITE,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
+                      📁 UPLOAD FILE
+                    </button>
                   </div>
                 )}
 
                 {/* Summary */}
                 <div style={{background:"#0a0500",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
                   <div style={{color:GOLD,fontSize:11,letterSpacing:2,marginBottom:8,fontWeight:900}}>YOUR MUSIC VIDEO</div>
-                  {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",config.durationMin>0?(config.durationMin+" min"):"Auto — match song"],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
+                  {[["TITLE",config.title||"—"],["ARTIST",config.artist||"—"],["GENRE",config.genre||"—"],["MOOD",config.mood||"—"],["STYLE",config.videoStyle||"—"],["GRADE",config.colorGrade||"—"],["DURATION",config.duration||"—"],["AUDIO",audioName||"No audio uploaded"]].map(([k,v])=>(
                     <div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #0a0800"}}>
                       <span style={{color:GOLDDIM,letterSpacing:2}}>{k}</span>
                       <span style={{color:WHITE,fontWeight:700}}>{v}</span>
@@ -1822,21 +1397,11 @@ function MusicVideoStudio({ onClose, onSave }) {
             <div style={{display:"flex",flexDirection:"column",background:"#000",overflow:"hidden"}}>
               {/* Video player */}
               <div style={{position:"relative",background:"#000"}}>
-                <canvas ref={canvasRef} style={{position:"fixed",right:8,bottom:8,width:160,height:90,opacity:1,pointerEvents:"none",zIndex:9999,border:"1px solid #e8c96d",background:"#000"}}/>
+                <canvas ref={canvasRef} style={{display:"none"}}/>
                 <video ref={videoRef} src={videoUrl} playsInline
                   style={{width:"100%",aspectRatio:"16/9",display:"block",background:"#000"}}
                   onTimeUpdate={()=>setCurrentTime(videoRef.current?.currentTime||0)}
-                  onLoadedMetadata={()=>{
-                    const v=videoRef.current;if(!v)return;
-                    // Chrome WebM duration bug: force seek to end so browser reads real duration
-                    if(v.duration===Infinity||isNaN(v.duration)||v.duration===0){
-                      v.currentTime=1e10;
-                      const fix=()=>{v.currentTime=0;setDuration2(v.duration||0);v.removeEventListener("timeupdate",fix);};
-                      v.addEventListener("timeupdate",fix);
-                    } else {
-                      setDuration2(v.duration);
-                    }
-                  }}
+                  onLoadedMetadata={()=>setDuration2(videoRef.current?.duration||0)}
                   onPlay={()=>setPlaying(true)}
                   onPause={()=>setPlaying(false)}
                   onEnded={()=>setPlaying(false)}
@@ -1871,7 +1436,7 @@ function MusicVideoStudio({ onClose, onSave }) {
                 <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:3,marginBottom:10}}>EXPORT YOUR MUSIC VIDEO</div>
 
                 {/* Download */}
-                <a href={videoUrl} download={(config.title||"MusicVideo")+"_"+config.artist+".webm"} target="_blank" rel="noopener noreferrer"
+                <a href={videoUrl} download={(config.title||"MusicVideo")+"_"+config.artist+".webm"}
                   style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"12px",textAlign:"center",textDecoration:"none",fontWeight:900,fontSize:12,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:8}}>
                   ⬇ DOWNLOAD VIDEO
                 </a>
@@ -1910,7 +1475,7 @@ function MusicVideoStudio({ onClose, onSave }) {
           )}
 
           {/* Canvas for rendering (always hidden) */}
-          {!videoUrl&&<canvas ref={canvasRef} style={{position:"fixed",right:8,bottom:8,width:160,height:90,opacity:1,pointerEvents:"none",zIndex:9999,border:"1px solid #e8c96d",background:"#000"}}/>}
+          {!videoUrl&&<canvas ref={canvasRef} style={{display:"none"}}/>}
         </div>
 
         {/* Bottom nav */}
@@ -1930,7 +1495,6 @@ function MusicVideoStudio({ onClose, onSave }) {
 }
 
 const VOICE_CHARACTERS = [
-  {id:"amanda",name:"Amanda",emoji:"⭐",gender:"Female",age:"Adult",origin:"Founder",region:"MandaStrong",style:"Your voice · Narrator",pitch:1.0,rate:0.85,desc:"Amanda's own voice — your recorded narration.",isOwner:true},
   {id:"james",name:"James",emoji:"🎩",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Sarcastic · Deadpan · Witty",pitch:0.86,rate:0.62,desc:"Dry British wit. Devastating things said with complete calm."},
   {id:"aurora",name:"Aurora",emoji:"🌅",gender:"Female",age:"Adult",origin:"British",region:"London",style:"Warm · Documentary · Authoritative",pitch:1.08,rate:0.80,desc:"Calm authority. The voice you trust completely."},
   {id:"edward",name:"Edward",emoji:"🎭",gender:"Male",age:"Adult",origin:"British",region:"London",style:"Theatrical · Grand · Classical",pitch:0.85,rate:0.75,desc:"Shakespearean gravitas. Every sentence carved in stone."},
@@ -1978,7 +1542,7 @@ const VOICE_CHARACTERS = [
   {id:"sage",name:"Sage",emoji:"🌿",gender:"Male",age:"Adult",origin:"Neutral",region:"Mindful",style:"Peaceful · Mindful · Grounded",pitch:0.95,rate:0.72,desc:"Deep calm."},
   {id:"faith",name:"Faith",emoji:"✨",gender:"Female",age:"Adult",origin:"American",region:"Gospel",style:"Inspirational · Gospel · Uplifting",pitch:1.18,rate:0.88,desc:"Gospel soul."},
   {id:"rebel",name:"Rebel",emoji:"✊",gender:"Female",age:"Teen",origin:"American",region:"Activist",style:"Fierce · Defiant · Young",pitch:1.22,rate:1.05,desc:"Will not back down."},
-  {id:"blaze",name:"Blaze",emoji:"🔥",gender:"Female",age:"Adult",origin:"American",region:"Cinematic",style:"Warm · Confident · Cinematic",pitch:1.02,rate:0.95,desc:"Warm cinematic narrator."},
+  {id:"blaze",name:"Blaze",emoji:"🔥",gender:"Male",age:"Adult",origin:"American",region:"Comedy",style:"Comic · Ridiculous · Energetic",pitch:1.05,rate:1.18,desc:"No dignity whatsoever."},
   {id:"remy",name:"Remy",emoji:"🎻",gender:"Male",age:"Adult",origin:"French",region:"Lyon",style:"Smooth · Romantic · Intimate",pitch:0.92,rate:0.80,desc:"Everything sounds like poetry."},
   {id:"zhara",name:"Zhara",emoji:"💫",gender:"Female",age:"Adult",origin:"Middle Eastern",region:"Dubai",style:"Elegant · Warm · Sophisticated",pitch:1.10,rate:0.85,desc:"Graceful and precise."},
   {id:"kai",name:"Kai",emoji:"🌊",gender:"Male",age:"Adult",origin:"Hawaiian",region:"Honolulu",style:"Relaxed · Warm · Soulful",pitch:0.96,rate:0.82,desc:"Unhurried ocean warmth."},
@@ -1996,94 +1560,11 @@ function P6Voice({ onSave, setMediaLib }) {
   const [filterOrigin,setFilterOrigin]=useState("All"); const [speed,setSpeed]=useState(0.62);
   const [pitchV,setPitchV]=useState(0.86); const [pauseLen,setPauseLen]=useState(1600);
   const [volume,setVolume]=useState(1.0); const [sysVoices,setSysVoices]=useState([]);
-  const [myVoices,setMyVoices]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_my_voices")||"[]");}catch{return [];}});
-  const myVoiceInputRef=useRef(null);
   const chunksRef=useRef([]); const idxRef=useRef(0); const timerRef=useRef(null);
-  const [recordingMine,setRecordingMine]=useState(false); const [recTime,setRecTime]=useState(0);
-  const micRef=useRef(null); const recTimerRef=useRef(null);
-  // Save your own voice AND keep the real audio in IndexedDB so it survives reload
-  // and can be baked into the film. (Previously only a blob: URL was kept, which
-  // died on refresh — that is why a recorded voice never actually played back.)
-  const addMyVoice=async(file)=>{
-    if(!file)return;
-    const id="myvoice_"+Date.now();
-    const url=URL.createObjectURL(file);
-    const nv={id,name:(file.name||"My Voice").replace(/\.[^.]+$/,""),url,dbId:id,origin:"My Upload",gender:"—",age:"—",emoji:"🎙",style:"Your recorded voice",desc:"Your own voice — plays back exactly as recorded."};
-    try{await safeSaveClipToDB(id,file,nv.name,"audio/myvoice");}catch(e){}
-    const upd=[nv,...myVoices];
-    setMyVoices(upd);
-    try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}
-    setSelVoice(id);
-  };
-  const startMyRecording=async()=>{
-    try{
-      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      const mr=new MediaRecorder(stream); micRef.current=mr; const chunks=[];
-      mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
-      mr.onstop=async()=>{
-        const blob=new Blob(chunks,{type:"audio/webm"});
-        const f=new File([blob],"My Recording "+new Date().toLocaleTimeString()+".webm",{type:"audio/webm"});
-        await addMyVoice(f);
-        stream.getTracks().forEach(t=>t.stop());
-        setRecordingMine(false);setRecTime(0);
-      };
-      mr.start(100);setRecordingMine(true);setRecTime(0);
-      recTimerRef.current=setInterval(()=>setRecTime(t=>t+1),1000);
-    }catch(e){alert("Microphone access denied. Please allow microphone and try again.");}
-  };
-  const stopMyRecording=()=>{
-    if(micRef.current&&micRef.current.state!=="inactive")micRef.current.stop();
-    if(recTimerRef.current)clearInterval(recTimerRef.current);
-  };
-  // Save the SELECTED own-voice recording as the film's narration — real audio,
-  // not synthetic. Lands on the timeline audio track like any other clip.
-  const saveMyVoiceAsNarration=async()=>{
-    const mine=myVoices.find(v=>v.id===selVoice);
-    if(!mine){alert("Pick or record your own voice first, then save it as narration.");return;}
-    let blob=null;
-    try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)blob=st.blob;}catch(e){}
-    if(!blob&&mine.url){try{blob=await (await fetch(mine.url)).blob();}catch(e){}}
-    if(!blob){alert("Could not find that recording's audio — try recording again.");return;}
-    const id="narr_myvoice_"+Date.now();
-    const asset={id,name:"My Voice Narration - "+new Date().toLocaleTimeString(),type:"audio/myvoice",dbId:id,date:new Date().toISOString()};
-    await safeSaveClipToDB(id,blob,asset.name,"audio/myvoice");
-    if(onSave)onSave(asset);
-    if(setMediaLib)setMediaLib(p=>[...p,asset]);
-    setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);
-  };
-  const delMyVoice=(id)=>{const upd=myVoices.filter(v=>v.id!==id);setMyVoices(upd);try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}};
-
-  // ── HIDDEN CLONE FEATURE ────────────────────────────────────────
-  // Not shown in normal UI. Turns the SELECTED own-voice recording into
-  // a cloned voice the engine can speak new text in. The clone is stored
-  // as an engine voice id on that my-voice entry; picking it later makes
-  // the engine narrate in the cloned voice.
-  const [cloning,setCloning]=useState(false);
-  const cloneMyVoice=async()=>{
-    const mine=myVoices.find(v=>v.id===selVoice);
-    if(!mine){alert("Pick or record one of your own voices first, then clone it.");return;}
-    if(mine.clonedVoiceId){alert("This voice is already cloned. Select it and the engine will narrate in your cloned voice.");return;}
-    setCloning(true);
-    try{
-      // Get the real audio for the sample, as a data URI the engine can read.
-      let blob=null;
-      try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)blob=st.blob;}catch(e){}
-      if(!blob&&mine.url){try{blob=await (await fetch(mine.url)).blob();}catch(e){}}
-      if(!blob){setCloning(false);alert("Could not find that recording's audio — try recording again.");return;}
-      const dataUri=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
-      const vid=await engineCloneVoice(dataUri);
-      if(!vid){setCloning(false);alert("Voice clone did not complete. Check the engine has credit, then try again.");return;}
-      const upd=myVoices.map(v=>v.id===mine.id?{...v,clonedVoiceId:vid,engineVoice:vid,desc:"Your cloned voice — the engine narrates new text in your voice.",style:"Your cloned voice"}:v);
-      setMyVoices(upd);
-      try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}
-      setCloning(false);
-      alert("Cloned. Select this voice and the engine will narrate any text in your voice.");
-    }catch(e){setCloning(false);alert("Voice clone failed — try again.");}
-  };
 
   useEffect(()=>{
-    const load=()=>{ if(typeof window==="undefined"||!window.speechSynthesis){return;} setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"))); };
-    load(); if(typeof window!=="undefined"&&window.speechSynthesis){window.speechSynthesis.onvoiceschanged=load;}
+    const load=()=>setSysVoices(window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")));
+    load(); window.speechSynthesis.onvoiceschanged=load;
     return()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);};
   },[]);
 
@@ -2097,34 +1578,45 @@ function P6Voice({ onSave, setMediaLib }) {
     const ms=search===""||v.name.toLowerCase().includes(search.toLowerCase())||v.style.toLowerCase().includes(search.toLowerCase());
     return mg&&ma&&mo&&ms;
   });
-  // A selected own-voice that has been cloned resolves to itself, so its
-  // engine voice id (the clone) flows into speakNow's meta.voice and the
-  // engine narrates in the cloned voice.
-  const mineSel=myVoices.find(v=>v.id===selVoice&&v.clonedVoiceId);
-  const selected=mineSel||VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
+  const selected=VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
+  // Deterministic cross-device voice matching — same character always resolves
+  // to the same PRIORITY-ORDERED name across iPad (Safari/Siri), HP (Chrome/Edge),
+  // and Android (Google), rather than a hash-random pick from whatever's on that
+  // device. If the top-priority name isn't installed, it falls through to the next
+  // best equivalent name known to exist on that platform.
+  const VOICE_NAME_PRIORITY = {
+    britishMale:   ["Daniel (Enhanced)","Daniel (Premium)","Daniel","Google UK English Male","Microsoft George","Microsoft Ryan Online (Natural)","Oliver","Arthur","George"],
+    britishFemale: ["Serena (Enhanced)","Serena (Premium)","Serena","Google UK English Female","Microsoft Hazel","Microsoft Sonia Online (Natural)","Kate","Tessa"],
+    usMale:        ["Alex (Enhanced)","Alex","Google US English","Microsoft Guy Online (Natural)","Microsoft David","Fred","Tom"],
+    usFemale:      ["Samantha (Enhanced)","Samantha (Premium)","Samantha","Google US English","Microsoft Jenny Online (Natural)","Microsoft Zira","Ava","Victoria","Karen"],
+    auMale:        ["Lee (Enhanced)","Lee","Microsoft William Online (Natural)","Google UK English Male"],
+    auFemale:      ["Karen (Enhanced)","Karen","Microsoft Natasha Online (Natural)","Google UK English Female"],
+    irish:         ["Moira (Enhanced)","Moira","Microsoft Sean Online (Natural)"],
+    scottish:      ["Fiona (Enhanced)","Fiona","Microsoft Ryan Online (Natural)"],
+  };
   const pickSysVoice=(vc)=>{
-    const allRaw=sysVoices.length?sysVoices:((typeof window!=="undefined"&&window.speechSynthesis)?window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")):[]);
-    if(!allRaw.length)return null;
-    // ── QUALITY FIRST — use Enhanced/Premium/Siri/Neural voices when present ──
-    const isHiQ=(v)=>/premium|enhanced|siri|neural|natural|online|multilingual/i.test((v.name||"")+" "+(v.voiceURI||""));
-    const hiQ=allRaw.filter(isHiQ);
-    const all=hiQ.length?hiQ:allRaw;
-    const gb=all.filter(v=>v.lang==="en-GB"),us=all.filter(v=>v.lang==="en-US"),au=all.filter(v=>v.lang==="en-AU");
-    const hash=vc.id.split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
-    const isMale=vc.gender==="Male",isBritish=["British","Scottish","Irish","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
-    const deepMaleNames=/daniel|oliver|arthur|malcolm|george|alex|fred|tom|aaron|guy|bruce|lee|david|mark/i;
-    const softFemaleNames=/kate|serena|emily|moira|fiona|samantha|ava|victoria|zoe|susan|karen|tessa/i;
-    let pool=[];
-    if(isBritish&&isMale){pool=[...gb.filter(v=>deepMaleNames.test(v.name)),...gb.filter(v=>!softFemaleNames.test(v.name))];}
-    else if(isBritish&&!isMale){pool=[...gb.filter(v=>softFemaleNames.test(v.name)),...gb.filter(v=>!deepMaleNames.test(v.name))];}
-    else if(isAU){pool=[...au,...all];}
-    else if(vc.origin==="Irish"){pool=gb.filter(v=>/moira/i.test(v.name));}
-    else if(isMale){pool=[...us.filter(v=>deepMaleNames.test(v.name)),...us.filter(v=>!softFemaleNames.test(v.name)),...all.filter(v=>!softFemaleNames.test(v.name))];}
-    else{pool=[...us.filter(v=>softFemaleNames.test(v.name)),...us.filter(v=>!deepMaleNames.test(v.name)),...all.filter(v=>!deepMaleNames.test(v.name))];}
-    if(!pool.length)pool=all;
-    const unique=[...new Map(pool.map(v=>[v.name,v])).values()];
-    return unique[hash%unique.length]||all[0];
+    const all=sysVoices.length?sysVoices:window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
+    if(!all.length)return null;
+    const isMale=vc.gender==="Male",isBritish=["British","Welsh"].includes(vc.origin),isAU=["Australian","New Zealand"].includes(vc.origin);
+    let key="usMale";
+    if(vc.origin==="Irish")key="irish";
+    else if(vc.origin==="Scottish")key="scottish";
+    else if(isAU)key=isMale?"auMale":"auFemale";
+    else if(isBritish)key=isMale?"britishMale":"britishFemale";
+    else key=isMale?"usMale":"usFemale";
+    const priorityNames=VOICE_NAME_PRIORITY[key]||[];
+    // 1. Try exact/partial name match in priority order — this is what makes it consistent
+    for(const wantName of priorityNames){
+      const found=all.find(v=>v.name===wantName || v.name.startsWith(wantName.split(" (")[0]));
+      if(found) return found;
+    }
+    // 2. Fall back to correct lang code, first available (still same lang family every time)
+    const langCode=key.startsWith("british")?"en-GB":key.startsWith("au")?"en-AU":key==="irish"?"en-IE":key==="scottish"?"en-GB":"en-US";
+    const sameLang=all.filter(v=>v.lang===langCode);
+    if(sameLang.length) return sameLang[0];
+    // 3. Absolute fallback — first English voice available on this device
+    return all[0];
   };
 
   const speakOneShot=(vc,txt)=>{
@@ -2136,7 +1628,7 @@ function P6Voice({ onSave, setMediaLib }) {
     window.speechSynthesis.speak(utt);
   };
 
-  const speakDevice=(txt)=>{
+  const speakNow=(txt)=>{
     window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
     // iOS Safari fix — keepalive ping every 10s
     if(/iphone|ipad|ipod/i.test(navigator.userAgent)){
@@ -2159,35 +1651,10 @@ function P6Voice({ onSave, setMediaLib }) {
       utt.onerror=()=>{idxRef.current=idx+1;next();};
       window.speechSynthesis.speak(utt);
     };
-    if(typeof window==="undefined"||!window.speechSynthesis){setTimeout(next,50);} else { window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);}; }
+    window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);};
   };
 
-  // Engine voice first. Identical on every device. Device voice only if the engine cannot deliver.
-  const speakNow=async(txt)=>{
-    window.speechSynthesis.cancel(); stopEngineAudio();
-    if(timerRef.current)clearTimeout(timerRef.current);
-    const chunks=buildChunks(txt); chunksRef.current=chunks; idxRef.current=0;
-    setSpeaking(true);
-    const meta={voice:selected.engineVoice||"",gender:selected.gender||"",origin:selected.origin||"",speed:speed*(selected.rate||0.9)};
-    const first=chunks.find(c=>c&&c.text);
-    if(!first){setSpeaking(false);return;}
-    const probe=await engineSpeak(first.text,meta);
-    if(!probe){ console.log("Cinema Voice Engine unavailable — using device voice"); speakDevice(txt); return; }
-    console.log("\u2713 MANDASTRONG CINEMA VOICE ENGINE \u2014 studio narration ready");
-    let url=probe;
-    for(let i=0;i<chunks.length;i++){
-      const c=chunks[i];
-      if(!c||!c.text) continue;
-      if(i>0){ url=await engineSpeak(c.text,meta); if(!url) continue; }
-      const ok=await playEngineAudio(url,volume);
-      if(!ok){ console.log("Cinema Voice Engine playback blocked — using device voice"); speakDevice(txt); return; }
-      const ap=c.type==="question"?Math.round(pauseLen*1.1):c.type==="sentence"?pauseLen:Math.round(pauseLen*0.4);
-      await new Promise(r=>setTimeout(r,ap));
-    }
-    setSpeaking(false);
-  };
-
-  const stop=()=>{window.speechSynthesis.cancel();stopEngineAudio();if(timerRef.current)clearTimeout(timerRef.current);setSpeaking(false);};
+  const stop=()=>{window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);setSpeaking(false);};
 
   const processAndSpeak=async()=>{
     if(!text.trim())return;setLoading(true);
@@ -2217,38 +1684,8 @@ function P6Voice({ onSave, setMediaLib }) {
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search voices..." style={{...inp,padding:"6px 10px",fontSize:11,height:30}}/>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 6px 80px"}}>
-            <input ref={myVoiceInputRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" style={{display:"none"}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(f)addMyVoice(f);e.target.value="";}}/>
-            {recordingMine?(
-              <div style={{display:"flex",alignItems:"center",gap:8,background:"#1a0000",border:"2px solid #ef4444",padding:"9px 12px",marginBottom:6}}>
-                <div style={{width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444"}}/>
-                <span style={{color:"#ef4444",fontWeight:900,fontSize:11,letterSpacing:2,flex:1}}>RECORDING — {String(Math.floor(recTime/60)).padStart(2,"0")}:{String(recTime%60).padStart(2,"0")}</span>
-                <button onClick={stopMyRecording} style={{background:"#ef4444",border:"none",color:"#fff",padding:"5px 14px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2}}>■ STOP & SAVE</button>
-              </div>
-            ):(
-              <button onClick={startMyRecording} style={{width:"100%",background:"linear-gradient(135deg,#7a0000,#ef4444)",border:"none",color:"#fff",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>● RECORD MY VOICE NOW</button>
-            )}
-            <button onClick={()=>myVoiceInputRef.current&&myVoiceInputRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>＋ ADD YOUR OWN VOICE (FILE)</button>
-            {myVoices.some(v=>v.id===selVoice)&&(
-              <button onClick={saveMyVoiceAsNarration} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>🎙 USE MY VOICE AS NARRATION</button>
-            )}
-            {myVoices.map(v=>(
-              <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+(selVoice===v.id?GOLD:GOLDDIM),cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    {/* Hidden clone trigger: double-click the emoji of a selected own-voice to clone it. */}
-                    <span style={{fontSize:18,cursor:selVoice===v.id?"pointer":"inherit"}} title="" onDoubleClick={e=>{e.stopPropagation();if(selVoice===v.id&&!cloning){setSelVoice(v.id);cloneMyVoice();}}}>{v.emoji}</span>
-                    <div><div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900}}>{v.name}{v.clonedVoiceId&&<span style={{color:GOLD,fontSize:10,marginLeft:6}}>✦ CLONED</span>}</div><div style={{color:GOLDDIM,fontSize:10}}>{v.clonedVoiceId?"Your cloned voice — engine narrates in your voice":"Your uploaded voice"}</div></div>
-                  </div>
-                  <div style={{display:"flex",gap:4,flexShrink:0}}>
-                    {v.url&&<button onClick={e=>{e.stopPropagation();const a=new Audio(v.url);a.play().catch(()=>{});}} style={{background:GOLDDIM,border:"none",color:"#000",padding:"3px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>▶</button>}
-                    <button onClick={e=>{e.stopPropagation();delMyVoice(v.id);}} style={{background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"3px 8px",cursor:"pointer",fontSize:9,fontWeight:900}}>✕</button>
-                  </div>
-                </div>
-                {selVoice===v.id&&<div style={{color:GOLD,fontSize:9,letterSpacing:2,marginTop:4,fontWeight:900}}>{cloning?"✦ CLONING YOUR VOICE…":"✓ SELECTED"}</div>}
-              </div>
-            ))}
             {filtered.map(v=>(
-              <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+(selVoice===v.id?GOLD:GOLDDIM),cursor:"pointer"}}>
+              <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+selVoice===v.id?GOLD:GOLDDIM,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:18}}>{v.emoji}</span>
@@ -2300,9 +1737,9 @@ function P6Voice({ onSave, setMediaLib }) {
           </div>
           <button onClick={()=>{
             if(!text.trim())return;
-            speaking?stop():processAndSpeak();
-          }} disabled={!text.trim()} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1,marginBottom:8}}>
-            {speaking?"⏹ STOP":"✦ PREPARE TO SPEAK"}
+            speakText(selVoice, text, ()=>setSpeaking(true), ()=>setSpeaking(false));
+          }} disabled={!text.trim()||speaking} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",width:"100%",padding:"16px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:!text.trim()?"not-allowed":"pointer",fontFamily:"'Rajdhani',sans-serif",opacity:!text.trim()?0.5:1,marginBottom:8}}>
+            {speaking?"⏺ SPEAKING...":"✦ PREPARE TO SPEAK"}
           </button>
           <button onClick={async()=>{
             if(!text.trim())return;
@@ -2348,40 +1785,13 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [log,setLog]=useState([]);
   const [videoUrl,setVideoUrl]=useState("");
   const [saved,setSaved]=useState(false);
-  // ── BACKGROUND MUSIC ──────────────────────────────────────────
-  const [addMusic,setAddMusic]=useState(false);
-  const [musicTrack,setMusicTrack]=useState("");
-  const [genStereo,setGenStereo]=useState(true);
-  const [useBrief,setUseBrief]=useState(true);
-  const [hasBrief,setHasBrief]=useState(false);
-  useEffect(()=>{try{const b=JSON.parse(localStorage.getItem("ms_render_brief")||"null");setHasBrief(!!(b&&b.brief));}catch{setHasBrief(false);}},[]);
-  const MUSIC_LIBRARY=[
-    {id:"epic",     label:"⚔️ Epic / Trailer",       url:"https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3"},
-    {id:"drama",    label:"🎭 Drama / Powerful",     url:"https://cdn.pixabay.com/audio/2023/01/29/audio_5bf2f9f5b0.mp3"},
-    {id:"emotional",label:"💧 Emotional / Piano",    url:"https://cdn.pixabay.com/audio/2021/11/25/audio_00fa5593f3.mp3"},
-    {id:"ambient",  label:"🌌 Ambient / Cinematic",  url:"https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1bab.mp3"},
-    {id:"uplifting",label:"☀️ Uplifting / Hopeful",   url:"https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3"},
-    {id:"tension",  label:"🎯 Tension / Suspense",    url:"https://cdn.pixabay.com/audio/2022/03/10/audio_d1718ab41b.mp3"},
-    {id:"warm",     label:"🕯️ Warm / Reflective",     url:"https://cdn.pixabay.com/audio/2021/08/09/audio_54ca0ffa52.mp3"},
-    {id:"inspiring",label:"🌅 Inspiring / Anthemic",  url:"https://cdn.pixabay.com/audio/2022/10/25/audio_946bc8a627.mp3"},
-    {id:"sad",      label:"🌧️ Sad / Melancholy",      url:"https://cdn.pixabay.com/audio/2022/10/18/audio_31a1f6f2a6.mp3"},
-    {id:"action",   label:"💥 Action / Driving",      url:"https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3"},
-  ];
   const [refMedia,setRefMedia]=useState(null);
   const [refMediaType,setRefMediaType]=useState("");
   const [refDataUrl,setRefDataUrl]=useState(null);
   const [refImages,setRefImages]=useState([]);
   const [renderStyle,setRenderStyle]=useState("photorealistic");
   const [genre,setGenre]=useState("");
-  const [targetMin,setTargetMin]=useState(0);
-  const [madeClips,setMadeClips]=useState([]);
-  const [gapPrompt,setGapPrompt]=useState(null);
-  const [gapBusy,setGapBusy]=useState(false);
   const addLog=(msg)=>setLog(p=>[...p,msg]);
-  const madeSeconds=madeClips.reduce((a,c)=>a+(c.duration||0),0);
-  const targetSeconds=targetMin*60;
-  const gapSeconds=Math.max(0,targetSeconds-madeSeconds);
-  const fmtMin=(s)=>{const m=Math.floor(s/60),ss=Math.round(s%60);return m+"m "+(ss<10?"0":"")+ss+"s";};
 
   const RENDER_STYLES=[
     {id:"photorealistic",label:"📷 Photorealistic"},
@@ -2429,7 +1839,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   // Real depth, real volumetric lighting, real atmosphere, real motion
   // ════════════════════════════════════════════════════════════════
   // ════════════════════════════════════════════════════════════════
-  // MANDASTRONG ENGINE — AI writes a custom drawFrame() per prompt
+  // CINEMAFORGE ENGINE — AI writes a custom drawFrame() per prompt
   // Every scene is unique. What you describe is exactly what renders.
   // ════════════════════════════════════════════════════════════════
   const generateVideo=async()=>{
@@ -2447,66 +1857,17 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       if(!existingTimeline||existingTimeline==="{}")localStorage.setItem("ms_timeline","{}");
       if(!existingMedia||existingMedia==="[]")localStorage.setItem("ms_medialib","[]");
     }catch(e){}
-    // ── PRE-GENERATION STORAGE CHECK — safe, never touches source clips ──
-    // Only clears old rendered films from IndexedDB.
+    // ── AGGRESSIVE MEMORY PRUNE before render ──────────────────────────────────
+    // Clears old clips from IndexedDB to free memory BEFORE the render starts.
+    // This is the main reason renders crash — too much stored data at render time.
     try{
-      const clips=await getAllClipsFromDB();
-      const oldRenders=clips.filter(c=>String(c.id).includes("render_final_old"));
-      for(const c of oldRenders){await deleteClipFromDB(c.id);}
+      const r=await autoFreeStorage();
+      if(r.freed>0)addLog("Memory freed — cleared "+r.freed+" old clip(s) before render");
+      // Also prune to keep only newest 10 clips — canvas render needs all available RAM
+      await autoPruneClips(10);
     }catch(e){}
-    addLog("MandaStrong Cinema Engine — reading your scene...");
+    addLog("CinemaForge Engine — reading your scene...");
     setProgress(5);
-
-    // ══════════════════════════════════════════════════════════════════
-    // MANDASTRONG CINEMA ENGINE — REAL PHOTOREALISTIC VIDEO
-    // Sends the scene to the Cinema Engine and returns real footage.
-    // Falls back to the built-in renderer if the engine is unavailable.
-    // ══════════════════════════════════════════════════════════════════
-    try{
-      addLog("Cinema Engine — synthesising photorealistic footage...");
-      setProgress(12);
-      // ── SCRIPT-TO-MOVIE BRIEF ── Page 5's Producer/Describe/Production
-      // notes, if the user wired them into the render, drive every scene.
-      let effectivePrompt=prompt.trim();
-      if(useBrief){
-        try{
-          const bd=JSON.parse(localStorage.getItem("ms_render_brief")||"null");
-          if(bd&&bd.brief){ effectivePrompt=bd.brief+"\nSHOT FOR THIS SCENE:\n"+effectivePrompt; addLog("✦ Using Script-to-Movie brief (Producer + Describe + Production) from Page 5"); }
-        }catch(e){}
-      }
-      const engineUrl=await engineRender(effectivePrompt,{
-        duration,
-        image:refDataUrl||"",
-        onTick:(i)=>{ setProgress(Math.min(88,12+i*2)); addLog("Cinema Engine rendering — "+Math.min(88,12+i*2)+"%"); }
-      });
-      if(engineUrl){
-        addLog("\u2713 Cinema Engine complete — downloading footage...");
-        setProgress(92);
-        const vidRes=await fetch(engineUrl);
-        const vidBlob=await vidRes.blob();
-        const localUrl=URL.createObjectURL(vidBlob);
-        setVideoUrl(localUrl);
-        setProgress(100);
-        addLog("\u2713 MANDASTRONG CINEMA ENGINE — photorealistic scene ready");
-        try{
-          const autoId="scene_"+Date.now();
-          const autoName=(title||"Scene")+"_"+duration+"s.mp4";
-          await Promise.race([
-            safeSaveClipToDB(autoId,vidBlob,autoName,"video/mp4"),
-            new Promise(r=>setTimeout(()=>r("timeout"),8000))
-          ]);
-          if(onSave)onSave({id:autoId,name:autoName,type:"video/mp4",url:localUrl,file:new File([vidBlob],autoName,{type:"video/mp4"}),dbId:autoId});
-          setSaved(true);
-          addLog("\u2713 Saved to Media Library");
-        }catch(e){}
-        setGenerating(false);
-        return;
-      }
-      const diag=await engineStatus();
-      addLog(diag&&diag.ok===false?("Cinema Engine: "+(diag.message||"unavailable")):"Cinema Engine returned no footage — using built-in renderer");
-    }catch(e){
-      addLog("Cinema Engine offline — using built-in renderer");
-    }
 
     // LOAD REFERENCE PHOTOS if user uploaded any
     let loadedRefImages=[];
@@ -2530,7 +1891,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     // ── STEP 1: Ask Claude to write a custom drawFrame for this exact scene ──
     let drawFnBody="";
     try{
-      addLog("MandaStrong Engine — asking AI to compose your scene...");
+      addLog("CinemaForge — asking AI to compose your scene...");
       setProgress(12);
       const hasPhotos=loadedRefImages.length>0;
       const photoNote=hasPhotos?"The user has uploaded "+loadedRefImages.length+" reference photo(s). The main photo will be drawn as the base layer already — your drawFrame should add atmosphere, lighting, overlays, and cinematic elements ON TOP of the photo base. Do NOT try to redraw the background from scratch.":"No reference photos. You must paint the entire scene from scratch using canvas drawing primitives — sky, ground, environment, people, objects, lighting. Make it look as photorealistic as possible using gradients, layering, and detail.";
@@ -2542,7 +1903,7 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
         body:JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens:3500,
-          system:`You are the MandaStrong Engine, a photorealistic canvas video renderer for MandaStrong Studio. You write JavaScript that renders cinematic scenes frame by frame on an HTML5 canvas.
+          system:`You are CinemaForge, a photorealistic canvas video renderer for MandaStrong Studio. You write JavaScript that renders cinematic scenes frame by frame on an HTML5 canvas.
 
 ${photoNote}
 
@@ -2652,47 +2013,18 @@ Write the drawFrame body now.`}]
 
     // ── STEP 3: Render all frames ──
     const fps=20;const totalFrames=duration*fps;
-    const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+    const getSupportedMimeType=()=>{
+        const opts=["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm;codecs=vp8","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+        for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+        return ""; // let MediaRecorder pick a browser default rather than throwing
+      };
+      const mimeType=getSupportedMimeType();
     const stream=canvas.captureStream(fps);
-    // ── BACKGROUND MUSIC — mix chosen track under the render ──
-    let musicCtx=null, musicSource=null;
-    if(addMusic&&musicTrack){
-      try{
-        const track=MUSIC_LIBRARY.find(m=>m.id===musicTrack);
-        if(track){
-          addLog("Loading background music: "+track.label+"...");
-          const resp=await fetch(track.url);
-          const arr=await resp.arrayBuffer();
-          musicCtx=new (window.AudioContext||window.webkitAudioContext)();
-          const buf=await musicCtx.decodeAudioData(arr);
-          const dest=musicCtx.createMediaStreamDestination();
-          musicSource=musicCtx.createBufferSource();
-          musicSource.buffer=buf; musicSource.loop=true;
-          const gain=musicCtx.createGain(); gain.gain.value=0.35;
-          if(genStereo && musicCtx.createStereoPanner){
-            addLog("🔊 Stereo sound ON — widening the music bed");
-            musicSource.connect(gain); gain.connect(dest);
-            const wet=musicCtx.createGain(); wet.gain.value=0.5;
-            [[-0.85,0.014],[0.85,0.021]].forEach(([pan,dl])=>{
-              const d=musicCtx.createDelay(); d.delayTime.value=dl;
-              const p=musicCtx.createStereoPanner(); p.pan.value=pan;
-              gain.connect(d); d.connect(p); p.connect(wet);
-            });
-            wet.connect(dest);
-          } else {
-            musicSource.connect(gain); gain.connect(dest);
-          }
-          dest.stream.getAudioTracks().forEach(tk=>stream.addTrack(tk));
-          addLog("✓ Background music ready — mixing into film");
-        }
-      }catch(e){ addLog("Music note: "+e.message+" — rendering without music"); musicCtx=null; musicSource=null; }
-    }
-    const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6000000});
-    if(musicSource){ try{ musicSource.start(0); }catch(e){} }
+    const recorder=new MediaRecorder(stream,mimeType?{mimeType,videoBitsPerSecond:6000000}:{videoBitsPerSecond:6000000});
     const chunks=[];
     recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     recorder.start(Math.round(1000/fps));
-    addLog("Rolling — rendering "+duration+"s at 24fps...");
+    addLog("Rolling — rendering "+duration+"s at 20fps...");
     setProgress(35);
 
     await new Promise(resolve=>{
@@ -2731,45 +2063,25 @@ Write the drawFrame body now.`}]
     // A fixed delay can fire before the final chunk arrives on slower machines, which hangs at 97%.
     await new Promise(resolve=>{
       let done=false;
-      const finish=()=>{ if(!done){done=true;resolve(null);} };
-      // Arm the escape hatch FIRST — guaranteed exit even if stop() throws
-      setTimeout(finish,4000);
-      try{
-        recorder.onstop=finish;
-        if(recorder.state!=="inactive"){recorder.stop();}
-        else{finish();}
-      }catch(e){finish();}
+      recorder.onstop=()=>{ if(!done){done=true;resolve(null);} };
+      recorder.stop();
+      // Safety net: never wait forever
+      setTimeout(()=>{ if(!done){done=true;resolve(null);} },4000);
     });
-    if(musicSource){ try{ musicSource.stop(); }catch(e){} }
-    if(musicCtx){ try{ musicCtx.close(); }catch(e){} }
-    const blob=new Blob(chunks,{type:mimeType});
+    const blob=new Blob(chunks,{type:mimeType||"video/webm"});
     const url=URL.createObjectURL(blob);
     setVideoUrl(url);
-    setProgress(100);
-    addLog("\u2713 MANDASTRONG ENGINE COMPLETE — "+duration+"s cinema-grade video ready");
-    // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
+    // AUTO-SAVE the finished clip immediately so it is never lost on crash or navigation
     try{
       const autoId="scene_"+Date.now();
       const autoName=(title||"Scene")+"_"+duration+"s.webm";
-      const saveResult=await Promise.race([
-        safeSaveClipToDB(autoId,blob,autoName,"video/webm"),
-        new Promise(r=>setTimeout(()=>r("timeout"),6000))
-      ]);
-      if(saveResult==="timeout"){addLog("Save is running in background — clip is ready above");}
-      else{
-        if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
-        setSaved(true);
-        addLog("\u2713 Auto-saved to library");
-      }
+      await safeSaveClipToDB(autoId,blob,autoName,"video/webm");
+      if(onSave)onSave({id:autoId,name:autoName,type:"video/webm",url:URL.createObjectURL(blob),file:new File([blob],autoName,{type:"video/webm"}),dbId:autoId});
+      setSaved(true);
+      addLog("\u2713 Auto-saved to library");
     }catch(e){addLog("Auto-save note: "+e.message);}
-    // Track this clip toward the target film length, then check the gap
-    try{
-      const newTotal=madeSeconds+duration;
-      setMadeClips(p=>[...p,{id:Date.now(),duration}]);
-      if(targetSeconds>0 && newTotal<targetSeconds){
-        setGapPrompt({have:newTotal,target:targetSeconds,gap:targetSeconds-newTotal});
-      }
-    }catch(e){}
+    setProgress(100);
+    addLog("\u2713 CINEMAFORGE COMPLETE — "+duration+"s cinema-grade video ready");
     setGenerating(false);
   };
 
@@ -2786,34 +2098,7 @@ Write the drawFrame body now.`}]
 
   return (
     <div style={{minHeight:"100vh",background:"#000",color:WHITE,fontFamily:"'Rajdhani',sans-serif",paddingBottom:160}}>
-      {gapPrompt&&(
-        <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.94)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{width:"min(460px,95vw)",background:"#050505",border:"2px solid "+GOLD,padding:"24px 22px"}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:16,fontWeight:900,letterSpacing:3,marginBottom:14,textAlign:"center"}}>⏳ FILL THE GAP?</div>
-            <p style={{color:WHITE,fontSize:14,lineHeight:1.7,margin:"0 0 18px",textAlign:"center"}}>
-              You have <b style={{color:GOLD}}>{fmtMin(gapPrompt.have)}</b> of your <b style={{color:GOLD}}>{fmtMin(gapPrompt.target)}</b> selection.
-              Would you like AI to create fill-in scenes to fill the remaining <b style={{color:GOLD}}>{fmtMin(gapPrompt.gap)}</b>?
-            </p>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <button disabled={gapBusy} onClick={()=>{
-                  const g=gapPrompt;setGapPrompt(null);
-                  if(!prompt.trim())setPrompt("Cinematic continuation scene that flows naturally from the previous shot, matching the film's mood, lighting and colour grade.");
-                  const fillSecs=Math.min(60,Math.max(5,g.gap));
-                  setDuration(fillSecs);
-                  setTimeout(()=>{generateVideo();},60);
-                }}
-                style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
-                ✓ YES, FILL IT
-              </button>
-              <button onClick={()=>setGapPrompt(null)}
-                style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"14px",fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif"}}>
-                NO, I'M DONE
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <canvas ref={canvasRef} style={{position:"fixed",right:8,bottom:8,width:160,height:90,opacity:1,pointerEvents:"none",zIndex:9999,border:"1px solid #e8c96d",background:"#000"}}/>
+      <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"12px 20px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:700}}>MANDASTRONG ENGINE v2 · CINEMA-GRADE RENDERER</div>
@@ -2850,7 +2135,7 @@ Write the drawFrame body now.`}]
               <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:8}}>
                 {refImages.map((ri,i)=>(
                   <div key={i} style={{position:"relative"}}>
-                    {ri.isVideo&&ri.url
+                    {ri.isVideo
                       ?<video src={ri.url} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}} muted/>
                       :<img src={ri.url} alt={ri.name||"ref"} style={{width:"100%",height:50,objectFit:"cover",border:"1px solid "+GOLD}}/>
                     }
@@ -2901,23 +2186,10 @@ Write the drawFrame body now.`}]
                 <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginTop:3}}>✓ REFERENCE LOADED</div>
               </div>
             ):(
-              <div
-                onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=GOLD;e.currentTarget.style.background="#1a0800";}}
-                onDragLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="transparent";}}
-                onDrop={e=>{
-                  e.preventDefault();
-                  e.currentTarget.style.borderColor=GOLDDIM;e.currentTarget.style.background="transparent";
-                  const f=e.dataTransfer.files&&e.dataTransfer.files[0];
-                  if(f&&(f.type.startsWith("image/")||f.type.startsWith("video/"))){
-                    const url=URL.createObjectURL(f);
-                    setRefMedia(url);setRefMediaType(f.type);
-                    const rdr=new FileReader();rdr.onload=ev=>setRefDataUrl(ev.target.result);rdr.readAsDataURL(f);
-                  }
-                }}
-                onClick={()=>refMediaRef.current&&refMediaRef.current.click()}
-                style={{border:"2px dashed "+GOLDDIM,padding:"14px 8px",textAlign:"center",cursor:"pointer",transition:"all .2s"}}>
-                <div style={{color:GOLD,fontSize:12,fontWeight:900,letterSpacing:2}}>⬆ DRAG & DROP or CLICK</div>
-                <div style={{color:GOLDDIM,fontSize:10,marginTop:3,letterSpacing:1}}>JPG · PNG · MP4</div>
+              <div onClick={()=>refMediaRef.current&&refMediaRef.current.click()}
+                style={{border:"1px dashed "+GOLDDIM,padding:"8px",textAlign:"center",cursor:"pointer"}}>
+                <div style={{color:WHITE,fontSize:11,fontWeight:700}}>⬆ CLICK TO UPLOAD</div>
+                <div style={{color:DIM,fontSize:10,marginTop:1}}>JPG · PNG · MP4</div>
               </div>
             )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:6}}>
@@ -2955,63 +2227,11 @@ Write the drawFrame body now.`}]
           </div>
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-              <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>TARGET FILM LENGTH</span>
-              <span style={{color:WHITE,fontSize:11,fontWeight:900}}>{targetMin>0?targetMin+" MIN":"OFF"}</span>
-            </div>
-            <input type="range" min={0} max={180} value={targetMin} onChange={e=>setTargetMin(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
-            {targetMin>0&&(
-              <div style={{color:GOLDDIM,fontSize:10,marginTop:6,letterSpacing:1}}>
-                Made so far: {fmtMin(madeSeconds)} of {targetMin}m · {gapSeconds>0?("gap "+fmtMin(gapSeconds)):"target reached ✓"}
-              </div>
-            )}
-          </div>
-          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
               <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>DURATION</span>
-              <span style={{color:WHITE,fontSize:11,fontWeight:900}}>{duration>60?(duration/60).toFixed(duration%60?1:0)+" MIN":duration+" SECONDS"}</span>
+              <span style={{color:WHITE,fontSize:11,fontWeight:900}}>{duration} SECONDS</span>
             </div>
-            <input type="range" min={5} max={300} value={duration} onChange={e=>setDuration(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
+            <input type="range" min={5} max={60} value={duration} onChange={e=>setDuration(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
           </div>
-          {/* ── ADD BACKGROUND MUSIC? ─────────────────────────────── */}
-          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>ADD BACKGROUND MUSIC?</span>
-              <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>setAddMusic(true)}
-                  style={{background:addMusic?GOLD:"#111",border:"1px solid "+(addMusic?"#000":GOLDDIM),color:addMusic?"#000":WHITE,padding:"5px 16px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1}}>Y</button>
-                <button onClick={()=>{setAddMusic(false);setMusicTrack("");}}
-                  style={{background:!addMusic?GOLD:"#111",border:"1px solid "+(!addMusic?"#000":GOLDDIM),color:!addMusic?"#000":WHITE,padding:"5px 16px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:1}}>N</button>
-              </div>
-            </div>
-            {addMusic&&(
-              <div style={{marginTop:12}}>
-                <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,marginBottom:8}}>CHOOSE A TRACK</div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <select value={musicTrack} onChange={e=>setMusicTrack(e.target.value)}
-                    style={{flex:1,background:"#000",border:"1px solid "+GOLD,color:WHITE,padding:"9px 12px",fontSize:12,fontWeight:900,fontFamily:"'Rajdhani',sans-serif",outline:"none",cursor:"pointer"}}>
-                    <option value="">— Select background music —</option>
-                    {MUSIC_LIBRARY.map(m=>(<option key={m.id} value={m.id} style={{background:"#000",color:WHITE}}>{m.label}</option>))}
-                  </select>
-                  <button onClick={()=>{const m=MUSIC_LIBRARY.find(x=>x.id===musicTrack);if(!m)return;try{const a=new Audio(m.url);a.volume=0.5;a.play().catch(()=>{});setTimeout(()=>{try{a.pause();}catch(e){}},6000);}catch(e){}}}
-                    disabled={!musicTrack} title="Preview 6 seconds"
-                    style={{background:musicTrack?"none":"#111",border:"1px solid "+GOLDDIM,color:musicTrack?GOLD:"#555",padding:"9px 14px",cursor:musicTrack?"pointer":"not-allowed",fontSize:12,fontWeight:900}}>▶ PREVIEW</button>
-                </div>
-                {!musicTrack&&<div style={{color:"#e0a020",fontSize:10,marginTop:8,letterSpacing:1}}>Pick a track from the menu, or press N to render without music.</div>}
-              </div>
-            )}
-          </div>
-          {/* ── USE STEREO SOUND ─────────────────────────────────── */}
-          <div onClick={()=>setGenStereo(s=>!s)} style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 14px",background:"#0a0a0a",border:"1px solid "+(genStereo?GOLD:GOLDDIM),cursor:"pointer"}}>
-            <div style={{width:20,height:20,borderRadius:4,border:"2px solid "+(genStereo?GOLD:GOLDDIM),background:genStereo?GOLD:"transparent",color:"#000",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{genStereo?"✓":""}</div>
-            <div><div style={{color:genStereo?GOLD:WHITE,fontWeight:900,fontSize:12,letterSpacing:1}}>🔊 USE STEREO SOUND</div><div style={{color:GOLDDIM,fontSize:10,marginTop:1}}>Full stereo width baked into the generated video's audio</div></div>
-          </div>
-          {/* ── SCRIPT-TO-MOVIE BRIEF (from Page 5) ──────────────── */}
-          {hasBrief&&(
-            <div onClick={()=>setUseBrief(b=>!b)} style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 14px",background:"#0a0a0a",border:"1px solid "+(useBrief?GOLD:GOLDDIM),cursor:"pointer"}}>
-              <div style={{width:20,height:20,borderRadius:4,border:"2px solid "+(useBrief?GOLD:GOLDDIM),background:useBrief?GOLD:"transparent",color:"#000",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{useBrief?"✓":""}</div>
-              <div><div style={{color:useBrief?GOLD:WHITE,fontWeight:900,fontSize:12,letterSpacing:1}}>🎬 USE SCRIPT-TO-MOVIE BRIEF</div><div style={{color:GOLDDIM,fontSize:10,marginTop:1}}>Your Producer, Describe &amp; Production notes from Page 5 drive this render</div></div>
-            </div>
-          )}
           <button onClick={generateVideo} disabled={generating||!prompt.trim()}
             style={{background:"linear-gradient(135deg,#a07820,#e8c96d)",border:"none",color:"#000",width:"100%",padding:"20px",fontSize:15,letterSpacing:3,cursor:generating||!prompt.trim()?"not-allowed":"pointer",fontWeight:900,fontFamily:"'Rajdhani',sans-serif",opacity:generating||!prompt.trim()?0.5:1}}>
             {generating?"⟳ MANDASTRONG ENGINE RENDERING... "+progress+"%":"🎬 GENERATE SCENE"}
@@ -3039,7 +2259,7 @@ Write the drawFrame body now.`}]
           {videoUrl&&!generating&&(
             <div style={{padding:"10px 14px",borderBottom:"1px solid "+GOLDDIM+"",display:"flex",flexDirection:"column",gap:6}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                <a href={videoUrl} download={(title||"scene")+"_"+duration+"s.webm"} target="_blank" rel="noopener noreferrer"
+                <a href={videoUrl} download={(title||"scene")+"_"+duration+"s.webm"}
                   style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"8px",fontSize:10,textDecoration:"none",textAlign:"center",letterSpacing:1,fontWeight:900,fontFamily:"'Rajdhani',sans-serif",display:"block"}}>⬇ DOWNLOAD</a>
                 <button onClick={saveToLibrary}
                   style={{background:saved?"linear-gradient(135deg,#a07820,#e8c96d)":"transparent",border:"1px solid "+GOLD,color:saved?"#000":GOLD,padding:"8px",fontSize:10,cursor:"pointer",fontWeight:900,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif"}}>
@@ -3084,6 +2304,23 @@ Write the drawFrame body now.`}]
   );
 }
 
+// ── DOWNLOAD APP BUTTON — simple, works everywhere ──
+function DownloadAppButton() {
+  const install = () => {
+    if(window.deferredInstallPrompt){
+      window.deferredInstallPrompt.prompt();
+      window.deferredInstallPrompt.userChoice.then(()=>{ window.deferredInstallPrompt = null; });
+    } else {
+      alert("To install: use your browser menu and choose 'Add to Home Screen' or look for the install icon in your address bar.");
+    }
+  };
+  return (
+    <button onClick={install} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
+      ⬇ DOWNLOAD APP
+    </button>
+  );
+}
+
 function P1({ go }) {
   return (
     <div style={{...Sp}}>
@@ -3095,7 +2332,7 @@ function P1({ go }) {
         </div>
         <style>{"@keyframes tw{0%,100%{opacity:.05}50%{opacity:.85}}"}</style>
         <div style={{position:"relative",zIndex:1}}>
-          <div style={{fontSize:11,color:DIM,letterSpacing:6,marginBottom:12}}>CINEMA INTELLIGENCE PLATFORM — EST. 2025</div>
+          <div style={{fontSize:11,color:DIM,letterSpacing:6,marginBottom:12}}>CINEMA INTELLIGENCE PLATFORM — EST. 2026</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"clamp(34px,6vw,58px)",fontWeight:900,color:GOLD,letterSpacing:5,lineHeight:1,textShadow:"0 0 60px "+GOLD+"dd,0 0 120px "+GOLD+"66"}}>MANDA STRONG</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"clamp(34px,6vw,58px)",fontWeight:900,color:GOLD,letterSpacing:5,lineHeight:1,textShadow:"0 0 60px "+GOLD+"dd,0 0 120px "+GOLD+"66",marginBottom:14}}>STUDIO</div>
           <div style={{color:WHITE,fontSize:12,letterSpacing:4,marginBottom:28,fontWeight:600}}>600+ AI TOOLS · 8K EXPORT · UP TO 3-HOUR FILMS</div>
@@ -3115,37 +2352,13 @@ function P1({ go }) {
       </div>
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-          <button onClick={async()=>{
-            const ua = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua) || (/(macintosh)/.test(ua) && navigator.maxTouchPoints>1);
-            const isAndroid = /android/.test(ua);
-            const isStandalone = (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
-            if(isStandalone){
-              alert("✓ MandaStrong Studio is already installed on this device.\n\nYou're using the installed app right now. Look for the gold M icon on your home screen to open it any time.");
-              return;
-            }
-            if(window.deferredInstallPrompt){
-              try{
-                window.deferredInstallPrompt.prompt();
-                const choice=await window.deferredInstallPrompt.userChoice;
-                window.deferredInstallPrompt=null;
-                if(choice&&choice.outcome==="accepted") alert("✓ Installing MandaStrong Studio to your home screen. Look for the gold M icon.");
-              }catch(e){ alert("To install: use your browser menu → 'Add to Home Screen' or 'Install App'."); }
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ⬆ (Safari, at the bottom or top)\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe gold M icon will appear on your home screen and open full screen.\n\n(Note: on iPhone/iPad this only works in the Safari browser, not Chrome.)");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in Chrome (top right)\n2. Tap 'Add to Home screen' or 'Install app'\n3. Tap Install\n\nThe gold M icon will appear on your home screen and open full screen.");
-            } else {
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser's address bar (right side)\n2. Click it and select Install\n\nOr open your browser menu and choose 'Install MandaStrong Studio'.\nChrome or Edge give the best result.");
-            }
-          }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
-            ⬇ DOWNLOAD APP
-          </button>
+          <DownloadAppButton/>
           <div style={{color:GOLDDIM,fontSize:10,letterSpacing:2,textAlign:"center"}}>BROWSER MENU → ADD TO HOME SCREEN</div>
         </div>
       </div>
     </div>
   );
+
 }
 
 function P2({ go }) {
@@ -3200,49 +2413,19 @@ function P3() {
   const [uploads, setUploads] = useState([null,null,null]);
   const [titles, setTitles] = useState(["","",""]);
   const [descs, setDescs] = useState(["","",""]);
-  const [loaded, setLoaded] = useState(false);
   const refs = [useRef(null),useRef(null),useRef(null)];
   const videoRefs = [useRef(null),useRef(null),useRef(null)];
 
-  // Load saved proof-of-concept films from permanent storage on mount
-  useEffect(()=>{
-    let alive=true;
-    (async()=>{
-      try{
-        const t=JSON.parse(localStorage.getItem("ms_poc_titles")||'["","",""]');
-        const d=JSON.parse(localStorage.getItem("ms_poc_descs")||'["","",""]');
-        if(alive){setTitles(t);setDescs(d);}
-      }catch{}
-      const next=[null,null,null];
-      for(let i=0;i<3;i++){
-        try{
-          const rec=await loadClipFromDB("poc_"+i);
-          if(rec&&rec.blob){
-            next[i]={url:URL.createObjectURL(rec.blob),name:rec.name,type:rec.type,size:(rec.blob.size/1024/1024).toFixed(1)};
-          }
-        }catch{}
-      }
-      if(alive){setUploads(next);setLoaded(true);}
-    })();
-    return ()=>{alive=false;};
-  },[]);
-
-  const saveTitles=(arr)=>{try{localStorage.setItem("ms_poc_titles",JSON.stringify(arr));}catch{}};
-  const saveDescs=(arr)=>{try{localStorage.setItem("ms_poc_descs",JSON.stringify(arr));}catch{}};
-
-  const handleFile=async(i,e)=>{
+  const handleFile=(i,e)=>{
     const f=e.target.files&&e.target.files[0];
     if(!f)return;
     const url=URL.createObjectURL(f);
-    setUploads(p=>{const n=[...p];if(n[i])URL.revokeObjectURL(n[i].url);n[i]={url,name:f.name,type:f.type,size:(f.size/1024/1024).toFixed(1)};return n;});
-    // Persist the actual file to IndexedDB so it stays forever
-    try{await saveClipToDB("poc_"+i,f,f.name,f.type);}catch(err){alert("Could not save film "+(i+1)+" — storage may be full.");}
+    setUploads(p=>{const n=[...p];n[i]={url,name:f.name,type:f.type,size:(f.size/1024/1024).toFixed(1)};return n;});
   };
-  const removeUpload=async(i)=>{
+  const removeUpload=(i)=>{
     setUploads(p=>{const n=[...p];if(n[i])URL.revokeObjectURL(n[i].url);n[i]=null;return n;});
-    setTitles(p=>{const n=[...p];n[i]="";saveTitles(n);return n;});
-    setDescs(p=>{const n=[...p];n[i]="";saveDescs(n);return n;});
-    try{await deleteClipFromDB("poc_"+i);}catch{}
+    setTitles(p=>{const n=[...p];n[i]="";return n;});
+    setDescs(p=>{const n=[...p];n[i]="";return n;});
   };
 
   const inp={width:"100%",background:"#000",border:"1px solid "+GOLDDIM,padding:"8px 10px",color:WHITE,fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif",boxSizing:"border-box"};
@@ -3252,8 +2435,7 @@ function P3() {
       <div style={{maxWidth:1100,margin:"0 auto"}}>
         <div style={{fontSize:12,color:GOLD,letterSpacing:4,marginBottom:8,fontWeight:700}}>SHOWCASE</div>
         <h1 style={{...H1,fontSize:30,marginBottom:6}}>PROOF OF CONCEPT</h1>
-        <div style={{color:GOLDDIM,fontSize:13,marginBottom:10,letterSpacing:1}}>Upload up to 3 films, trailers, or demo reels created with MandaStrong Studio.</div>
-        <div style={{color:"#22c55e",fontSize:11,marginBottom:24,letterSpacing:2,fontWeight:900}}>✓ SAVED PERMANENTLY — YOUR FILMS STAY UNTIL YOU REPLACE OR REMOVE THEM</div>
+        <div style={{color:GOLDDIM,fontSize:13,marginBottom:28,letterSpacing:1}}>Upload up to 3 films, trailers, or demo reels created with MandaStrong Studio.</div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20}}>
           {[0,1,2].map(i=>(
@@ -3288,12 +2470,12 @@ function P3() {
 
               {/* Title */}
               <div style={{color:GOLD,fontSize:9,letterSpacing:2,fontWeight:900,marginBottom:4}}>FILM TITLE</div>
-              <input value={titles[i]} onChange={e=>setTitles(p=>{const n=[...p];n[i]=e.target.value;saveTitles(n);return n;})}
+              <input value={titles[i]} onChange={e=>setTitles(p=>{const n=[...p];n[i]=e.target.value;return n;})}
                 placeholder="Enter film title..." style={{...inp,marginBottom:8}}/>
 
               {/* Description */}
               <div style={{color:GOLD,fontSize:9,letterSpacing:2,fontWeight:900,marginBottom:4}}>DESCRIPTION</div>
-              <textarea value={descs[i]} onChange={e=>setDescs(p=>{const n=[...p];n[i]=e.target.value;saveDescs(n);return n;})}
+              <textarea value={descs[i]} onChange={e=>setDescs(p=>{const n=[...p];n[i]=e.target.value;return n;})}
                 placeholder="Describe this film..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:10}}/>
 
               {/* Upload button */}
@@ -3311,16 +2493,10 @@ function P3() {
               ):(
                 <div>
                   <div style={{color:"#22c55e",fontSize:9,fontWeight:900,letterSpacing:2,marginBottom:6}}>✓ {uploads[i].name.slice(0,28)} · {uploads[i].size}MB</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                    <a href={uploads[i].url} download={uploads[i].name}
-                      style={{...G("gold",false),width:"100%",padding:"8px",fontSize:10,letterSpacing:2,textDecoration:"none",textAlign:"center",display:"block",boxSizing:"border-box"}}>
-                      💾 SAVE
-                    </a>
-                    <button onClick={()=>refs[i].current&&refs[i].current.click()}
-                      style={{...G("out",false),width:"100%",padding:"8px",fontSize:10,letterSpacing:2}}>
-                      ↻ REPLACE
-                    </button>
-                  </div>
+                  <button onClick={()=>refs[i].current&&refs[i].current.click()}
+                    style={{...G("out",false),width:"100%",padding:"8px",fontSize:10,letterSpacing:2}}>
+                    ↻ REPLACE
+                  </button>
                 </div>
               )}
             </div>
@@ -3348,13 +2524,9 @@ function P4({ go, setUser }) {
   const [loginOk,setLoginOk]=useState(false);
   const inp={width:"100%",background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"10px 12px",color:WHITE,fontSize:14,marginBottom:10,outline:"none",boxSizing:"border-box",fontFamily:"'Rajdhani',sans-serif"};
   const login=()=>{
-    const amandaEmails=["woolleya129@gmail.com"];
-    const amandaPasswords=["Admin","MandaAdmin2026!","amandasox1970!!","admin","ADMIN"];
-    const isAmanda=amandaEmails.includes(email)&&amandaPasswords.includes(pass);
+    const isAmanda=email==="woolleya129@gmail.com"&&pass==="Admin";
     if(isAmanda){
       setLoginOk(true);setTimeout(()=>{setUser({name:"Amanda",plan:"Studio",isAdmin:true});go(5);},800);
-    } else if(email==="test@mandastrong.com"&&pass==="Test2026"){
-      setLoginOk(true);setTimeout(()=>{setUser({name:"Studio User",plan:"Studio",isAdmin:false});go(5);},800);
     } else if(email.includes("@")&&pass.length>0){
       window.open(STRIPE.studio,"_blank");
       alert("To access MandaStrong Studio, please complete your subscription. You will be redirected to our secure payment page.");
@@ -3407,29 +2579,21 @@ function P4({ go, setUser }) {
           <button onClick={()=>{setUser({name:"Creator",plan:"Guest",isAdmin:false});go(5);}} style={{...G("out",false),padding:"12px 32px"}}>✦ NEW PROJECT</button>
         </div>
         <h2 style={{...H1,fontSize:22,textAlign:"center",marginBottom:22}}>SUBSCRIPTION PLANS</h2>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
           {[
-            {t:"BASIC PLAN",p:"20",link:STRIPE.basic,f:["HD Export 1080p","100 AI Tools","10GB Storage","Email Support"],pop:false,trial:false,ent:false},
-            {t:"PRO PLAN",p:"30",link:STRIPE.pro,f:["4K Export","300 AI Tools","100GB Storage","Priority Support","Commercial License"],pop:true,trial:false,ent:false},
-            {t:"STUDIO PLAN",p:"50",link:STRIPE.studio,f:["8K Export","600+ AI Tools","1TB Storage","24/7 Support","Full Rights","API Access","7-Day Free Trial"],pop:false,trial:true,ent:false},
+            {t:"CREATOR PLAN",p:"20",link:STRIPE.basic,f:["HD Export 1080p","100 AI Tools","10GB Storage","Email Support"],pop:false,trial:false},
+            {t:"PRO PLAN",p:"30",link:STRIPE.pro,f:["4K Export","300 AI Tools","100GB Storage","Priority Support","Commercial License"],pop:true,trial:false},
+            {t:"STUDIO PLAN",p:"50",link:STRIPE.studio,f:["8K Export","600+ AI Tools","1TB Storage","24/7 Support","Full Rights","API Access","7-Day Free Trial"],pop:false,trial:true},
           ].map(plan=>(
             <div key={plan.t} style={{...Card(),border:plan.pop?"2px solid "+GOLD:"1px solid "+GOLDDIM,position:"relative"}}>
               {plan.pop&&<div style={{position:"absolute",top:-11,left:"50%",transform:"translateX(-50%)",background:GOLD,color:"#000",padding:"2px 12px",fontSize:11,fontWeight:900,whiteSpace:"nowrap"}}>MOST POPULAR</div>}
               {plan.trial&&<div style={{position:"absolute",top:-11,right:12,background:"#22c55e",color:"#000",padding:"2px 10px",fontSize:11,fontWeight:900}}>🎉 FREE TRIAL</div>}
               <div style={{color:WHITE,fontSize:11,letterSpacing:3,fontWeight:700}}>{plan.t}</div>
               <div style={{color:GOLD,fontFamily:"'Cinzel',serif",fontSize:34,fontWeight:900,margin:"8px 0"}}>{plan.p}<span style={{fontSize:12,color:WHITE}}>/mo</span></div>
-              <div style={{margin:"12px 0"}}>{plan.f.map(f=><div key={f} style={{color:WHITE,fontSize:12,padding:"3px 0",borderBottom:"1px solid #0a0a0a"}}>✓ {f}</div>)}</div>
+              <div style={{margin:"12px 0"}}>{plan.f.map(f=><div key={f} style={{color:WHITE,fontSize:13,padding:"3px 0",borderBottom:"1px solid #0a0a0a"}}>✓ {f}</div>)}</div>
               <button onClick={()=>window.open(plan.link,"_blank")} style={{...G(plan.trial?"out":"gold",false),width:"100%"}}>{plan.trial?"START FREE TRIAL":"SUBSCRIBE NOW"}</button>
             </div>
           ))}
-        </div>
-
-        {/* ── PURCHASE USAGE CREDITS ── one-time top-up at the bottom of the page ── */}
-        <div style={{marginTop:40,padding:"28px 24px",background:"#050500",border:"2px solid "+GOLD,textAlign:"center",boxShadow:"0 0 24px "+GOLD+"22"}}>
-          <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:900,marginBottom:6}}>NEED MORE USAGE?</div>
-          <h3 style={{...H1,fontSize:20,marginBottom:8}}>PURCHASE USAGE CREDITS</h3>
-          <p style={{color:WHITE,fontSize:13,lineHeight:1.7,maxWidth:520,margin:"0 auto 18px"}}>You've already had your usage replaced once. To top up again, purchase extra usage credits here — pay once, use them for renders and generations whenever you're ready, and they never expire. Proceeds from MandaStrong1.Etsy.com are donated to humanitarian causes.</p>
-          <button onClick={()=>window.open(STRIPE.studio,"_blank")} style={{...G("gold",false),padding:"14px 44px",fontSize:14}}>💳 PURCHASE USAGE CREDITS</button>
         </div>
       </div>
     </div>
@@ -3477,9 +2641,14 @@ function MergeVideos({ onSave }) {
       canvas.width = 1920; canvas.height = 1080;
       const ctx = canvas.getContext("2d");
       const fps = 24;
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const getSupportedMimeType=()=>{
+      const opts=["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm;codecs=vp8","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+      for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+      return ""; // let MediaRecorder pick a browser default rather than throwing
+      };
+      const mimeType = getSupportedMimeType();
       const stream = canvas.captureStream(fps);
-      const recorder = new MediaRecorder(stream, {mimeType, videoBitsPerSecond:8000000});
+      const recorder = new MediaRecorder(stream, mimeType?{mimeType, videoBitsPerSecond:8000000}:{videoBitsPerSecond:8000000});
       const chunks = [];
       recorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
       recorder.start(100);
@@ -3551,8 +2720,9 @@ function MergeVideos({ onSave }) {
 
       setProgress(95);
       log("Finalising merged film...");
-      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,4000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
-      const blob = new Blob(chunks, {type:mimeType});
+      recorder.stop();
+      await new Promise(r => { recorder.onstop = r; });
+      const blob = new Blob(chunks, {type:mimeType||"video/webm"});
       const url = URL.createObjectURL(blob);
       setMergedUrl(url);
       setProgress(100);
@@ -3622,7 +2792,7 @@ function MergeVideos({ onSave }) {
       {mergedUrl&&(
         <div style={{background:"#061406",border:"1px solid #22c55e",padding:"10px 14px"}}>
           <div style={{color:"#22c55e",fontWeight:900,fontSize:11,letterSpacing:2,marginBottom:6}}>✓ MERGED FILM SAVED TO MEDIA LIBRARY — READY FOR TIMELINE</div>
-          <a href={mergedUrl} download="MandaStrong_Merged.webm" target="_blank" rel="noopener noreferrer"
+          <a href={mergedUrl} download="MandaStrong_Merged.webm"
             style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2,textDecoration:"none"}}>⬇ DOWNLOAD MERGED FILM</a>
         </div>
       )}
@@ -3632,22 +2802,10 @@ function MergeVideos({ onSave }) {
 
 function P11({ mediaLib, setMediaLib }) {
   const fileRef = useRef(null);
-  const onFiles = async files => {
+  const onFiles = files => {
     if(!files)return;
-    const arr=Array.from(files);
-    const added=[];
-    for(const f of arr){
-      // Large files: warn but still allow — IndexedDB handles big blobs fine
-      if(f.size>1024*1024*1024){ // >1GB
-        alert('"'+f.name+'" is very large ('+(f.size/1024/1024/1024).toFixed(1)+"GB). It may load slowly. For smoothest results keep single files under 1GB.");
-      }
-      const id=Date.now()+Math.random();
-      const asset={id,name:f.name,type:f.type,file:f,url:URL.createObjectURL(f),dbId:"upload_"+id};
-      // Persist to IndexedDB so it survives refresh and doesn't rely on holding the File in memory
-      try{await safeSaveClipToDB("upload_"+id,f,f.name,f.type);}catch(err){console.warn("upload persist failed",err);}
-      added.push(asset);
-    }
-    setMediaLib(p=>[...p,...added]);
+    const n=Array.from(files).map(f=>({id:Date.now()+Math.random(),name:f.name,type:f.type,file:f,url:URL.createObjectURL(f)}));
+    setMediaLib(p=>[...p,...n]);
   };
   return (
     <div style={{...Sp,padding:40}}>
@@ -3678,7 +2836,7 @@ function P11({ mediaLib, setMediaLib }) {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
               {mediaLib.map(a=>(
                 <div key={a.id} style={{...Card(),padding:8,position:"relative"}}>
-                  {a.type.startsWith("video")&&a.url?<video src={a.url} style={{width:"100%",marginBottom:5}}/>:
+                  {a.type.startsWith("video")?<video src={a.url} style={{width:"100%",marginBottom:5}}/>:
                    a.type.startsWith("image")?<img src={a.url} style={{width:"100%",marginBottom:5}} alt={a.name}/>:
                    <div style={{height:60,background:"#000",marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎵</div>}
                   <div style={{color:WHITE,fontSize:11,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.name}</div>
@@ -3703,29 +2861,21 @@ function P11({ mediaLib, setMediaLib }) {
 }
 
 function P12({ go, mediaLib }) {
-  const boxes=[
-    {ic:"🗂",t:"MEDIA LIBRARY",d:(mediaLib?mediaLib.length:0)+" assets",p:11},
-    {ic:"⏱",t:"TIMELINE EDITOR",d:"Multi-track editing",p:13},
-    {ic:"✨",t:"ENHANCEMENT STUDIO",d:"90+ AI tools",p:14},
-    {ic:"🎵",t:"AUDIO MIXER",d:"4-channel mixing",p:15},
-    {ic:"⚡",t:"RENDER ENGINE",d:"Up to 8K output",p:16},
-    {ic:"▶",t:"PREVIEW PLAYER",d:"Full-screen playback",p:17}
-  ];
   return (
-    <div style={{...Sp,padding:30}}>
-      <div style={{maxWidth:1100,margin:"0 auto"}}>
-        <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>PRODUCTION HUB</div>
-        <h1 style={{...H1,fontSize:44,marginBottom:6}}>EDITOR SUITE</h1>
-        <div style={{color:WHITE,fontSize:15,marginBottom:28,lineHeight:1.6}}>Your complete post-production workspace.</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
-          {boxes.map(b=>(
-            <button key={b.t} onClick={()=>go(b.p)}
-              style={{background:"#0a0500",border:"1px solid "+GOLDDIM,padding:"28px 24px",cursor:"pointer",textAlign:"left",fontFamily:"'Rajdhani',sans-serif",minHeight:150,display:"flex",flexDirection:"column"}}
+    <div style={{...Sp,padding:40}}>
+      <div style={{maxWidth:880,margin:"0 auto"}}>
+        <div style={{fontSize:12,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>PRODUCTION HUB</div>
+        <h1 style={{...H1,fontSize:28,marginBottom:4}}>EDITOR SUITE</h1>
+        <div style={{color:WHITE,fontSize:14,marginBottom:20,fontWeight:600}}>Your complete post-production workspace.</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:18}}>
+          {[{ic:"🗂",t:"MEDIA LIBRARY",d:mediaLib.length+" assets",p:11},{ic:"⏱",t:"TIMELINE EDITOR",d:"Multi-track editing",p:13},{ic:"✨",t:"ENHANCEMENT STUDIO",d:"90+ AI tools",p:14},{ic:"🎵",t:"AUDIO MIXER",d:"4-channel mixing",p:15},{ic:"⚡",t:"RENDER ENGINE",d:"Up to 8K output",p:16},{ic:"▶",t:"PREVIEW PLAYER",d:"Full-screen playback",p:17}].map(c=>(
+            <button key={c.t} onClick={()=>go(c.p)}
+              style={{...Card(),textAlign:"left",cursor:"pointer"}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=GOLD;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=GOLDDIM;}}>
-              <div style={{fontSize:34,marginBottom:24}}>{b.ic}</div>
-              <div style={{fontSize:15,color:GOLD,letterSpacing:2,fontWeight:900,marginBottom:6}}>{b.t}</div>
-              <div style={{fontSize:13,color:WHITE,opacity:0.75}}>{b.d}</div>
+              <div style={{fontSize:28,marginBottom:8}}>{c.ic}</div>
+              <div style={{color:GOLD,fontWeight:900,fontSize:13,letterSpacing:2}}>{c.t}</div>
+              <div style={{color:WHITE,fontSize:12,marginTop:4}}>{c.d}</div>
             </button>
           ))}
         </div>
@@ -3745,7 +2895,7 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
           <h1 style={{...H1,fontSize:24,margin:0}}>TIMELINE EDITOR</h1>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
             <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>FILM: {filmDuration||60} MIN</span>
-            <input type="range" min={1} max={180} step={1} value={filmDuration||60} onChange={e=>setFilmDuration(+e.target.value)} style={{width:160,accentColor:GOLD}}/>
+            <input type="range" min={0} max={180} step={30} value={filmDuration||60} onChange={e=>setFilmDuration(+e.target.value)} style={{width:160,accentColor:GOLD}}/>
             <div style={{display:"flex",gap:4}}>
               {[60,90,180].map(m=><button key={m} onClick={()=>setFilmDuration(m)} style={{background:filmDuration===m?GOLD:"#111",border:"1px solid "+(filmDuration===m?"#000":GOLDDIM),color:filmDuration===m?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>{m}m</button>)}
             </div>
@@ -3754,51 +2904,18 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setTracks(p=>[...p,"TRACK "+p.length+1])} style={{...G("out",true)}}>+ ADD TRACK</button>
           <button onClick={()=>{
-            // Auto-populate tracks from media library and sync — sorted in correct order
-            // Sort by leading number in name (Scene 1, Scene 2, etc.), then by name, then by id/timestamp
-            const sortClips=(clips)=>{
-              return clips.slice().sort((a,b)=>{
-                const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-                const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-                if(na!==nb)return na-nb;
-                const cmp=(a.name||"").localeCompare(b.name||"");
-                if(cmp!==0)return cmp;
-                return (a.id||0)-(b.id||0);
-              });
-            };
-            const videoAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||(a.type.includes("webm")&&!a.type.startsWith("audio")))));
-            const audioAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration")));
-            // Assign sequential start times so clips play in order
-            let vTime=0;
-            const videoTrack=videoAssets.map((a,i)=>{const startTime=vTime;vTime+=(a.duration||5);return {...a,startTime,order:i,syncGroup:"master",synced:true};});
-            let aTime=0;
-            const audioTrack=audioAssets.map((a,i)=>{const startTime=aTime;aTime+=(a.duration||10);return {...a,startTime,order:i,syncGroup:"master",synced:true};});
+            // Auto-populate tracks from media library and sync
+            const videoAssets=mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||a.type.includes("webm")));
+            const audioAssets=mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type.includes("webm")&&!a.type.startsWith("video")));
             const newTl={};
-            if(videoTrack.length>0)newTl[0]=videoTrack;
-            if(audioTrack.length>0)newTl[1]=audioTrack;
-            setTimeline(newTl);
-            // ── DURATION GAP CHECK — works across the whole slider, any length ──
-            const targetSec=(filmDuration||60)*60;
-            const filledSec=vTime; // total seconds of laid video clips
-            const gapSec=targetSec-filledSec;
-            const fmt=(s)=>{const m=Math.floor(s/60),ss=Math.round(s%60);return m+"m"+(ss?" "+ss+"s":"");};
-            if(gapSec>30){
-              const wantFill=window.confirm(
-                "You have "+fmt(filledSec)+" of a "+fmt(targetSec)+" selection.\n\n"+
-                "That leaves a gap of about "+fmt(gapSec)+".\n\n"+
-                "Would you like AI to create fill-in scenes to fill the gap?\n\n"+
-                "OK = generate a fill-scene prompt for Page 8.\nCancel = keep it as is."
-              );
-              if(wantFill){
-                const n=Math.max(1,Math.ceil(gapSec/60));
-                const prompt="Generate "+n+" additional cinematic fill scene"+(n>1?"s":"")+" (about "+fmt(gapSec)+" total) that match the tone, lighting and subject of this film, to bridge the gap to a "+fmt(targetSec)+" runtime. Keep the same color grade and style. 60 seconds each.";
-                try{navigator.clipboard.writeText(prompt);}catch{}
-                alert("✓ Fill-scene prompt copied.\n\nGo to Page 8 (Video Tools), paste it, and generate "+n+" more clip"+(n>1?"s":"")+" — then SYNC again.");
-                go(8);
-                return;
-              }
-            }
-            alert("✓ All tracks synced in order — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
+            if(videoAssets.length>0)newTl[0]=videoAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));
+            if(audioAssets.length>0)newTl[1]=audioAssets.map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));
+            setTimeline(p=>{
+              const merged={...p,...newTl};
+              Object.keys(merged).forEach(k=>{merged[k]=(merged[k]||[]).map(a=>({...a,startTime:0,syncGroup:"master",synced:true}));});
+              return merged;
+            });
+            alert("✓ All tracks synced — "+videoAssets.length+" video clips · "+audioAssets.length+" audio tracks");
           }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>⚡ SYNC ALL TRACKS</button>
           <button onClick={()=>go(16)} style={{...G("gold",false)}}>→ RENDER</button>
           <button onClick={()=>go(11)} style={{...G("out",true)}}>⬆ UPLOAD MEDIA</button>
@@ -3806,7 +2923,7 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
         </div>
       </div>
       <div style={{background:"#000",height:100,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,border:"1px solid "+GOLDDIM}}>
-        {mediaLib[0]&&mediaLib[0].type.startsWith("video")&&mediaLib[0].url?
+        {mediaLib[0]&&mediaLib[0].type.startsWith("video")?
           <video src={mediaLib[0].url} style={{height:"100%",width:"100%",objectFit:"cover",opacity:.5}}/>:
           <div style={{textAlign:"center"}}>
             <div style={{fontSize:12,letterSpacing:3,color:WHITE,marginBottom:8}}>ADD MEDIA TO SEE PREVIEW</div>
@@ -3961,8 +3078,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   const [fps,setFps]=useState(30);
   const [codec,setCodec]=useState("vp9");
   const [currentClipIdx,setCurrentClipIdx]=useState(-1);
-  // ── GAP-FILL CHOICE (Y = generate extra scenes, N = stretch clips) ──
-  const [gapFill,setGapFill]=useState(false);
   const canvasRef=useRef(null);
 
   const log=(msg)=>setRenderLog(p=>[...p,msg]);
@@ -3979,18 +3094,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
     return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
   };
 
-  // Background music bed. A music asset is any audio the user tagged as music,
-  // or a second audio asset that is NOT the narration we're already using.
-  const getMusicTrack=(narr)=>{
-    const isMusic=(a)=>a&&a.type&&(a.type==="audio/music"||a.type==="music"||/music|score|soundtrack|bgm|bed/i.test(a.name||""));
-    const pool=[...Object.values(timeline||{}).flat(),...(mediaLib||[])].filter(Boolean);
-    const tagged=pool.find(isMusic);
-    if(tagged)return tagged;
-    // else: a distinct second audio asset (not the narration)
-    const audios=pool.filter(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/webm"));
-    return audios.find(a=>narr?(a.id!==narr.id&&a.dbId!==narr.dbId):true&&a!==narr);
-  };
-
   const startRender=async()=>{
     // ── PRIORITY SAVE — runs before anything else ──────────────────────────────
     // Saves current state immediately so a crash mid-render doesn't lose work.
@@ -3999,73 +3102,38 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const tl=localStorage.getItem("ms_timeline");
       if(tl)localStorage.setItem("ms_timeline",tl); // re-write to confirm it's current
     }catch(e){}
-    // ── PRE-RENDER STORAGE CHECK — never touches source clips ──────────────────
-    // Only clears old render_final files, never user-generated source clips.
-    // Before this fix, autoPruneClips was destroying 12 of 13 clips before render.
+    // ── AGGRESSIVE MEMORY PRUNE before render ──────────────────────────────────
+    // Frees IndexedDB space before render so the browser tab has enough RAM.
+    // This is the single biggest cause of render crashes — storage pressure.
     try{
-      const clips=await getAllClipsFromDB();
-      // Delete only old finished renders, never source scene clips
-      const oldRenders=clips.filter(c=>String(c.id).includes("render_final_old"));
-      for(const c of oldRenders){await deleteClipFromDB(c.id);}
-      log("Memory check complete — "+clips.length+" clips preserved");
+      await autoFreeStorage();
+      await autoPruneClips(12); // keep newest 12, delete the rest
+      log("Memory optimised — render starting with clean storage");
     }catch(e){}
 
-    // ── CLIP ORDER: the TIMELINE is the authority ──────────────────────────
-    // Previously the render loaded clips from IndexedDB (which returns them in
-    // keyPath / alphabetical order) and then sorted by the first number in the
-    // filename — with names like GODS_GURUS_6 and LOVE_WAR_60s that number is
-    // meaningless, so scenes came out in the wrong order. Now: take the order
-    // straight from the timeline, and use IndexedDB ONLY to refresh each clip's
-    // blob/url. The number-sort runs ONLY when there is no timeline at all.
+    // Step 1: Refresh ALL clips from IndexedDB before rendering
+    // This ensures clips work even after page reload
+    log("Loading clips from storage...");
+    // Load clips DIRECTLY from IndexedDB — don't rely on React state timing
     let freshClips = [];
-    let dbClipsAll = [];
-    try{ dbClipsAll = await getAllClipsFromDB(); }catch(e){ console.warn("DB load failed",e); }
-    const dbById = new Map(); const dbByName = new Map();
-    for(const c2 of dbClipsAll){ dbById.set(c2.id,c2); if(c2.name)dbByName.set(c2.name,c2); }
-    const relink=(c2)=>{
-      const db = dbById.get(c2.dbId) || dbById.get(c2.id) || dbByName.get(c2.name);
-      if(db&&db.blob){
-        return {...c2,type:c2.type||db.type||"video/webm",url:URL.createObjectURL(db.blob),file:new File([db.blob],c2.name||db.name,{type:db.type||c2.type||"video/webm"}),dbId:db.id};
+    try{
+      const dbClips=await getAllClipsFromDB();
+      if(dbClips.length>0){
+        freshClips=dbClips.map(c2=>({
+          id:c2.id,name:c2.name,type:c2.type||"video/webm",
+          url:URL.createObjectURL(c2.blob),
+          file:new File([c2.blob],c2.name,{type:c2.type||"video/webm"}),
+          dbId:c2.id
+        }));
+        setMediaLib(freshClips);
+        log("Loaded "+freshClips.length+" clips from storage");
       }
-      return c2;
-    };
-    const timelineClips = getVideoClips(); // already in timeline order (falls back to mediaLib)
-    const hasTimeline = Object.values(timeline||{}).flat().some(a=>a&&a.type&&a.type.startsWith("video"));
-    if(timelineClips.length>0){
-      freshClips = timelineClips.map(relink);
-      log("Loaded "+freshClips.length+" clips in timeline order");
-    } else if(dbClipsAll.length>0){
-      freshClips = dbClipsAll.map(c2=>({id:c2.id,name:c2.name,type:c2.type||"video/webm",url:URL.createObjectURL(c2.blob),file:new File([c2.blob],c2.name,{type:c2.type||"video/webm"}),dbId:c2.id}));
-      log("Loaded "+freshClips.length+" clips from storage");
-    }
-    if(freshClips.length>0){ setMediaLib(freshClips); }
+    }catch(e){console.warn("DB load failed",e);}
 
-    // Fall back to current mediaLib if nothing resolved
+    // Fall back to current mediaLib if DB empty
     let clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
-    // ── EXCLUDE old rendered films and empty clips ──────────────────────────
-    // A previously-rendered "MandaStrong_Film..." file in the library has no real
-    // scene frames — including it makes the whole render come out 0.0MB.
-    clips = clips.filter(c2=>{
-      const n=(c2.name||"").toLowerCase();
-      if(n.includes("mandastrong_film")||n.includes("render_final")||n.includes("_film_")) return false;
-      if(c2.file&&c2.file.size!==undefined&&c2.file.size<1000) return false; // skip empty blobs
-      return true;
-    });
-    // Number-sort ONLY when there is no timeline to define the order.
-    if(!hasTimeline){
-      clips.sort((a,b)=>{
-        const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-        const nb=parseInt((b.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
-        if(na!==nb)return na-nb;
-        return (a.name||"").localeCompare(b.name||"");
-      });
-      log("No timeline — clips ordered by scene number");
-    } else {
-      log("Render order locked to timeline: "+clips.map(c2=>(c2.name||"").slice(0,18)).join(" → "));
-    }
     const audioAsset=getAudioTrack();
     if(clips.length===0){alert("No video clips found. Generate clips on Page 8 first.");return;}
-    log("Rendering "+clips.length+" scene clips (old render files excluded)");
     setRendering(true);setDone(false);setProgress(0);setRenderLog([]);setRenderUrl("");setCurrentClipIdx(-1);
     try{
       log("MandaStrong Render Engine v2 initialising...");
@@ -4080,40 +3148,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       let audioSource=null,audioBuffer=null;
       let liveNarration=false;
       if(audioAsset){
-        // NARRATION: bake through the Cinema Voice Engine so it RECORDS into the film.
-        // Device speech (speechSynthesis) plays out the speaker and never enters the
-        // captured audio graph, so on iPad the film came out silent / "voice unavailable".
-        // Fix: fetch real audio from engineSpeak, decode into THIS audioCtx, feed audioDest —
-        // the same path uploaded audio uses. Live speech remains only as a fallback.
+        // If it's a text narration asset, speak it live via Web Speech API during render
         if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
-          try{
-            const vc=(typeof VOICE_CHARACTERS!=="undefined")?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
-            const meta={voice:vc?.engineVoice||"",gender:vc?.gender||"",origin:vc?.origin||"",speed:vc?.rate||0.9};
-            const narrChunks=buildChunks(audioAsset.text||"");
-            log("Baking narration through Cinema Voice Engine — "+narrChunks.length+" segment(s)...");
-            const decoded=[];
-            for(const c of narrChunks){
-              if(!c||!c.text) continue;
-              const u=await engineSpeak(c.text,meta);
-              if(!u) continue;
-              try{ const r=await fetch(u); const ab=await r.arrayBuffer(); decoded.push(await audioCtx.decodeAudioData(ab)); }catch(e){}
-            }
-            if(decoded.length){
-              const total=decoded.reduce((s,b)=>s+b.duration,0);
-              const merged=audioCtx.createBuffer(1,Math.max(1,Math.ceil(total*audioCtx.sampleRate)),audioCtx.sampleRate);
-              const out=merged.getChannelData(0);
-              let off=0;
-              for(const b of decoded){ out.set(b.getChannelData(0),Math.floor(off*audioCtx.sampleRate)); off+=b.duration; }
-              audioBuffer=merged;
-              log("✓ Narration baked from Cinema Voice Engine: "+total.toFixed(1)+"s");
-            } else {
-              liveNarration=true;
-              log("Engine narration unavailable — speaking live as fallback");
-            }
-          }catch(e){
-            liveNarration=true;
-            log("Narration bake error — live fallback: "+e.message);
-          }
+          liveNarration=true;
+          log("✓ Narration ready — will speak live during render");
         } else {
           try{
             let audioBlob=null;
@@ -4138,82 +3176,30 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         }
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
-      // ── BACKGROUND MUSIC BED ────────────────────────────────────────────────
-      // Plays under the narration, quiet, looped to cover the whole film. Voice
-      // stays on top (locked mix VOICE 85 / MUSIC 40 ≈ 0.25 gain under voice).
-      let musicSource=null;
-      try{
-        const musicAsset=getMusicTrack(audioAsset);
-        if(musicAsset){
-          let mBlob=null;
-          const mId=musicAsset.dbId||musicAsset.id;
-          if(mId){try{const st=await loadClipFromDB(mId);if(st&&st.blob)mBlob=st.blob;}catch(e){}}
-          if(!mBlob&&musicAsset.url){try{mBlob=await (await fetch(musicAsset.url)).blob();}catch(e){}}
-          if(!mBlob&&musicAsset.file)mBlob=musicAsset.file;
-          if(mBlob){
-            const mBuf=await audioCtx.decodeAudioData(await mBlob.arrayBuffer());
-            musicSource=audioCtx.createBufferSource();
-            musicSource.buffer=mBuf;
-            musicSource.loop=true; // music beds loop to fill; narration never does
-            const mGain=audioCtx.createGain();
-            mGain.gain.value=0.25;
-            musicSource.connect(mGain);
-            mGain.connect(audioDest);
-            mGain.connect(audioCtx.destination);
-            log("♪ Background music bed mixed in under narration");
-          }
-        }
-      }catch(e){log("Music bed skipped: "+e.message);}
-      // Draw several plain frames BEFORE capturing so the stream is definitely live.
-      // No words on screen — the film shows only the source footage.
-      for(let w=0;w<5;w++){
-        ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
-        await new Promise(r=>setTimeout(r,60));
-      }
       const videoStream=canvas.captureStream(fps);
-      const vTrack=videoStream.getVideoTracks()[0];
-      if(!vTrack||vTrack.readyState!=="live"){
-        log("⚠ Canvas capture unavailable in this browser.");
-        alert("This browser blocked video capture. Try Chrome or Safari with the tab kept in front.");
-        setRendering(false);return;
-      }
       const tracks=[...videoStream.getTracks(),...audioDest.stream.getTracks()];
       const combinedStream=new MediaStream(tracks);
       const vCodec=codec==="vp9"?"vp9":"vp8";
-      const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs="+vCodec+",opus")?"video/webm;codecs="+vCodec+",opus":"video/webm";
-      // ── ADAPTIVE BITRATE — caps total memory so long films finish encoding ──
-      // The end-of-render crash was memory: chunks pile up all render, then the
-      // final Blob build doubles them. iPad Safari kills the tab (~1.4GB).
-      // Fix: budget ~320MB of chunks max, whatever the film length.
-      const totalFilmSec=Math.max(1,clips.reduce((s,c)=>s+(c.duration||60),0));
-      const requested=quality==="4K"?40000000:quality==="1080p"?8000000:4000000;
-      const budgetBits=320*1024*1024*8; // 320MB in bits
-      const safeBitrate=Math.floor(budgetBits/totalFilmSec);
-      const bitrate=Math.min(requested,Math.max(2000000,safeBitrate));
-      if(bitrate<requested)log("Adaptive bitrate: "+(bitrate/1000000).toFixed(1)+"Mbps for "+Math.round(totalFilmSec)+"s film — keeps memory safe to the end");
-      const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:128000});
+      const getSupportedMimeType3=()=>{
+        const opts=["video/webm;codecs="+vCodec+",opus","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm","video/mp4;codecs=avc1,mp4a.40.2","video/mp4"];
+        for(const o of opts){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(o)) return o; }
+        return "";
+      };
+      const mimeType=getSupportedMimeType3();
+      const bitrate=quality==="4K"?40000000:quality==="1080p"?8000000:4000000;
+      const recorder=new MediaRecorder(combinedStream,mimeType?{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:192000}:{videoBitsPerSecond:bitrate,audioBitsPerSecond:192000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       // Prime the canvas so captureStream has a real frame
       ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
       await new Promise(r=>setTimeout(r,200));
-      recorder.start(1000);
-      // iPad Safari fix: force the recorder to flush data every second so chunks
-      // never end up empty, and keep the canvas stream alive with a heartbeat.
-      const dataInterval=setInterval(()=>{try{if(recorder.state==="recording")recorder.requestData();}catch(e){}},1000);
-      const heartbeat=setInterval(()=>{
-        try{
-          // Nudge one pixel each tick so captureStream always sees a new frame
-          ctx.fillStyle="rgba(0,0,0,0.003)";ctx.fillRect(0,0,2,2);
-          if(vTrack&&vTrack.requestFrame)vTrack.requestFrame();
-        }catch(e){}
-      },Math.round(1000/fps));
+      recorder.start(100);
       if(audioSource)audioSource.start(0);
-      if(musicSource){try{musicSource.start(0);}catch(e){}}
-      // Live-speak fallback ONLY when the engine bake could not deliver audio.
+      // Speak live narration text through speakers during render
       if(liveNarration&&audioAsset?.text){
+        const vc=typeof VOICE_CHARACTERS!=="undefined"?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
         speakText(audioAsset.voice||"blaze",audioAsset.text,null,null);
-        log("✓ Speaking narration live (fallback): "+(audioAsset.voice||"blaze"));
+        log("✓ Speaking narration live: "+(audioAsset.voice||"blaze"));
       }
       log("Recording started...");
       setProgress(5);
@@ -4263,7 +3249,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       try{
         const freshDB=await getAllClipsFromDB();
         if(freshDB.length>0){
-          clips=clips.map(cl=>{
+          const refreshed=clips.map(cl=>{
             const db=freshDB.find(d=>d.id===cl.dbId||d.id===cl.id||d.name===cl.name);
             if(db&&db.blob){
               return {...cl,file:new File([db.blob],cl.name,{type:db.type||"video/webm"}),url:URL.createObjectURL(db.blob)};
@@ -4273,39 +3259,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           log("Clips refreshed from storage: "+freshDB.length+" found");
         }
       }catch(e){log("Storage reload: "+e.message);}
-
-      // ── GAP-FILL: the DURATION SLIDER is master ─────────────────────────────
-      // filmDuration (1–180 min, set on the timeline page) decides the film length.
-      // Clips stretch to fill that total: each clip holds (sliderSecs / clipCount).
-      // The old 65s-per-clip cap is lifted — the engine accepts long clips, so a
-      // clip can hold as long as the slider needs. If the slider is somehow unset,
-      // fall back to the narration length, then to natural clip lengths.
-      const sliderSecs = (Number(filmDuration)>0 ? Number(filmDuration)*60 : 0);
-      const narrationSecs = audioBuffer ? audioBuffer.duration : 0;
-      const targetTotal = sliderSecs>0 ? sliderSecs : narrationSecs;
-      let perClipTarget = 0; // 0 = use each clip's natural duration
-      if(targetTotal>0 && clips.length>0){
-        if(gapFill){
-          let naturalTotal=0;
-          for(const c of clips){ const m=(c.name||"").match(/(\d+)s/); naturalTotal += m?parseInt(m[1]):30; }
-          const gap = targetTotal - naturalTotal;
-          if(gap > 5){
-            const fillCount = Math.ceil(gap/30);
-            log("Fill-in: generating "+fillCount+" extra scene"+(fillCount!==1?"s":"")+" to reach "+(targetTotal/60).toFixed(1)+" min");
-            const seeds=clips.length?clips.map(c=>(c.name||"scene").replace(/\.[^.]+$/,"").replace(/_/g,"")):["cinematic scene"];
-            for(let f=0;f<fillCount;f++){
-              const seed=seeds[f%seeds.length]||"cinematic establishing scene";
-              clips.push({ name:"fill_"+(f+1)+"_"+seed+"_30s.webm", type:"video/webm", __fill:true });
-            }
-            log("Fill-in ON — film built from "+clips.length+" scenes (real + generated)");
-          } else {
-            log("Fill-in ON — footage already covers the target, nothing to add");
-          }
-        } else {
-          perClipTarget = Math.max(targetTotal / clips.length, 3);
-          log("Stretch mode: film "+(targetTotal/60).toFixed(1)+" min ÷ "+clips.length+" clips ≈ "+perClipTarget.toFixed(1)+"s each");
-        }
-      }
 
       for(let ci=0;ci<clips.length;ci++){
         const clip=clips[ci];setCurrentClipIdx(ci);
@@ -4325,14 +3278,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             let done2=false;
             const finish=(ok)=>{if(!done2){done2=true;resolve(ok);}};
             vid.onloadeddata=async()=>{
-              const natural=vid.duration||30;
-              // Hold this clip for its share of the film (slider-driven). No 65s cap:
-              // the engine accepts long clips, so a clip can hold as long as needed.
-              // Never below its natural length. Loop the source within the window so
-              // the picture keeps moving instead of freezing.
-              const clipDur=perClipTarget>0?Math.max(perClipTarget,natural):Math.min(natural,65);
+              const clipDur=Math.min(vid.duration||30,65);
               vid.currentTime=0;
-              vid.loop=true; // replay within the hold window; render stops it by time, not by end
               // Wait for first frame to decode before drawing
               await new Promise(r=>{
                 if(vid.readyState>=3){r();}
@@ -4345,9 +3292,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
               const draw=()=>{
                 if(done2)return;
                 const elapsed=(Date.now()-startTime)/1000;
-                // Stop strictly by elapsed time now (video loops), so the clip fills
-                // its whole target window even if the source footage is short.
-                if(elapsed>=clipDur){vid.pause();finish(true);return;}
+                if(vid.ended||elapsed>=clipDur||vid.paused&&elapsed>1){vid.pause();finish(true);return;}
                 const now=performance.now();
                 if(now-lastDraw>=msPerF-2){
                   try{
@@ -4367,7 +3312,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
               requestAnimationFrame(draw);
             };
             vid.onerror=()=>finish(false);
-            setTimeout(()=>finish(false),Math.max(70000,(perClipTarget>0?perClipTarget:65)*1000+15000));
+            setTimeout(()=>finish(false),70000);
             vid.load();
           });
         }
@@ -4375,12 +3320,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         // If video failed or no file — regenerate scene with Claude
         if(!videoPlayed){
           log("  Clip not playable — generating scene: "+clip.name.slice(0,30)+"...");
-          const natSec=parseInt(clip.name.match(/(\d+)s/)?.[1]||"30");
-          const clipDurSec=perClipTarget>0?Math.max(perClipTarget,natSec):natSec;
+          const clipDurSec=parseInt(clip.name.match(/(\d+)s/)?.[1]||"30");
           const ok=await renderSceneToCanvas(clip.name,clipDurSec);
           if(!ok){
-            // Last resort: plain black hold — real-time paced. No words on screen;
-            // the film never burns the clip/scene name onto the picture.
+            // Last resort: title card — real-time paced
             const tcFrames=5*fps;
             const tcStart=performance.now();
             await new Promise(resolve=>{
@@ -4388,6 +3331,8 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
               const draw=()=>{
                 if(f>=tcFrames){resolve(null);return;}
                 ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
+                ctx.fillStyle="#e8c96d";ctx.font="900 "+Math.round(dims.w/24)+"px Arial";ctx.textAlign="center";
+                ctx.fillText(clip.name.replace(/\.[^.]+$/,"").replace(/_/g," ").slice(0,40).toUpperCase(),dims.w/2,dims.h/2);
                 f++;
                 const next=tcStart+(f*(1000/fps));
                 setTimeout(draw,Math.max(4,next-performance.now()));
@@ -4410,40 +3355,21 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         };draw();
       });}
       setProgress(92);log("Finalising...");
-      try{clearInterval(dataInterval);}catch(e){}
-      try{clearInterval(heartbeat);}catch(e){}
       if(audioSource){try{audioSource.stop();}catch(e){}}
-      if(musicSource){try{musicSource.stop();}catch(e){}}
-      // Flush any final data before stopping
-      try{if(recorder.state==="recording")recorder.requestData();}catch(e){}
-      await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,5000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
-      const blob=new Blob(chunks,{type:mimeType});
-      // ── SAFETY: never hand an empty file to the player (that's the grey arrow) ──
-      if(!chunks.length||blob.size<10000){
-        log("⚠ RENDER PRODUCED NO VIDEO DATA");
-        log("Your browser blocked canvas capture. Fix: keep this tab in front");
-        log("for the whole render, and try 720p · 24FPS.");
-        setProgress(0);setDone(false);setRendering(false);
-        try{clearInterval(dataInterval);}catch(e){}
-        try{clearInterval(heartbeat);}catch(e){}
-        try{if(audioCtx)audioCtx.close();}catch(e){}
-        alert("Render produced no video data.\n\nKeep this tab in front for the whole render (don't switch apps or tabs), and use 720p · 24FPS. Then try again.");
-        return;
-      }
+      recorder.stop();
+      await new Promise(r=>{recorder.onstop=r;});
+      const blob=new Blob(chunks,{type:mimeType||"video/webm"});
       const url=URL.createObjectURL(blob);
+      // Save final render to IndexedDB
+      try{
+        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
+        await saveClipToDB("render_final",blob,renderName,"video/webm");
+      }catch(e){}
       setRenderUrl(url);
       if(setRendered)setRendered({url,quality,format:"WebM",timestamp:new Date().toLocaleString()});
       setProgress(100);setDone(true);
       log("RENDER COMPLETE — "+(blob.size/1024/1024).toFixed(1)+"MB");
-      // Save final render to IndexedDB — timeout-protected, never blocks completion
-      try{
-        const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
-        await Promise.race([
-          saveClipToDB("render_final",blob,renderName,"video/webm"),
-          new Promise(r=>setTimeout(r,6000))
-        ]);
-      }catch(e){}
-      try{if(audioCtx)audioCtx.close();}catch(e){}
+      audioCtx.close();
     }catch(e){log("Render error: "+e.message);}
     setRendering(false);
   };
@@ -4454,14 +3380,14 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
 
   return (
     <div style={{...Sp,padding:0}}>
-      <canvas ref={canvasRef} style={{position:"fixed",right:8,bottom:8,width:160,height:90,opacity:1,pointerEvents:"none",zIndex:9999,border:"1px solid #e8c96d",background:"#000"}}/>
+      <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"12px 24px",borderBottom:"1px solid "+GOLDDIM+"",background:"#020200",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:10,color:GOLD,letterSpacing:4,fontWeight:700}}>PRODUCTION ENGINE — STAGE 6</div>
           <h1 style={{...H1,fontSize:22,margin:0}}>RENDER FILM</h1>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
             <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>FILM: {filmDuration||60} MIN</span>
-            <input type="range" min={1} max={180} step={1} value={filmDuration||60} onChange={e=>setFilmDuration(+e.target.value)} style={{width:160,accentColor:GOLD}}/>
+            <input type="range" min={0} max={180} step={30} value={filmDuration||60} onChange={e=>setFilmDuration(+e.target.value)} style={{width:160,accentColor:GOLD}}/>
             <div style={{display:"flex",gap:4}}>
               {[60,90,180].map(m=><button key={m} onClick={()=>setFilmDuration(m)} style={{background:filmDuration===m?GOLD:"#111",border:"1px solid "+(filmDuration===m?"#000":GOLDDIM),color:filmDuration===m?"#000":WHITE,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:900,fontFamily:"'Rajdhani',sans-serif"}}>{m}m</button>)}
             </div>
@@ -4532,35 +3458,12 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             <div style={{background:"#061406",border:"1px solid #22c55e",padding:"16px 20px",marginBottom:16}}>
               <div style={{color:"#22c55e",fontWeight:900,fontSize:13,letterSpacing:2,marginBottom:12}}>RENDER COMPLETE</div>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <button onClick={()=>{
-                  try{
-                    const a=document.createElement("a");
-                    a.href=renderUrl; a.download="MandaStrong_Film_"+Date.now()+".webm"; a.rel="noopener noreferrer";
-                    document.body.appendChild(a); a.click();
-                    setTimeout(()=>{try{document.body.removeChild(a);}catch(e){}},1000);
-                    log("✓ Download started — check your device's Downloads");
-                  }catch(e){ try{window.open(renderUrl,"_blank");}catch(e2){} log("Opened film in new tab — long-press to save"); }
-                }} style={{...G("gold",false),padding:"12px 24px",fontSize:12,letterSpacing:2,cursor:"pointer"}}>⬇ DOWNLOAD FILM</button>
+                <a href={renderUrl} download="MandaStrong_Film.webm" style={{...G("gold",false),padding:"12px 24px",textDecoration:"none",display:"inline-block",fontSize:12,letterSpacing:2}}>DOWNLOAD FILM</a>
                 <button onClick={()=>go(17)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>PREVIEW</button>
                 <button onClick={()=>go(18)} style={{...G("out",false),padding:"12px 24px",fontSize:12}}>EXPORT</button>
               </div>
             </div>
           )}
-          {/* ── FILL IN THE GAPS? ─────────────────────────────────── */}
-          <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"14px 16px",marginBottom:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>FILL IN THE GAPS WITH EXTRA SCENES?</div>
-                <div style={{color:GOLDDIM,fontSize:10,marginTop:4,lineHeight:1.6}}>If your clips are shorter than {filmDuration||60} min, choose Y to generate extra scenes so the film reaches full length. Choose N to stretch the clips you have.</div>
-              </div>
-              <div style={{display:"flex",gap:6,flexShrink:0,marginLeft:12}}>
-                <button onClick={()=>setGapFill(true)}
-                  style={{background:gapFill?GOLD:"#111",border:"1px solid "+(gapFill?"#000":GOLDDIM),color:gapFill?"#000":WHITE,padding:"6px 18px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:1}}>Y</button>
-                <button onClick={()=>setGapFill(false)}
-                  style={{background:!gapFill?GOLD:"#111",border:"1px solid "+(!gapFill?"#000":GOLDDIM),color:!gapFill?"#000":WHITE,padding:"6px 18px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:1}}>N</button>
-              </div>
-            </div>
-          </div>
           <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"18px 20px",marginBottom:16}}>
             <button onClick={startRender} disabled={rendering||clips.length===0}
               style={{...G("gold",false),width:"100%",padding:"18px",fontSize:14,letterSpacing:3,opacity:rendering||clips.length===0?0.5:1,marginBottom:10}}>
@@ -4657,7 +3560,7 @@ function P17({ go, rendered, mediaLib }) {
 
 function P18({ rendered, mediaLib }) {
   const vs=rendered?.url||(mediaLib.find(a=>a.type&&a.type.startsWith("video"))?mediaLib.find(a=>a.type&&a.type.startsWith("video")).url:"");
-  const dl=()=>{if(!vs){alert("No film yet — render first!");return;}const a=document.createElement("a");a.href=vs;a.download="MandaStrong_Film.webm";a.target="_blank";a.rel="noopener noreferrer";a.click();};
+  const dl=()=>{if(!vs){alert("No film yet — render first!");return;}const a=document.createElement("a");a.href=vs;a.download="MandaStrong_Film.webm";a.click();};
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:780,margin:"0 auto"}}>
@@ -4695,100 +3598,11 @@ function TutCanvas({drawFn}){
     const ctx=cv.getContext("2d");
     const resize=()=>{const p=cv.parentElement;if(!p)return;cv.width=p.clientWidth;cv.height=Math.round(p.clientWidth*9/16);};
     resize();window.addEventListener("resize",resize);
-    // Ambient particles for depth
-    const particles=Array.from({length:40},()=>({x:Math.random(),y:Math.random(),z:Math.random()*0.6+0.2,s:Math.random()*0.7+0.3}));
-    const draw=(ts)=>{
-      if(!t0.current)t0.current=ts;
-      const sec=(ts-t0.current)/1000;
-      const loop=120;
-      const t=Math.min(1,(sec%loop)/loop);
-      const W=cv.width,H=cv.height;
-
-      // Base — Claude animation
-      try{drawFn(ctx,W,H,t,sec);}
-      catch(e){ctx.fillStyle="#050300";ctx.fillRect(0,0,W,H);}
-
-      // ── CINEMATIC POLISH LAYER — makes every tutorial feel premium ────
-
-      // Warm cinematic grade — subtle gold tint over entire frame
-      ctx.fillStyle="rgba(232,180,60,0.045)";ctx.fillRect(0,0,W,H);
-
-      // Deepen shadows for contrast
-      ctx.fillStyle="rgba(10,5,0,0.06)";ctx.fillRect(0,0,W,H);
-
-      // Highlight recovery — glow near top centre
-      const hr=ctx.createRadialGradient(W/2,H*0.3,0,W/2,H*0.3,W*0.4);
-      hr.addColorStop(0,"rgba(255,245,215,0.06)");hr.addColorStop(1,"rgba(0,0,0,0)");
-      ctx.fillStyle=hr;ctx.fillRect(0,0,W,H);
-
-      // Ambient particle depth — slow-drifting gold specks
-      particles.forEach(p=>{
-        const drift=(sec*0.008*(1-p.z))%1;
-        const x=((p.x+drift)%1)*W;
-        const y=p.y*H;
-        const size=p.s*(1-p.z)*2.2;
-        ctx.fillStyle="rgba(232,201,109,"+(0.10*(1-p.z)).toFixed(3)+")";
-        ctx.beginPath();ctx.arc(x,y,size,0,Math.PI*2);ctx.fill();
-      });
-
-      // Vignette — cinematic edge fall-off
-      const vig=ctx.createRadialGradient(W/2,H/2,W*0.18,W/2,H/2,W*0.78);
-      vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.62)");
-      ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
-
-      // Letterbox bars — 2.35:1 cinema look
-      const bar=Math.round(H*0.068);
-      ctx.fillStyle="#000";
-      ctx.fillRect(0,0,W,bar);
-      ctx.fillRect(0,H-bar,W,bar);
-
-      // Fine film grain
-      for(let g=0;g<28;g++){
-        const gv=Math.random()>0.5?160:20;
-        ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.013)";
-        ctx.fillRect(Math.random()*W,Math.random()*H,1.2,1.2);
-      }
-
-      // Chromatic aberration hint at edges (subtle warmth)
-      const edge=ctx.createLinearGradient(0,0,0,H);
-      edge.addColorStop(0,"rgba(232,180,60,0.04)");
-      edge.addColorStop(0.5,"rgba(0,0,0,0)");
-      edge.addColorStop(1,"rgba(160,80,20,0.04)");
-      ctx.fillStyle=edge;ctx.fillRect(0,0,W,H);
-
-      // Fade-in first 1.5s and fade-out last 1.5s of loop
-      const loopSec=sec%loop;
-      if(loopSec<1.5){ctx.fillStyle="rgba(0,0,0,"+(1-loopSec/1.5).toFixed(3)+")";ctx.fillRect(0,0,W,H);}
-      if(loopSec>loop-1.5){ctx.fillStyle="rgba(0,0,0,"+((loopSec-(loop-1.5))/1.5).toFixed(3)+")";ctx.fillRect(0,0,W,H);}
-
-      // Professional branding overlay — top-left studio mark
-      const brandY=bar+Math.round(H*0.045);
-      ctx.font="bold "+Math.round(H*0.022)+"px Georgia, serif";
-      ctx.textAlign="left";
-      // Gold gradient text
-      const brandGrad=ctx.createLinearGradient(bar+8,brandY-Math.round(H*0.02),bar+8,brandY);
-      brandGrad.addColorStop(0,"rgba(255,243,207,0.95)");
-      brandGrad.addColorStop(1,"rgba(160,120,32,0.95)");
-      ctx.fillStyle=brandGrad;
-      ctx.fillText("MANDASTRONG STUDIO",bar+10,brandY);
-      // Thin gold line under brand
-      ctx.strokeStyle="rgba(232,201,109,0.6)";ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(bar+10,brandY+4);ctx.lineTo(bar+10+Math.round(H*0.28),brandY+4);ctx.stroke();
-
-      // Bottom right — TUTORIAL watermark
-      ctx.font="bold "+Math.round(H*0.017)+"px Georgia, serif";
-      ctx.textAlign="right";
-      ctx.fillStyle="rgba(232,201,109,0.55)";
-      ctx.fillText("• TUTORIAL •",W-bar-10,H-bar-Math.round(H*0.025));
-
-      ctx.textAlign="left";
-
-      rafRef.current=requestAnimationFrame(draw);
-    };
+    const draw=(ts)=>{if(!t0.current)t0.current=ts;const sec=(ts-t0.current)/1000;const t=Math.min(1,(sec%120)/120);try{drawFn(ctx,cv.width,cv.height,t,sec);}catch(e){ctx.fillStyle="#111";ctx.fillRect(0,0,cv.width,cv.height);}rafRef.current=requestAnimationFrame(draw);};
     rafRef.current=requestAnimationFrame(draw);
     return()=>{window.removeEventListener("resize",resize);if(rafRef.current)cancelAnimationFrame(rafRef.current);};
   },[drawFn]);
-  return <canvas ref={cvRef} style={{width:"100%",display:"block",background:"#000",boxShadow:"0 0 60px rgba(232,201,109,0.25), inset 0 0 40px rgba(0,0,0,0.5)"}}/>;
+  return <canvas ref={cvRef} style={{width:"100%",display:"block",background:"#000"}}/>;
 }
 
 function P19({ go }) {
@@ -4816,13 +3630,11 @@ function P19({ go }) {
   const generate=async(idx)=>{
     setGenerating(idx);setActive(idx);
     const t=tuts[idx];
-    // Stop any current narration before starting a new one
-    try{window.speechSynthesis.cancel();}catch{}
     try{
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
-          messages:[{role:"user",content:"Write a highly polished JavaScript canvas animation for a professional cinema-platform tutorial about \""+t.t+"\". This is for MandaStrong Studio — the aesthetic must be premium: gold (#e8c96d) on deep black, glowing highlights, smooth eased motion using Math.sin() and clean easing curves, deep drop shadows, professional serif and sans typography. Animation should include: (1) an elegant animated LESSON "+t.n+" number card that fades in and settles, (2) the tutorial title \""+t.t+"\" appearing letter by letter with warm gold glow, (3) an animated diagram or visual metaphor that illustrates the topic conceptually — smooth transitions, layered shapes, glowing lines, not stick figures, (4) key concepts revealed one at a time with smooth fade-in, (5) subtle particle effects and ambient movement to avoid static frames. Every frame should look like a high-end motion graphics piece — think Apple keynote crossed with cinema title design. Use sec for continuous animation, t=0-1 for progress. W=canvas width, H=canvas height. Do not draw letterbox bars, watermarks, or vignettes — those are added separately. Return ONLY: function drawFrame(ctx,W,H,t,sec){"}]})
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+          messages:[{role:"user",content:"Write a JavaScript canvas animation for a tutorial about \""+t.t+"\" for MandaStrong Studio cinema platform. Gold (#e8c96d) on black. Cinematic. Show animated title LESSON "+t.n+", relevant diagram for the topic, and MANDASTRONG STUDIO bottom label. Use sec for animation, t=0-1 progress. W=canvas width, H=canvas height. Return ONLY: function drawFrame(ctx,W,H,t,sec){"}]})
       });
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
@@ -4832,9 +3644,6 @@ function P19({ go }) {
       const body=bo>=0&&bc>bo?code.slice(bo+1,bc):"";
       const fn=new Function("ctx","W","H","t","sec",body);
       setDrawFns(p=>({...p,[idx]:fn}));
-      // Blaze female voice narration for this lesson
-      const narration="Lesson "+parseInt(t.n)+". "+t.t+". "+t.d+" Pro tips. "+t.tips.join(". ")+".";
-      setTimeout(()=>{try{speakText("blaze",narration,null,null);}catch(e){}},500);
     }catch(e){console.error(e);}
     setGenerating(null);
   };
@@ -4872,18 +3681,7 @@ function P19({ go }) {
                   {isGen?(
                     <span style={{color:GOLD,fontSize:10,fontWeight:900,letterSpacing:2}}>GENERATING...</span>
                   ):(
-                    <button onClick={e=>{
-                      e.stopPropagation();
-                      if(hasFn){
-                        // PLAY AGAIN — re-narrate with Blaze
-                        try{window.speechSynthesis.cancel();}catch{}
-                        const narration="Lesson "+parseInt(t.n)+". "+t.t+". "+t.d+" Pro tips. "+t.tips.join(". ")+".";
-                        setTimeout(()=>{try{speakText("blaze",narration,null,null);}catch(e){}},300);
-                        setActive(idx);
-                      } else {
-                        generate(idx);
-                      }
-                    }}
+                    <button onClick={e=>{e.stopPropagation();generate(idx);}}
                       style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"7px 18px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",whiteSpace:"nowrap"}}>
                       {hasFn?"▶ PLAY AGAIN":"▶ GENERATE TO WATCH"}
                     </button>
@@ -4982,7 +3780,7 @@ function P20() {
             {sec("7. LIMITATION OF LIABILITY",<>{p("MandaStrong Studio is provided as-is without warranties of any kind, express or implied. To the maximum extent permitted by law, MandaStrong Studio shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount you paid in the 30 days prior to the claim.")}</>)}
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
             {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
-            {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Grok on Page 21 of the platform.")}</>)}
+            {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Claude on Page 21 of the platform.")}</>)}
 
             <div style={{background:"#050500",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginTop:8}}>
               <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO · AMANDA WOOLLEY, FOUNDER · MARCH 2026</p>
@@ -5007,7 +3805,7 @@ function P20() {
             {sec("CHANGES TO THIS DISCLAIMER",<>{p("MandaStrong Studio reserves the right to update this disclaimer at any time. Continued use of the platform following any update constitutes your acceptance of the revised terms.")}</>)}
 
             <div style={{background:"#050500",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginTop:8}}>
-              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO · MARCH 2026 · mandastrong01.bolt.host</p>
+              <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO · MARCH 2026 · mandastrongstudio2026.bolt.host</p>
             </div>
           </div>
         )}
@@ -5017,7 +3815,7 @@ function P20() {
 }
 
 function P21() {
-  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Grok — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}]);
+  const [msgs,setMsgs]=useState([{role:"assistant",content:"Welcome to MandaStrong Studio. I am Agent Claude — your 24/7 production consultant. Ask me anything about tools, workflow, pricing, or filmmaking."}]);
   const [inp2,setInp2]=useState(""); const [loading,setLoading]=useState(false);
   const bot=useRef(null);
   const QUICK=["Recommended production workflow?","How do I generate a scene?","Best audio mix for documentary?","How to export in 4K?","Subscription plans?","How does the Voice Engine work?","What genres can I render?","How do I use the Timeline?"];
@@ -5027,7 +3825,7 @@ function P21() {
     setInp2("");setLoading(true);
     setMsgs(p=>[...p,{role:"user",content:question}]);
     try{
-      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Grok, AI production assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, 54 voice characters, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial. Be specific and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
+      const d=await proxyFetch({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are Agent Claude, AI production assistant for MandaStrong Studio. Expert on all 23 pages, 600+ tools, 54 voice characters, video generator, music video studio, timeline, render engine up to 4K. Plans: Creator $20/mo, Pro $30/mo, Studio $50/mo with 7-day free trial. Be specific and direct.",messages:[...msgs.filter(m=>m.role!=="system"),{role:"user",content:question}]});
       setMsgs(p=>[...p,{role:"assistant",content:d&&d.content&&d.content[0]?d.content[0].text:"Try again."}]);
     }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Connection error. Try again."}]);}
     setLoading(false);
@@ -5043,7 +3841,7 @@ function P21() {
             <div style={{position:"absolute",bottom:-2,right:-2,width:11,height:11,background:"#22c55e",border:"2px solid #000",borderRadius:"50%"}}/>
           </div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(18px,2.5vw,28px)",fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT GROK</div>
+            <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(18px,2.5vw,28px)",fontWeight:900,letterSpacing:4,lineHeight:1}}>AGENT CLAUDE</div>
             <div style={{display:"flex",alignItems:"center",gap:10,marginTop:3}}>
               <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 5px #22c55e"}}/><span style={{color:"#22c55e",fontSize:10,fontWeight:900,letterSpacing:2}}>ONLINE 24/7</span></div>
               <span style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:700}}>YOUR AI PRODUCTION CONSULTANT</span>
@@ -5063,7 +3861,7 @@ function P21() {
             <div key={i} style={{display:"flex",gap:10,flexDirection:m.role==="user"?"row-reverse":"row"}}>
               <div style={{width:32,height:32,flexShrink:0,background:m.role==="user"?"#1a0a00":"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:m.role==="user"?GOLD:"#000",fontFamily:"'Cinzel',serif"}}>{m.role==="user"?"Y":"G"}</div>
               <div style={{flex:1,maxWidth:"82%"}}>
-                <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT GROK"}</div>
+                <div style={{color:GOLD,fontSize:9,fontWeight:900,letterSpacing:3,marginBottom:3,textAlign:m.role==="user"?"right":"left"}}>{m.role==="user"?"YOU":"AGENT CLAUDE"}</div>
                 <div style={{background:m.role==="user"?"#100800":"#0a0900",border:"1px solid "+GOLD+"33",padding:"9px 13px"}}>
                   <div style={{color:WHITE,fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{m.content}</div>
                 </div>
@@ -5133,45 +3931,21 @@ function P22() {
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
-    {t:"WELCOME — HOW TO READ THIS BOOK",c:"This is more than a how-to. It is a complete guide to making films with AI on MandaStrong Studio (mandastrong01.bolt.host) AND a plain-English education in what AI actually is, so you are never at its mercy. Read Part One to understand the machine you are working with. Read Part Two to master the studio page by page. Read Part Three for the craft — prompting, voice, story, and ethics. You do not need any technical background. Every idea here is explained the way you would explain it to a friend across a kitchen table."},
-
-    {t:"PART ONE · WHAT AI ACTUALLY IS",c:"AI does not think, feel, or know things the way you do. A large language model — the kind of AI behind most creative tools — is a very powerful pattern machine. It has read an enormous amount of human writing and images and learned which words and shapes tend to follow which. When you ask it for something, it is not looking up an answer; it is predicting, piece by piece, the most likely continuation of your request. That is why it can sound confident and still be wrong. Understanding this one fact changes how you use it: you are the director, it is the crew. It is fast and tireless and knows a thousand styles, but it has no judgement about YOUR story. That judgement is yours, and it always will be."},
-
-    {t:"PART ONE · WHY AI SOMETIMES GETS IT WRONG",c:"Because AI predicts rather than knows, it can 'hallucinate' — state something untrue with total confidence, invent a fact, or misread what you wanted. This is normal and expected, not a fault in you. The fix is always the same: be more specific, give an example, or break the task into smaller steps. If a render or a line of narration comes out wrong, it is almost never because you did something stupid — it is because the machine guessed and guessed poorly. Re-roll it, refine your wording, and move on. Treat every output as a first draft from a talented but literal-minded assistant."},
-
-    {t:"PART ONE · PROMPTING — TALKING TO THE MACHINE",c:"A prompt is simply your instruction to the AI. The single biggest skill in the whole studio is learning to prompt well, and it comes down to specificity. 'A man walking' gives the machine nothing to hold onto. 'A weathered fisherman in his sixties walking along a stormy grey beach at dawn, wind pulling at his yellow raincoat, shot from behind, cinematic, muted cold colour grade' gives it everything. Name the subject, the setting, the light, the mood, the camera angle, and the style. Show, don't summarise. When in doubt, describe it as if to someone who cannot see what is in your head — because that is exactly the situation."},
-
-    {t:"PART ONE · AI AND YOU — STAYING IN CHARGE",c:"AI is a tool, like a camera or a pen. It amplifies whoever holds it. It has no taste of its own, so your taste is the whole game. Never let a machine talk you out of a creative instinct, and never assume its confident answer is correct without checking. Keep your own copies of everything important. Understand that what you type may be processed on servers you don't control, so don't paste anything you'd be uncomfortable sharing. And remember the deeper point behind this whole studio: AI should widen the door to creativity, not replace the human standing in it. You are not being replaced. You are being equipped."},
-
-    {t:"PART TWO · GETTING STARTED",c:"Open mandastrong01.bolt.host. Log in with your credentials or start a free trial. Use the ☰ hamburger menu top left to jump to any of the 24 pages. AUTOSAVE ON is real — your work saves automatically every time you change page, generate a clip, or update your timeline. Hit 💾 SAVE PROJECT to create a named restore point you can return to from MY PROJECTS. Your plan and remaining usage are always visible from your account panel — tap the avatar top right."},
-
-    {t:"PART TWO · PAGE 1 — HOME & INSTALL",c:"The front door of mandastrong01.bolt.host. The DOWNLOAD APP button installs the studio to your device like a real app, using your browser's built-in install prompt — on iPhone and iPad use Share then Add to Home Screen, as Apple does not allow one-tap install. The whole page is built to fit any screen, phone or laptop. From here, enter the studio and begin."},
-
-    {t:"PART TWO · PAGE 4 — PLANS & USAGE CREDITS",c:"Three plans: Basic $20, Pro $30, Studio $50 — pick the one that fits how much you create. At the very bottom is PURCHASE USAGE CREDITS: a one-time top-up for extra renders and generations when you need more than your plan includes. Credits never expire. All payments run through Stripe's secure checkout — the studio never sees your card details."},
-
-    {t:"PART TWO · PAGE 5 — WRITING TOOLS & SCRIPT TO MOVIE",c:"100+ AI writing tools. Type a description into any tool and hit AI CREATE for professional results. At the top sits SCRIPT TO MOVIE — three boxes: PRODUCER (your vision, tone, casting), DESCRIBE (the film scene by scene), and PRODUCTION NOTES (shots, camera, lighting, locations). Fill them, save each to your Media Library, then hit WIRE INTO RENDER. From that moment the video generator on Page 8 uses your three boxes to drive every scene it makes. This is how your written vision becomes moving pictures."},
-
-    {t:"PART TWO · PAGE 6 — VOICE ENGINE",c:"Cinematic voices that sound human, not robotic. Filter by gender, age, and origin. Tap any voice card to hear it. Paste your narration into the text box and hit PREPARE TO SPEAK to hear it in your chosen voice with your exact speed, pitch, and mood settings. RECORD MY VOICE lets you narrate yourself; UPLOAD lets you bring in a recording. On the right, USE MY VOICE AS NARRATION turns your own recording into the film's narration, with a duration option. Hit SAVE TO MEDIA LIBRARY and the narration auto-adds to your timeline's audio track. The MUSIC VIDEO STUDIO button lives up top."},
-
-    {t:"PART TWO · PAGE 8 — VIDEO GENERATOR",c:"The heart of the studio. Upload a reference photo first and the engine builds the scene around your real image for photorealistic output. Paste your scene prompt — or let your wired Script to Movie brief drive it — pick your options, and hit GENERATE SCENE. You can add background music from the built-in library with a live preview, and toggle USE STEREO SOUND for a full stereo mix. Clips save automatically and populate your timeline's video track. Generate all your scenes, then move to the timeline."},
-
-    {t:"PART TWO · THE TIMELINE, MIX & RENDER",c:"Page 13: hit ⚡ SYNC ALL TRACKS to lay your clips and narration in order — drag to reorder. Page 15: set your audio mix so voice sits above music. Page 16: choose quality up to 4K and render — auto-enhancement (warm grade, contrast, sharpness) runs on every frame, and an emergency save fires before rendering so a crash never costs you the session. Do not close the tab while rendering. Page 17 previews the finished film; Page 18 exports and shares to YouTube, Instagram, TikTok, Facebook, X, and Vimeo."},
-
-    {t:"PART TWO · MUSIC VIDEO STUDIO",c:"Open from Page 6, top right. SONG step: enter title, artist, genre, mood, tempo; drag and drop your audio, click to upload, or hit RECORD YOUR OWN SONG; toggle USE STEREO SOUND. The DURATION slider runs freely from AUTO up to 180 minutes — at AUTO the film matches your song's length exactly; drag it up to lock a fixed length that overrides the music. STYLE step: video look, colour grade, effects. SCENE step: describe what we see. GENERATE builds a full beat-synced video. Download or save when done."},
-
-    {t:"PART TWO · PAGE 24 — CHARACTER STUDIO",c:"Build reusable characters. Drag and drop a reference photo or tap to choose one, assign a voice, and record appearance notes — hair, eyes, costume, personality, role. Save the character and reuse them across every scene so your cast stays consistent. Characters persist across sessions. From here, HOME returns to the studio and EXIT APP signs you out."},
-
-    {t:"PART THREE · THE CRAFT OF PROMPTING FOR FILM",c:"For video, think like a cinematographer. Always specify five things: subject (who or what), setting (where and when), light (dawn, neon, candlelight), motion (what moves and how), and style (film stock, colour grade, mood). Add a camera instruction — wide establishing shot, slow push-in, handheld, aerial. Contradictions confuse the machine, so keep your prompt coherent. If a scene comes out flat, add sensory and lighting detail rather than more objects. Consistency across scenes comes from reusing the same style language every time."},
-
-    {t:"PART THREE · WRITING NARRATION THAT LANDS",c:"Narration is written to be heard, not read. Short sentences. Natural breath points. Read every line aloud before you save it — if you stumble, the voice engine will too. Punctuation is your friend: a full stop is a real pause, a comma a small one. Match the voice to the story — a documentary wants warmth and authority; a thriller wants restraint. Use the PREPARE TO SPEAK button as your rehearsal room, and tune speed and pitch until it feels like a person, not a reader."},
-
-    {t:"PART THREE · STORY FIRST, ALWAYS",c:"The most photorealistic render in the world means nothing without a reason to watch. Decide what your film is really about before you generate a single frame — the feeling you want to leave behind. Use the Script to Movie PRODUCER box to write that down and keep yourself honest. AI can make anything look good; only you can make it mean something. Structure beats spectacle. A clear beginning, a turn in the middle, and an earned ending will carry a simple film further than dazzling clips with no spine."},
-
-    {t:"PART THREE · ETHICS & RESPONSIBILITY",c:"With these tools you can make almost anything, which means the responsibility is yours. Don't put real people's faces or voices into films they never agreed to. Be honest when something is AI-generated if presenting it as real could mislead. Respect others' work rather than copying a living artist's style wholesale and calling it your own. And remember MandaStrong's founding mission — these tools exist to spread kindness, understanding, and hope, with proceeds supporting veterans' mental health and anti-bullying work. Make things that would make that mission proud."},
-
-    {t:"SAVING, RECOVERING & GETTING HELP",c:"AUTOSAVE ON saves as you work. 💾 SAVE PROJECT creates a named session — name it meaningfully. 📂 MY PROJECTS shows your history; CONTINUE PROJECT restores a session including all clips. An emergency save fires if the tab closes or crashes, so work is never permanently lost. Stuck? Agent Grok on Page 21 is your 24/7 production consultant with full knowledge of every page and workflow. This guide lives on your closing page at mandastrong01.bolt.host and is updated as the studio grows."},
-
-    {t:"RECOMMENDED WORKFLOW — START TO FINISH",c:"Page 5 → fill Script to Movie's Producer, Describe, Production boxes → WIRE INTO RENDER. Page 6 → choose a voice → PREPARE TO SPEAK → SAVE TO MEDIA LIBRARY. Page 8 → upload a reference photo → generate each scene (your brief drives them) → add background music and stereo if you like. Page 13 → SYNC ALL TRACKS. Page 15 → set the mix. Page 16 → choose quality → render. Page 17 → preview. Page 18 → export and share. That is a finished film, made by you, at mandastrong01.bolt.host."},
+    {t:"GETTING STARTED",c:"Open mandastrongstudio2026.bolt.host. Log in with your credentials or start a free trial. Use the ☰ hamburger menu top left to jump to any of the 24 pages. AUTOSAVE ON is real — your work saves automatically every time you change page, generate a clip, or update your timeline. Hit 💾 SAVE PROJECT to create a named restore point you can return to from MY PROJECTS."},
+    {t:"PAGE 5 — WRITING TOOLS",c:"100+ AI writing tools. Type a description into any tool and hit AI CREATE for instant professional results. Use the search bar to find specific tools. Paste your full narration script and director instructions here using Script to Movie — the AI generates complete video prompts for every chapter. All results save to your Media Library automatically."},
+    {t:"PAGE 6 — VOICE ENGINE",c:"54 cinematic voices. Filter by gender, age, and origin. Hit TEST on any voice card to hear it. Paste your narration script into the text box. Hit PREPARE TO SPEAK to hear it aloud through your chosen voice. Hit SAVE TO MEDIA LIBRARY to save the narration — it auto-adds to the Audio Track on your timeline. No dragging needed. Blaze voice recommended for the AI For Humanity documentary. Music Video Studio button is top right on this page."},
+    {t:"PAGE 8 — VIDEO GENERATOR",c:"Upload a reference photo first — the engine builds the scene around your real photo for photorealistic output. Then paste your scene prompt and hit Generate Scene. Clips save automatically to your Media Library and auto-populate the Video Track on your timeline. The memory guard clears old clips before each render so the browser has room to work. Generate all your scenes then go to Page 13."},
+    {t:"PAGE 11 — UPLOAD MEDIA",c:"Upload your own video, audio, images, and files here. Drag and drop or click to browse. Uploaded assets auto-save to your Media Library and route to the correct timeline track automatically — video to the video track, audio to the audio track. Use the Reload Clips from Storage button to recover clips after a page refresh."},
+    {t:"PAGE 13 — TIMELINE EDITOR",c:"Hit ⚡ SYNC ALL TRACKS to auto-populate your timeline in the correct order. Your narration audio clip appears in the Audio Track automatically. Use ⬆ UPLOAD MEDIA next to CLEAR ALL to add more content at any time. Drag clips to reorder. Set your film duration — 60, 90, or 180 minutes. When satisfied hit → RENDER or navigate to Page 16."},
+    {t:"PAGE 15 — AUDIO MIXER",c:"Documentary: Voice 85 · Music 40 · Effects 50 · Master 85. Music Video: Voice 60 · Music 75 · Effects 40 · Master 85. Narrative Film: Voice 80 · Music 50 · Effects 60 · Master 85. Hit Apply Mix when done before going to Page 16."},
+    {t:"PAGE 16 — RENDER ENGINE",c:"Choose quality — 480p, 720p, 1080p, or 4K. Auto-enhancement runs automatically on every frame during render — contrast boost, warm gold colour grade, sharpness, and noise reduction — no settings needed. A priority save fires before render starts so a crash never loses your session. Do not close the browser tab while rendering. Download button appears when complete."},
+    {t:"PAGE 17 & 18 — PREVIEW & EXPORT",c:"Page 17: your completed film loads automatically from storage — press play to watch. Page 18: download to your device and share directly to YouTube, Instagram, TikTok, Facebook, X, and Vimeo using the platform buttons."},
+    {t:"PAGE 19 — TUTORIALS",c:"12 lessons covering every page and workflow. Hit Generate to Watch on any lesson — an animated tutorial plays instantly. Each lesson has Pro Tips and an Open Page button. Lesson 12 is a complete documentary production case study from script to 4K render."},
+    {t:"PAGE 21 — AGENT CLAUDE",c:"Your 24/7 AI production consultant. Ask anything about the platform, workflow, filmmaking, or your project. Type your question and hit Send. Agent Claude has full knowledge of every tool and workflow on the platform."},
+    {t:"PAGE 24 — CHARACTER STUDIO",c:"Create and save reusable characters for your films. Upload a reference photo, assign a voice from the 54-character library, add appearance notes. Hit USE IN SCENE to send the character to your Media Library ready for any scene. Characters persist across sessions."},
+    {t:"MUSIC VIDEO STUDIO",c:"Open from Page 6 top right. Step 1: Song title, artist, genre, mood, tempo — drag and drop your audio file or click to upload, or hit RECORD YOUR OWN SONG. Step 2: Video style, colour grade, effects, aspect ratio. Step 3: Describe your scene in detail. Step 4: Hit Generate Music Video. The engine builds a full beat-synced video. Download or Save to Media Library when done."},
+    {t:"SAVING & RECOVERING WORK",c:"AUTOSAVE ON saves automatically as you work. 💾 SAVE PROJECT creates a named session — give it a meaningful name. 📂 MY PROJECTS shows your full history. Hit CONTINUE PROJECT to fully restore a session including all clips from storage. Emergency save fires automatically if the browser tab closes or crashes — your work is never permanently lost."},
+    {t:"RECOMMENDED WORKFLOW",c:"Page 5 → Paste director instructions and narration script into Script to Movie. Page 6 → Select Blaze voice → PREPARE TO SPEAK → SAVE TO MEDIA LIBRARY. Page 8 → Upload reference photo → paste scene prompt → Generate → repeat for all scenes. Page 13 → SYNC ALL TRACKS. Page 15 → Set audio mix. Page 16 → Choose quality → Render. Page 17 → Preview. Page 18 → Export and share."},
   ];
   return(
     <div style={{padding:"20px 32px 40px",maxWidth:860,margin:"0 auto"}}>
@@ -5192,7 +3966,7 @@ function HowToGuide() {
   );
 }
 
-function P24CharacterStudio({ onSave, go }) {
+function P24CharacterStudio({ onSave }) {
   const [chars,setChars]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_characters")||"[]");}catch{return [];}});
   const [name,setName]=useState("");
   const [voice,setVoice]=useState("james");
@@ -5223,21 +3997,7 @@ function P24CharacterStudio({ onSave, go }) {
     if(!f)return;
     setPhotoName(f.name);
     const reader=new FileReader();
-    reader.onload=ev=>{
-      // Downscale large photos so localStorage doesn't overflow and crash
-      const img=new Image();
-      img.onload=()=>{
-        const max=900;let{width:w,height:h}=img;
-        if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
-        try{
-          const cv=document.createElement("canvas");cv.width=w;cv.height=h;
-          cv.getContext("2d").drawImage(img,0,0,w,h);
-          setPhoto(cv.toDataURL("image/jpeg",0.85));
-        }catch(err){setPhoto(ev.target.result);}
-      };
-      img.onerror=()=>setPhoto(ev.target.result);
-      img.src=ev.target.result;
-    };
+    reader.onload=ev=>setPhoto(ev.target.result);
     reader.readAsDataURL(f);
   };
 
@@ -5355,22 +4115,9 @@ function P24CharacterStudio({ onSave, go }) {
                 <button onClick={()=>{setPhoto(null);setPhotoName("");}} style={{position:"absolute",top:5,right:5,background:"#000",border:"1px solid "+GOLD,color:GOLD,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:900}}>✕</button>
               </div>
             ):(
-              <div
-                onClick={()=>fileRef.current&&fileRef.current.click()}
-                onDragOver={e=>{e.preventDefault();e.currentTarget.style.background="#2a1200";}}
-                onDragLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,#1a0800,#2a1200)";}}
-                onDrop={e=>{
-                  e.preventDefault();e.currentTarget.style.background="linear-gradient(135deg,#1a0800,#2a1200)";
-                  const f=e.dataTransfer.files&&e.dataTransfer.files[0];
-                  if(f&&f.type.startsWith("image/")){const r=new FileReader();r.onload=ev=>{setPhoto(ev.target.result);setPhotoName(f.name);};r.readAsDataURL(f);}
-                  else if(f){alert("Please drop an image file.");}
-                }}
-                style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px dashed "+GOLD,color:GOLD,padding:"18px 14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:12,textAlign:"center"}}>
-                <div>🖼 DRAG & DROP A PHOTO HERE</div>
-                <div style={{color:GOLDDIM,fontSize:9,marginTop:4,fontWeight:700}}>or tap to choose from your photos</div>
-              </div>
+              <button onClick={()=>fileRef.current&&fileRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"14px",cursor:"pointer",fontSize:12,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:12}}>📷 UPLOAD CHARACTER PHOTO</button>
             )}
-            <input ref={fileRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" style={{display:"none"}} onChange={handlePhoto}/>
+            <input ref={fileRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" capture="environment" style={{display:"none"}} onChange={handlePhoto}/>
 
             {lbl("ASSIGNED VOICE")}
             <select value={voice} onChange={e=>setVoice(e.target.value)} style={{...inp,marginBottom:14,cursor:"pointer"}}>
@@ -5427,10 +4174,6 @@ function P24CharacterStudio({ onSave, go }) {
             )}
           </div>
         </div>
-        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginTop:30,paddingBottom:20}}>
-          <button onClick={()=>go&&go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
-          <button onClick={()=>{try{localStorage.removeItem("ms_user");}catch{}window.location.reload();}} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🚪 EXIT APP</button>
-        </div>
       </div>
     </div>
   );
@@ -5439,8 +4182,6 @@ function P24CharacterStudio({ onSave, go }) {
 function P23({ go }) {
   const bgRef = useRef(null);
   const [howOpen, setHowOpen] = useState(false);
-  const [savedMsg, setSavedMsg] = useState(false);
-  const [vidNeedsTap, setVidNeedsTap] = useState(false);
   useEffect(()=>{
     const v=bgRef.current;
     if(!v)return;
@@ -5449,55 +4190,40 @@ function P23({ go }) {
     v.loop=true;
     v.playsInline=true;
     v.preload="auto";
-    try{v.load();}catch{}
-    const tryPlay=()=>{
-      const p=v.play();
-      if(p&&p.then){p.then(()=>setVidNeedsTap(false)).catch(()=>setVidNeedsTap(true));}
+    // Prevent jumping — use timeupdate to detect unexpected jumps and smooth them
+    let lastTime=0;
+    const onTimeUpdate=()=>{
+      if(v.currentTime<lastTime-1){v.currentTime=lastTime;} // prevent backward jump
+      lastTime=v.currentTime;
     };
-    // Try immediately and again once data is ready
+    const tryPlay=()=>{v.play().catch(()=>{});}; 
     tryPlay();
-    if(v.readyState>=2){tryPlay();}
-    v.addEventListener("loadeddata",tryPlay);
-    v.addEventListener("canplay",tryPlay);
-    v.addEventListener("canplaythrough",tryPlay);
     v.addEventListener("pause",tryPlay);
+    v.addEventListener("ended",tryPlay);
     v.addEventListener("stalled",tryPlay);
-    v.addEventListener("waiting",tryPlay);
+    v.addEventListener("timeupdate",onTimeUpdate);
     return()=>{
-      v.removeEventListener("loadeddata",tryPlay);
-      v.removeEventListener("canplay",tryPlay);
-      v.removeEventListener("canplaythrough",tryPlay);
       v.removeEventListener("pause",tryPlay);
+      v.removeEventListener("ended",tryPlay);
       v.removeEventListener("stalled",tryPlay);
-      v.removeEventListener("waiting",tryPlay);
+      v.removeEventListener("timeupdate",onTimeUpdate);
     };
   },[]);
-  const tapPlayVideo=()=>{const v=bgRef.current;if(!v)return;v.muted=true;v.play().then(()=>setVidNeedsTap(false)).catch(()=>{});};
   const exitApp = () => {
     try{localStorage.removeItem("ms_user");}catch{}
     window.location.reload();
   };
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
+      <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
+        onError={e=>{try{e.currentTarget.style.display="none";}catch(err){}}}
+        style={{display:"block",width:"100%",maxHeight:"42vh",objectFit:"cover",margin:"0 auto"}}>
+        <source src="/background.mp4" type="video/mp4"/>
+        <source src="background.mp4" type="video/mp4"/>
+      </video>
       <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
         <div style={{maxWidth:880,margin:"0 auto",textAlign:"center"}}>
-          <div style={{width:"100%",maxHeight:"34vh",overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",background:"#000",border:"1px solid "+GOLDDIM,marginBottom:26}}>
-            <video ref={bgRef} autoPlay loop playsInline muted preload="auto"
-              onLoadedMetadata={(e)=>{try{if(e.currentTarget.currentTime<0.1)e.currentTarget.currentTime=0.1;}catch{}}}
-              style={{display:"block",width:"100%",maxHeight:"34vh",objectFit:"cover",background:"#000"}}>
-              <source src="/background.mp4" type="video/mp4"/>
-              <source src="background.mp4" type="video/mp4"/>
-              <source src="./background.mp4" type="video/mp4"/>
-              <source src="/background_5.mp4" type="video/mp4"/>
-              <source src="background_5.mp4" type="video/mp4"/>
-              <source src="./background_5.mp4" type="video/mp4"/>
-              <source src="/thatsallfolks.mp4" type="video/mp4"/>
-            </video>
-            {vidNeedsTap&&(
-              <button onClick={tapPlayVideo} style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.45)",border:"none",color:GOLD,fontSize:16,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Cinzel',serif",display:"flex",alignItems:"center",justifyContent:"center"}}>▶ TAP TO PLAY</button>
-            )}
-          </div>
-          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM</div>
+          <div style={{fontSize:10,color:GOLD,letterSpacing:6,marginBottom:8,fontWeight:700}}>MANDASTRONG STUDIO · CINEMA INTELLIGENCE PLATFORM · 2026</div>
           <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(32px,5vw,52px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 40px "+GOLD+"99",marginBottom:28}}>THAT'S ALL FOLKS</h1>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,"+GOLD+",transparent)",marginBottom:28}}/>
           <div style={{...Card(),textAlign:"left",marginBottom:28,background:"#050500ee",border:"2px solid "+GOLD}}>
@@ -5513,146 +4239,25 @@ function P23({ go }) {
             <p style={{color:WHITE,fontSize:13,lineHeight:1.9,margin:0}}>All proceeds from <strong style={{color:GOLD}}>MandaStrong1.Etsy.com</strong> are donated directly to humanitarian causes — veterans mental health, anti-bullying programmes in schools, and children in need.</p>
           </div>
           <button onClick={()=>setHowOpen(o=>!o)} style={{width:"100%",background:howOpen?"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")":"#050500ee",border:"2px solid "+GOLD,color:howOpen?"#000":GOLD,padding:"18px 24px",cursor:"pointer",fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:900,letterSpacing:4,marginBottom:howOpen?0:28,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 0 30px "+GOLD+"44"}}>
-            <span>📖 MANDASTRONG STUDIO — THE COMPLETE GUIDE &amp; AI HANDBOOK</span>
+            <span>📖 MANDASTRONG STUDIO HOW TO USE GUIDE</span>
             <span style={{fontSize:18}}>{howOpen?"▲":"▼"}</span>
           </button>
           {howOpen&&<div style={{background:"#030200ee",border:"2px solid "+GOLD,borderTop:"none",marginBottom:28}}><HowToGuide/></div>}
           <a href="https://MandaStrong1.Etsy.com" target="_blank" rel="noreferrer" style={{display:"block",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",color:"#000",padding:"16px 24px",fontWeight:900,fontSize:14,letterSpacing:3,textDecoration:"none",marginBottom:28,fontFamily:"'Cinzel',serif"}}>📚 HUMANITY FOR FUTURE AI — MANDASTRONG1.ETSY.COM</a>
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-            <button onClick={()=>{try{localStorage.setItem("ms_last_saved",new Date().toISOString());}catch{} setSavedMsg(true); setTimeout(()=>setSavedMsg(false),2500);}} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>💾 SAVE</button>
-            <button onClick={()=>go(24)} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>NEXT →</button>
+            <button onClick={()=>go(1)} style={{...G("gold",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🏠 HOME</button>
+            <button onClick={exitApp} style={{...G("out",false),padding:"14px 40px",fontSize:13,letterSpacing:3}}>🚪 EXIT APP</button>
           </div>
-          {savedMsg&&<div style={{color:"#22c55e",fontSize:12,fontWeight:900,letterSpacing:2,marginTop:12}}>✓ PROJECT SAVED</div>}
         </div>
       </div>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-// CINEMATIC INTRO — black shiny gold doors that open to reveal the app
-// One giant M spans both doors (splits when they part). Wordmark, tagline,
-// ENTER button and URL sit in the lower area. ~6 seconds. Synthesized music.
-// ══════════════════════════════════════════════════════════════════
-function IntroDoors({ onEnter }){
-  const [phase,setPhase]=useState("closed");
-  const playChime=()=>{
-    try{
-      const ctx=new (window.AudioContext||window.webkitAudioContext)();
-      const now=ctx.currentTime;
-      const master=ctx.createGain(); master.gain.value=0.95; master.connect(ctx.destination);
-      // Deep mysterious sub-drone bed
-      const drone=ctx.createOscillator(); const dg=ctx.createGain();
-      drone.type="sine"; drone.frequency.value=41.20; // low E
-      dg.gain.setValueAtTime(0,now);
-      dg.gain.linearRampToValueAtTime(0.14,now+1.4);
-      dg.gain.exponentialRampToValueAtTime(0.001,now+6.0);
-      drone.connect(dg); dg.connect(master); drone.start(now); drone.stop(now+6.2);
-      // Second darker drone a fifth above for tension
-      const drone2=ctx.createOscillator(); const dg2=ctx.createGain();
-      drone2.type="triangle"; drone2.frequency.value=61.74; // low B
-      dg2.gain.setValueAtTime(0,now+0.3);
-      dg2.gain.linearRampToValueAtTime(0.08,now+1.8);
-      dg2.gain.exponentialRampToValueAtTime(0.001,now+5.6);
-      drone2.connect(dg2); dg2.connect(master); drone2.start(now+0.3); drone2.stop(now+5.8);
-      // Slow, minor, mysterious rising line (E minor feel)
-      const notes=[82.41,98.00,123.47,164.81,196.00]; // E2 G2 B2 E3 G3
-      notes.forEach((f,i)=>{
-        const o=ctx.createOscillator(); const g=ctx.createGain();
-        o.type="triangle"; o.frequency.value=f;
-        const t0=now+0.4+i*0.42; // slower, more deliberate
-        g.gain.setValueAtTime(0,t0);
-        g.gain.linearRampToValueAtTime(0.12,t0+0.5);
-        g.gain.exponentialRampToValueAtTime(0.001,t0+3.8);
-        o.connect(g); g.connect(master); o.start(t0); o.stop(t0+4.0);
-      });
-      // Distant high shimmer for cinematic air
-      const sh=ctx.createOscillator(); const sg=ctx.createGain();
-      sh.type="sine"; sh.frequency.value=659.25;
-      sg.gain.setValueAtTime(0,now+1.5);
-      sg.gain.linearRampToValueAtTime(0.035,now+2.6);
-      sg.gain.exponentialRampToValueAtTime(0.001,now+5.5);
-      sh.connect(sg); sg.connect(master); sh.start(now+1.5); sh.stop(now+5.6);
-      // Low resolving bell
-      const bell=ctx.createOscillator(); const bg=ctx.createGain();
-      bell.type="triangle"; bell.frequency.value=164.81;
-      bg.gain.setValueAtTime(0,now+2.6);
-      bg.gain.linearRampToValueAtTime(0.10,now+2.9);
-      bg.gain.exponentialRampToValueAtTime(0.001,now+6.0);
-      bell.connect(bg); bg.connect(master); bell.start(now+2.6); bell.stop(now+6.1);
-      setTimeout(()=>{try{ctx.close();}catch(e){}},6400);
-    }catch(e){}
-  };
-  const enter=()=>{
-    if(phase!=="closed")return;
-    playChime(); setPhase("opening");
-    setTimeout(()=>setPhase("gone"),3200);
-    setTimeout(()=>{ if(onEnter)onEnter(); },4200);
-  };
-  const opening=phase==="opening"||phase==="gone";
-  const halfM=(side)=>(
-    <svg viewBox={side==="left"?"0 0 150 200":"150 0 150 200"} width="min(46vw,340px)" height="min(50vh,440px)"
-      preserveAspectRatio={side==="left"?"xMaxYMid meet":"xMinYMid meet"}
-      style={{filter:"drop-shadow(0 0 30px rgba(232,201,109,0.5))",overflow:"visible",marginTop:"-12vh",maxWidth:"46vw"}}>
-      <defs>
-        <linearGradient id={"goldM"+side} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff6d0"/><stop offset="0.35" stopColor="#e8c96d"/>
-          <stop offset="0.7" stopColor="#a07820"/><stop offset="1" stopColor="#5a3f10"/>
-        </linearGradient>
-      </defs>
-      <text x="150" y="150" textAnchor="middle" fontFamily="Georgia,serif" fontSize="200" fontWeight="900" fill={"url(#goldM"+side+")"}>M</text>
-    </svg>
-  );
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:100000,background:"#000",overflow:"hidden",
-      opacity:phase==="gone"?0:1,transition:"opacity 1s ease",pointerEvents:phase==="gone"?"none":"auto"}}>
-      <div style={{position:"absolute",top:0,left:0,width:"50%",height:"100%",
-        background:"linear-gradient(100deg,#050505 0%,#1a1305 30%,#2a2008 45%,#0a0803 60%,#000 100%)",
-        borderRight:"1px solid "+GOLD,boxShadow:"inset -40px 0 80px rgba(0,0,0,0.9), inset 0 0 120px rgba(232,201,109,0.08)",
-        transform:opening?"perspective(1600px) rotateY(-105deg)":"perspective(1600px) rotateY(0deg)",
-        transformOrigin:"left center",transition:"transform 3s cubic-bezier(0.7,0,0.3,1)",
-        display:"flex",alignItems:"center",justifyContent:"flex-end",paddingTop:0,overflow:"hidden"}}>
-        {halfM("left")}
-      </div>
-      <div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",
-        background:"linear-gradient(260deg,#050505 0%,#1a1305 30%,#2a2008 45%,#0a0803 60%,#000 100%)",
-        borderLeft:"1px solid "+GOLD,boxShadow:"inset 40px 0 80px rgba(0,0,0,0.9), inset 0 0 120px rgba(232,201,109,0.08)",
-        transform:opening?"perspective(1600px) rotateY(105deg)":"perspective(1600px) rotateY(0deg)",
-        transformOrigin:"right center",transition:"transform 3s cubic-bezier(0.7,0,0.3,1)",
-        display:"flex",alignItems:"center",justifyContent:"flex-start",paddingTop:0,overflow:"hidden"}}>
-        {halfM("right")}
-      </div>
-      <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",
-        width:opening?"5px":"2px",height:opening?"100%":"0%",
-        background:"linear-gradient(180deg,#fff6d0,#e8c96d,#a07820)",
-        boxShadow:"0 0 30px 6px rgba(232,201,109,0.8)",
-        transition:"height 0.9s ease-out, width 0.9s ease-out",zIndex:5}}/>
-      <div style={{position:"absolute",left:0,right:0,bottom:"6%",display:"flex",flexDirection:"column",alignItems:"center",
-        zIndex:6,opacity:opening?0:1,transition:"opacity 0.7s",pointerEvents:opening?"none":"auto"}}>
-        <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,5.5vw,50px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 30px rgba(232,201,109,0.6)"}}>MANDASTRONG</div>
-        <div style={{fontFamily:"'Cinzel',serif",color:WHITE,fontSize:"clamp(11px,2vw,18px)",letterSpacing:14,marginTop:4}}>STUDIO</div>
-        <div style={{color:GOLDDIM,fontSize:"clamp(8px,1.4vw,11px)",letterSpacing:3,marginTop:12,textAlign:"center",padding:"0 16px"}}>CINEMA INTELLIGENCE PLATFORM · 600+ AI TOOLS · UP TO 3-HOUR FILMS</div>
-        <button onClick={enter}
-          style={{marginTop:22,background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",
-          padding:"16px 52px",fontSize:15,fontWeight:900,letterSpacing:4,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",
-          boxShadow:"0 0 40px rgba(232,201,109,0.6)",borderRadius:0}}>
-          ▶ ENTER
-        </button>
-        <div style={{color:GOLDDIM,fontSize:11,letterSpacing:3,marginTop:16}}>mandastrong01.bolt.host</div>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
+function AppInner() {
   const [page,setPage]=useState(1);
-  // ── CINEMATIC INTRO — gold doors open to reveal the app ──
-  const [showIntro,setShowIntro]=useState(true);
   const [menu,setMenu]=useState(false);
   useEffect(()=>{
-    // Raise the storage ceiling so large uploads don't crash — ask the browser
-    // to make storage persistent (grants a much larger quota when accepted).
-    try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist().catch(()=>{});}).catch(()=>{});}}catch(e){}
     // Fonts
     const link=document.createElement("link");
     link.rel="stylesheet";
@@ -5679,35 +4284,6 @@ export default function App() {
     // PWA install prompt capture
     const handleInstall=(e)=>{e.preventDefault();window.deferredInstallPrompt=e;};
     window.addEventListener("beforeinstallprompt",handleInstall);
-    // PWA MANIFEST — makes the DOWNLOAD APP button work as a real install
-    try{
-      const manifestData={
-        name:"MandaStrong Studio",
-        short_name:"MandaStrong",
-        description:"Cinema Intelligence Platform — 600+ AI tools, 24 pages, up to 3-hour films",
-        start_url:"/",
-        display:"standalone",
-        background_color:"#000000",
-        theme_color:"#e8c96d",
-        orientation:"any",
-        icons:[
-          {src:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#000"/><text x="96" y="130" text-anchor="middle" font-family="Georgia" font-size="120" font-weight="900" fill="#e8c96d">M</text></svg>'),sizes:"192x192",type:"image/svg+xml",purpose:"any maskable"},
-          {src:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#000"/><text x="256" y="350" text-anchor="middle" font-family="Georgia" font-size="320" font-weight="900" fill="#e8c96d">M</text></svg>'),sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}
-        ]
-      };
-      const manifestBlob=new Blob([JSON.stringify(manifestData)],{type:"application/json"});
-      const manifestUrl=URL.createObjectURL(manifestBlob);
-      let mLink=document.querySelector('link[rel="manifest"]');
-      if(!mLink){mLink=document.createElement("link");mLink.rel="manifest";document.head.appendChild(mLink);}
-      mLink.href=manifestUrl;
-      // Apple-specific PWA meta
-      const addMeta=(name,content)=>{if(!document.querySelector('meta[name="'+name+'"]')){const m=document.createElement("meta");m.name=name;m.content=content;document.head.appendChild(m);}};
-      addMeta("apple-mobile-web-app-capable","yes");
-      addMeta("apple-mobile-web-app-status-bar-style","black-translucent");
-      addMeta("apple-mobile-web-app-title","MandaStrong");
-      addMeta("mobile-web-app-capable","yes");
-      addMeta("theme-color","#e8c96d");
-    }catch(e){}
     return()=>{try{document.head.removeChild(link);}catch{} window.removeEventListener("beforeinstallprompt",handleInstall);};
   },[]);
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem("ms_user")||'{"name":"Guest","plan":"Guest","isAdmin":false}');}catch{return {name:"Guest",plan:"Guest",isAdmin:false};}});
@@ -5793,13 +4369,13 @@ export default function App() {
 
   const saveProject=()=>setShowSaveModal(true);
 
-  const doSave=(name,note,status)=>{
+  const doSave=(name,note)=>{
     try{
       localStorage.setItem("ms_page",JSON.stringify(page));
       localStorage.setItem("ms_user",JSON.stringify(user));
       localStorage.setItem("ms_timeline",JSON.stringify(timeline));
       localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));
-      const entry={name,note,page,status:status||"in_progress",assetCount:mediaLib.length,date:new Date().toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}),savedPage:page,savedTimeline:JSON.parse(JSON.stringify(timeline)),savedUser:user};
+      const entry={name,note,page,assetCount:mediaLib.length,date:new Date().toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}),savedPage:page,savedTimeline:JSON.parse(JSON.stringify(timeline)),savedUser:user};
       const existing=JSON.parse(localStorage.getItem("ms_project_history")||"[]");
       existing.push(entry);if(existing.length>20)existing.shift();
       localStorage.setItem("ms_project_history",JSON.stringify(existing));
@@ -5841,14 +4417,13 @@ export default function App() {
       case 21: return <P21/>;
       case 22: return <P22/>;
       case 23: return <P23 go={go}/>;
-      case 24: return <P24CharacterStudio onSave={saveAsset} go={go}/>;
+      case 24: return <P24CharacterStudio onSave={saveAsset}/>;
       default: return <P1 go={go}/>;
     }
   };
 
   return (
     <div style={{background:"#000",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif"}}>
-      {showIntro&&<IntroDoors onEnter={()=>setShowIntro(false)}/>}
       <Header go={go} setMenu={setMenu}/>
       {menu&&<QAMenu go={go} onClose={()=>setMenu(false)} user={user}/>}
       {showHistory&&<ProjectHistoryModal onClose={()=>setShowHistory(false)} onResume={resumeProject}/>}
@@ -5859,5 +4434,14 @@ export default function App() {
       </div>
       <Footer page={page} go={go} onSave={saveProject} onHistory={()=>setShowHistory(true)}/>
     </div>
+  );
+}
+
+// ── Outer export — wraps AppInner in the ErrorBoundary defined above ──
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner/>
+    </ErrorBoundary>
   );
 }
