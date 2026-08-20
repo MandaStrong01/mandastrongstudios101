@@ -547,7 +547,7 @@ function Footer({ page, go, onSave, onHistory }) {
   return (
     <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:400,background:"#000",borderTop:"1px solid "+GOLD+"",padding:"6px 20px 8px",display:"flex",flexDirection:"column",gap:4}}>
       <div style={{textAlign:"center"}}>
-        <span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700}}>MANDASTRONG STUDIO · PROFESSIONAL CINEMA SYNTHESIS · mandastrong-01.bolt.host</span>
+        <span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700}}>MANDASTRONG STUDIO · PROFESSIONAL CINEMA SYNTHESIS · MandaStrong1.Etsy.com</span>
         {page===1&&<span style={{color:GOLD,fontSize:11,letterSpacing:1,fontWeight:700,opacity:0.75}}> · CREATED 2025</span>}
       </div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
@@ -961,7 +961,7 @@ function MusicVideoStudio({ onClose, onSave }) {
   const audioRef = useRef(null);
   const audioInputRef = useRef(null);
 
-  const [config, setConfig]=useState(()=>{
+  const [config, setConfig] = useState(()=>{
     try{
       const saved=localStorage.getItem("ms_mvs_config");
       if(saved) return JSON.parse(saved);
@@ -1815,7 +1815,6 @@ function MusicVideoStudio({ onClose, onSave }) {
                 )}
               </div>
             )}
-
           </div>
 
           {/* Right — video player + export (only when video exists) */}
@@ -1829,7 +1828,6 @@ function MusicVideoStudio({ onClose, onSave }) {
                   onTimeUpdate={()=>setCurrentTime(videoRef.current?.currentTime||0)}
                   onLoadedMetadata={()=>{
                     const v=videoRef.current;if(!v)return;
-                    // Chrome WebM duration bug: force seek to end so browser reads real duration
                     if(v.duration===Infinity||isNaN(v.duration)||v.duration===0){
                       v.currentTime=1e10;
                       const fix=()=>{v.currentTime=0;setDuration2(v.duration||0);v.removeEventListener("timeupdate",fix);};
@@ -2002,9 +2000,6 @@ function P6Voice({ onSave, setMediaLib }) {
   const chunksRef=useRef([]); const idxRef=useRef(0); const timerRef=useRef(null);
   const [recordingMine,setRecordingMine]=useState(false); const [recTime,setRecTime]=useState(0);
   const micRef=useRef(null); const recTimerRef=useRef(null);
-  // Save your own voice AND keep the real audio in IndexedDB so it survives reload
-  // and can be baked into the film. (Previously only a blob: URL was kept, which
-  // died on refresh — that is why a recorded voice never actually played back.)
   const addMyVoice=async(file)=>{
     if(!file)return;
     const id="myvoice_"+Date.now();
@@ -2036,8 +2031,7 @@ function P6Voice({ onSave, setMediaLib }) {
     if(micRef.current&&micRef.current.state!=="inactive")micRef.current.stop();
     if(recTimerRef.current)clearInterval(recTimerRef.current);
   };
-  // Save the SELECTED own-voice recording as the film's narration — real audio,
-  // not synthetic. Lands on the timeline audio track like any other clip.
+  const delMyVoice=(id)=>{const upd=myVoices.filter(v=>v.id!==id);setMyVoices(upd);try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}};
   const saveMyVoiceAsNarration=async()=>{
     const mine=myVoices.find(v=>v.id===selVoice);
     if(!mine){alert("Pick or record your own voice first, then save it as narration.");return;}
@@ -2052,13 +2046,6 @@ function P6Voice({ onSave, setMediaLib }) {
     if(setMediaLib)setMediaLib(p=>[...p,asset]);
     setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);
   };
-  const delMyVoice=(id)=>{const upd=myVoices.filter(v=>v.id!==id);setMyVoices(upd);try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}};
-
-  // ── HIDDEN CLONE FEATURE ────────────────────────────────────────
-  // Not shown in normal UI. Turns the SELECTED own-voice recording into
-  // a cloned voice the engine can speak new text in. The clone is stored
-  // as an engine voice id on that my-voice entry; picking it later makes
-  // the engine narrate in the cloned voice.
   const [cloning,setCloning]=useState(false);
   const cloneMyVoice=async()=>{
     const mine=myVoices.find(v=>v.id===selVoice);
@@ -2066,7 +2053,6 @@ function P6Voice({ onSave, setMediaLib }) {
     if(mine.clonedVoiceId){alert("This voice is already cloned. Select it and the engine will narrate in your cloned voice.");return;}
     setCloning(true);
     try{
-      // Get the real audio for the sample, as a data URI the engine can read.
       let blob=null;
       try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)blob=st.blob;}catch(e){}
       if(!blob&&mine.url){try{blob=await (await fetch(mine.url)).blob();}catch(e){}}
@@ -2080,6 +2066,42 @@ function P6Voice({ onSave, setMediaLib }) {
       setCloning(false);
       alert("Cloned. Select this voice and the engine will narrate any text in your voice.");
     }catch(e){setCloning(false);alert("Voice clone failed — try again.");}
+  };
+  const [narrConsent,setNarrConsent]=useState(()=>{try{return localStorage.getItem("ms_narr_consent")||"";}catch{return "";}});
+  const setConsent=(v)=>{setNarrConsent(v);try{localStorage.setItem("ms_narr_consent",v);}catch{}};
+  const [cloneConsent,setCloneConsent]=useState(()=>{try{return localStorage.getItem("ms_clone_consent")||"";}catch{return "";}});
+  const setCloneOk=(v)=>{setCloneConsent(v);try{localStorage.setItem("ms_clone_consent",v);}catch{}};
+  const [narrBusy,setNarrBusy]=useState(false);
+  const engineCompleteNarration=async()=>{
+    const mine=myVoices.find(v=>v.id===selVoice);
+    if(!mine){alert("Record or pick your own voice first.");return;}
+    const script=(text||"").trim();
+    if(!script){alert("Paste your narration into YOUR NARRATION SCRIPT first.");return;}
+    setNarrBusy(true);
+    try{
+      let vid=mine.clonedVoiceId;
+      if(!vid){
+        let blob=null;
+        try{const st=await loadClipFromDB(mine.dbId||mine.id);if(st&&st.blob)blob=st.blob;}catch(e){}
+        if(!blob&&mine.url){try{blob=await (await fetch(mine.url)).blob();}catch(e){}}
+        if(!blob){setNarrBusy(false);alert("Could not find that recording's audio — try recording again.");return;}
+        const dataUri=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
+        vid=await engineCloneVoice(dataUri);
+        if(!vid){setNarrBusy(false);alert("Voice clone did not complete. Check the engine has credit, then try again.");return;}
+        const upd=myVoices.map(v=>v.id===mine.id?{...v,clonedVoiceId:vid,engineVoice:vid}:v);
+        setMyVoices(upd);
+        try{localStorage.setItem("ms_my_voices",JSON.stringify(upd.map(v=>({...v,url:undefined}))));}catch{}
+      }
+      const buf=await engineSpeak(script,{voice:vid});
+      const id="narr_myvoice_full_"+Date.now();
+      const asset={id,name:"Full Narration (my cloned voice) - "+new Date().toLocaleTimeString(),type:"audio/myvoice",dbId:id,clonedVoiceId:vid,engineVoice:vid,narrText:script,date:new Date().toISOString()};
+      if(buf){try{const b=(buf instanceof Blob)?buf:new Blob([buf],{type:"audio/mpeg"});await safeSaveClipToDB(id,b,asset.name,"audio/myvoice");}catch(e){}}
+      if(onSave)onSave(asset);
+      if(setMediaLib)setMediaLib(p=>[...p,asset]);
+      setNarrBusy(false);
+      setSavedToLib(true);setTimeout(()=>setSavedToLib(false),3000);
+      alert("Done — the engine narrated your full script in your voice and saved it to the timeline for the render.");
+    }catch(e){setNarrBusy(false);alert("Could not complete the narration — try again.");}
   };
 
   useEffect(()=>{
@@ -2098,16 +2120,12 @@ function P6Voice({ onSave, setMediaLib }) {
     const ms=search===""||v.name.toLowerCase().includes(search.toLowerCase())||v.style.toLowerCase().includes(search.toLowerCase());
     return mg&&ma&&mo&&ms;
   });
-  // A selected own-voice that has been cloned resolves to itself, so its
-  // engine voice id (the clone) flows into speakNow's meta.voice and the
-  // engine narrates in the cloned voice.
   const mineSel=myVoices.find(v=>v.id===selVoice&&v.clonedVoiceId);
   const selected=mineSel||VOICE_CHARACTERS.find(v=>v.id===selVoice)||VOICE_CHARACTERS[0];
 
   const pickSysVoice=(vc)=>{
     const allRaw=sysVoices.length?sysVoices:((typeof window!=="undefined"&&window.speechSynthesis)?window.speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en")):[]);
     if(!allRaw.length)return null;
-    // ── QUALITY FIRST — use Enhanced/Premium/Siri/Neural voices when present ──
     const isHiQ=(v)=>/premium|enhanced|siri|neural|natural|online|multilingual/i.test((v.name||"")+" "+(v.voiceURI||""));
     const hiQ=allRaw.filter(isHiQ);
     const all=hiQ.length?hiQ:allRaw;
@@ -2139,7 +2157,6 @@ function P6Voice({ onSave, setMediaLib }) {
 
   const speakDevice=(txt)=>{
     window.speechSynthesis.cancel();if(timerRef.current)clearTimeout(timerRef.current);
-    // iOS Safari fix — keepalive ping every 10s
     if(/iphone|ipad|ipod/i.test(navigator.userAgent)){
       const keepAlive=setInterval(()=>{if(window.speechSynthesis.speaking){window.speechSynthesis.pause();window.speechSynthesis.resume();}else{clearInterval(keepAlive);}},9000);
     }
@@ -2163,7 +2180,6 @@ function P6Voice({ onSave, setMediaLib }) {
     if(typeof window==="undefined"||!window.speechSynthesis){setTimeout(next,50);} else { window.speechSynthesis.getVoices().length>0?setTimeout(next,50):window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;setTimeout(next,50);}; }
   };
 
-  // Engine voice first. Identical on every device. Device voice only if the engine cannot deliver.
   const speakNow=async(txt)=>{
     window.speechSynthesis.cancel(); stopEngineAudio();
     if(timerRef.current)clearTimeout(timerRef.current);
@@ -2229,14 +2245,27 @@ function P6Voice({ onSave, setMediaLib }) {
               <button onClick={startMyRecording} style={{width:"100%",background:"linear-gradient(135deg,#7a0000,#ef4444)",border:"none",color:"#fff",padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>● RECORD MY VOICE NOW</button>
             )}
             <button onClick={()=>myVoiceInputRef.current&&myVoiceInputRef.current.click()} style={{width:"100%",background:"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"10px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>＋ ADD YOUR OWN VOICE (FILE)</button>
-            {myVoices.some(v=>v.id===selVoice)&&(
-              <button onClick={saveMyVoiceAsNarration} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>🎙 USE MY VOICE AS NARRATION</button>
-            )}
+            {myVoices.some(v=>v.id===selVoice)&&(<>
+              <div style={{color:GOLDDIM,fontSize:10,lineHeight:1.5,marginBottom:6,letterSpacing:0.5}}>Record just the FIRST PARAGRAPH in your own voice — the engine clones your voice and reads the rest of the narration to the end in YOUR voice, wired into the generator and render.</div>
+              <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:4}}>ALLOW ENGINE TO CLONE VOICE?</div>
+              <div style={{display:"flex",gap:6,marginBottom:8}}>
+                <button onClick={()=>setCloneOk("yes")} style={{flex:1,background:cloneConsent==="yes"?GOLD:"#000",border:"2px solid "+GOLD,color:cloneConsent==="yes"?"#000":GOLD,padding:"7px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>YES</button>
+                <button onClick={()=>setCloneOk("no")} style={{flex:1,background:cloneConsent==="no"?"#7a0000":"#000",border:"2px solid #7a0000",color:cloneConsent==="no"?"#fff":"#ef4444",padding:"7px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>NO</button>
+              </div>
+              <div style={{color:GOLD,fontSize:10,letterSpacing:2,fontWeight:900,marginBottom:4}}>USE MY VOICE AS NARRATOR?</div>
+              <div style={{display:"flex",gap:6,marginBottom:8}}>
+                <button onClick={()=>setConsent("yes")} style={{flex:1,background:narrConsent==="yes"?GOLD:"#000",border:"2px solid "+GOLD,color:narrConsent==="yes"?"#000":GOLD,padding:"7px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>YES</button>
+                <button onClick={()=>setConsent("no")} style={{flex:1,background:narrConsent==="no"?"#7a0000":"#000",border:"2px solid #7a0000",color:narrConsent==="no"?"#fff":"#ef4444",padding:"7px",cursor:"pointer",fontSize:10,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif"}}>NO</button>
+              </div>
+              {narrConsent==="yes"&&(<>
+                <button onClick={saveMyVoiceAsNarration} style={{width:"100%",background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"11px",cursor:"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>🎙 USE MY VOICE AS NARRATION</button>
+                <button onClick={engineCompleteNarration} disabled={narrBusy} style={{width:"100%",background:narrBusy?"#1a0800":"linear-gradient(135deg,#1a0800,#2a1200)",border:"2px solid "+GOLD,color:GOLD,padding:"11px",cursor:narrBusy?"wait":"pointer",fontSize:11,fontWeight:900,letterSpacing:2,fontFamily:"'Rajdhani',sans-serif",marginBottom:6}}>{narrBusy?"⟳ CLONING & COMPLETING…":"🎧 USE ENGINE TO COMPLETE FULL NARRATION"}</button>
+              </>)}
+            </>)}
             {myVoices.map(v=>(
               <div key={v.id} onClick={()=>setSelVoice(v.id)} style={{padding:"10px 12px",marginBottom:4,background:selVoice===v.id?"#0a0800":"#000",border:"2px solid "+(selVoice===v.id?GOLD:GOLDDIM),cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    {/* Hidden clone trigger: double-click the emoji of a selected own-voice to clone it. */}
                     <span style={{fontSize:18,cursor:selVoice===v.id?"pointer":"inherit"}} title="" onDoubleClick={e=>{e.stopPropagation();if(selVoice===v.id&&!cloning){setSelVoice(v.id);cloneMyVoice();}}}>{v.emoji}</span>
                     <div><div style={{color:selVoice===v.id?GOLD:WHITE,fontSize:13,fontWeight:900}}>{v.name}{v.clonedVoiceId&&<span style={{color:GOLD,fontSize:10,marginLeft:6}}>✦ CLONED</span>}</div><div style={{color:GOLDDIM,fontSize:10}}>{v.clonedVoiceId?"Your cloned voice — engine narrates in your voice":"Your uploaded voice"}</div></div>
                   </div>
@@ -2346,7 +2375,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
   const [log,setLog]=useState([]);
   const [videoUrl,setVideoUrl]=useState("");
   const [saved,setSaved]=useState(false);
-  // ── BACKGROUND MUSIC ──────────────────────────────────────────
   const [addMusic,setAddMusic]=useState(false);
   const [musicTrack,setMusicTrack]=useState("");
   const [genStereo,setGenStereo]=useState(true);
@@ -2422,31 +2450,12 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     reader.readAsDataURL(f);
   };
 
-  // ══════════════════════════════════════════════════════════════════
-  // MANDASTRONG ENGINE v2 — CINEMA-GRADE RENDERER
-  // Real depth, real volumetric lighting, real atmosphere, real motion
-  // ══════════════════════════════════════════════════════════════════
-  // ══════════════════════════════════════════════════════════════════
-  // MANDASTRONG ENGINE — AI writes a custom drawFrame() per prompt
-  // Every scene is unique. What you describe is exactly what renders.
-  // ══════════════════════════════════════════════════════════════════
   const generateVideo=async()=>{
     if(!prompt.trim()){alert("Describe your scene first");return;}
     setGenerating(true);setProgress(0);setLog([]);setVideoUrl("");setSaved(false);
-
-    // ── PRIORITY SAVE — runs before anything else ──────────────────────────────
-    // Saves page/timeline/mediaLib to localStorage immediately so if the tab
-    // crashes mid-render, the session is already written and can be resumed.
     try{
       localStorage.setItem("ms_page",JSON.stringify(8));
-      const existingTimeline=localStorage.getItem("ms_timeline")||"{}";
-      const existingMedia=localStorage.getItem("ms_medialib")||"[]";
-      // These are already up to date from auto-persist — just verify they're written
-      if(!existingTimeline||existingTimeline==="{}")localStorage.setItem("ms_timeline","{}");
-      if(!existingMedia||existingMedia==="[]")localStorage.setItem("ms_medialib","[]");
     }catch(e){}
-    // ── PRE-GENERATION STORAGE CHECK — safe, never touches source clips ──
-    // Only clears old rendered films from IndexedDB.
     try{
       const clips=await getAllClipsFromDB();
       const oldRenders=clips.filter(c=>String(c.id).includes("render_final_old"));
@@ -2454,17 +2463,9 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     }catch(e){}
     addLog("MandaStrong Cinema Engine — reading your scene...");
     setProgress(5);
-
-    // ══════════════════════════════════════════════════════════════════
-    // MANDASTRONG CINEMA ENGINE — REAL PHOTOREALISTIC VIDEO
-    // Sends the scene to the Cinema Engine and returns real footage.
-    // Falls back to the built-in renderer if the engine is unavailable.
-    // ══════════════════════════════════════════════════════════════════
     try{
       addLog("Cinema Engine — synthesising photorealistic footage...");
       setProgress(12);
-      // ── SCRIPT-TO-MOVIE BRIEF ── Page 5's Producer/Describe/Production
-      // notes, if the user wired them into the render, drive every scene.
       let effectivePrompt=prompt.trim();
       if(useBrief){
         try{
@@ -2506,7 +2507,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
       addLog("Cinema Engine offline — using built-in renderer");
     }
 
-    // LOAD REFERENCE PHOTOS if user uploaded any
     let loadedRefImages=[];
     if(refImages.length>0){
       addLog("Loading "+refImages.length+" reference photo(s) for photorealistic base...");
@@ -2525,7 +2525,6 @@ function P8VideoGenerator({ onSave, user, filmDuration, setFilmDuration }) {
     const styleId=renderStyle||"photorealistic";
     const bt=String.fromCharCode(96);
 
-    // ── STEP 1: Ask Claude to write a custom drawFrame for this exact scene ──
     let drawFnBody="";
     try{
       addLog("MandaStrong Engine — asking AI to compose your scene...");
@@ -2573,9 +2572,7 @@ Write the drawFrame body now.`}]
       clearTimeout(composeTimeout);
       const d=await res.json();
       let code=d.content&&d.content[0]?d.content[0].text.trim():"";
-      // Strip markdown fences if present
       code=code.split(bt+bt+bt+"javascript").join("").split(bt+bt+bt+"js").join("").split(bt+bt+bt).join("").trim();
-      // Strip function wrapper if Claude included it
       if(code.startsWith("function drawFrame")){
         const bo=code.indexOf("{");const bc=code.lastIndexOf("}");
         if(bo>=0&&bc>bo)code=code.slice(bo+1,bc);
@@ -2585,7 +2582,6 @@ Write the drawFrame body now.`}]
       setProgress(28);
     }catch(e){
       addLog("Scene compose error: "+e.message+" — using fallback renderer");
-      // Fallback: atmospheric dark scene
       drawFnBody=`
         const sky=ctx.createLinearGradient(0,0,0,H);
         sky.addColorStop(0,"#020108");sky.addColorStop(0.6,"#0a0520");sky.addColorStop(1,"#050210");
@@ -2598,20 +2594,16 @@ Write the drawFrame body now.`}]
       `;
     }
 
-    // ── STEP 2: Set up canvas + MediaRecorder ──
     const canvas=canvasRef.current;
     if(!canvas){setGenerating(false);addLog("Canvas error");return;}
     canvas.width=1280;canvas.height=720;
     const ctx=canvas.getContext("2d");
 
-    // Build the drawFrame function — wraps AI code + photo base layer
     let drawFrame;
     try{
       if(loadedRefImages.length>0){
-        // Photo mode: draw photo base first, then AI atmospheric overlay
         const mainImg=loadedRefImages[0];
         drawFrame=new Function("ctx","W","H","t","sec","loadedRefImages",`
-          // Photo base — Ken Burns push-in
           const pushIn=1+t*0.05;
           const driftX=Math.sin(sec*0.08)*6;
           const driftY=Math.cos(sec*0.06)*3;
@@ -2623,7 +2615,6 @@ Write the drawFrame body now.`}]
             if(ar>targetAR){dh=H*pushIn;dw=dh*ar;}else{dw=W*pushIn;dh=dw/ar;}
             ctx.drawImage(img,(W-dw)/2+driftX,(H-dh)/2+driftY,dw,dh);
           }
-          // Additional photos as foreground layers
           loadedRefImages.slice(1).forEach((ri,li)=>{
             if(!ri||!ri.img)return;
             const lw=W*0.38;const lh=lw*(ri.h/ri.w);
@@ -2631,11 +2622,9 @@ Write the drawFrame body now.`}]
             const ly=H*0.5+Math.cos(sec*0.3+li)*3;
             ctx.globalAlpha=0.85;ctx.drawImage(ri.img,lx-lw/2,ly-lh/2,lw,lh);ctx.globalAlpha=1;
           });
-          // AI atmospheric overlay
           ${drawFnBody}
         `);
       }else{
-        // No photos — full AI scene
         drawFrame=new Function("ctx","W","H","t","sec","loadedRefImages",drawFnBody);
       }
     }catch(e){
@@ -2643,16 +2632,13 @@ Write the drawFrame body now.`}]
       setGenerating(false);return;
     }
 
-    // Test render frame 0
     try{drawFrame(ctx,1280,720,0,0,loadedRefImages);}catch(e){addLog("Frame test warning: "+e.message);}
     await new Promise(r=>setTimeout(r,100));
     setProgress(32);
 
-    // ── STEP 3: Render all frames ──
     const fps=20;const totalFrames=duration*fps;
     const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
     const stream=canvas.captureStream(fps);
-    // ── BACKGROUND MUSIC — mix chosen track under the render ──
     let musicCtx=null, musicSource=null;
     if(addMusic&&musicTrack){
       try{
@@ -2700,17 +2686,14 @@ Write the drawFrame body now.`}]
         const t=frame/totalFrames;const sec=frame/fps;
         ctx.clearRect(0,0,1280,720);
         try{drawFrame(ctx,1280,720,t,sec,loadedRefImages);}catch(e){ctx.fillStyle="#050200";ctx.fillRect(0,0,1280,720);}
-        // Consistent post-processing on every frame
         const vig=ctx.createRadialGradient(640,360,80,640,360,650);
         vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.8)");
         ctx.fillStyle=vig;ctx.fillRect(0,0,1280,720);
-        // ── AUTO-ENHANCEMENT — warm gold grade + contrast + highlight recovery ──
         ctx.fillStyle="rgba(232,180,60,0.06)";ctx.fillRect(0,0,1280,720);
         ctx.fillStyle="rgba(0,0,0,0.08)";ctx.fillRect(0,0,1280,720);
         const hr2=ctx.createRadialGradient(640,216,0,640,216,512);
         hr2.addColorStop(0,"rgba(255,255,240,0.04)");hr2.addColorStop(1,"rgba(0,0,0,0)");
         ctx.fillStyle=hr2;ctx.fillRect(0,0,1280,720);
-        // ──────────────────────────────────────────────────────────────────────
         ctx.fillStyle="#000";ctx.fillRect(0,0,1280,50);ctx.fillRect(0,670,1280,50);
         for(let g=0;g<20;g++){const gv=Math.random()>0.5?160:20;ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.008)";ctx.fillRect(Math.random()*1280,Math.random()*720,1.2,1.2);}
         if(t<0.05){ctx.fillStyle="rgba(0,0,0,"+(1-t/0.05)+")";ctx.fillRect(0,0,1280,720);}
@@ -2725,12 +2708,9 @@ Write the drawFrame body now.`}]
 
     setProgress(97);
     addLog("Encoding...");
-    // Wait for the recorder to actually finish flushing its data before building the blob.
-    // A fixed delay can fire before the final chunk arrives on slower machines, which hangs at 97%.
     await new Promise(resolve=>{
       let done=false;
       const finish=()=>{ if(!done){done=true;resolve(null);} };
-      // Arm the escape hatch FIRST — guaranteed exit even if stop() throws
       setTimeout(finish,4000);
       try{
         recorder.onstop=finish;
@@ -2745,7 +2725,6 @@ Write the drawFrame body now.`}]
     setVideoUrl(url);
     setProgress(100);
     addLog("\u2713 MANDASTRONG ENGINE COMPLETE — "+duration+"s cinema-grade video ready");
-    // AUTO-SAVE the finished clip — timeout-protected so it can never stall the render
     try{
       const autoId="scene_"+Date.now();
       const autoName=(title||"Scene")+"_"+duration+"s.webm";
@@ -2760,7 +2739,6 @@ Write the drawFrame body now.`}]
         addLog("\u2713 Auto-saved to library");
       }
     }catch(e){addLog("Auto-save note: "+e.message);}
-    // Track this clip toward the target film length, then check the gap
     try{
       const newTotal=madeSeconds+duration;
       setMadeClips(p=>[...p,{id:Date.now(),duration}]);
@@ -2970,7 +2948,6 @@ Write the drawFrame body now.`}]
             </div>
             <input type="range" min={5} max={300} value={duration} onChange={e=>setDuration(+e.target.value)} style={{width:"100%",accentColor:GOLD}}/>
           </div>
-          {/* ── ADD BACKGROUND MUSIC? ─────────────────────────────── */}
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:14,marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{color:GOLD,fontSize:11,fontWeight:900,letterSpacing:2}}>ADD BACKGROUND MUSIC?</span>
@@ -2998,12 +2975,10 @@ Write the drawFrame body now.`}]
               </div>
             )}
           </div>
-          {/* ── USE STEREO SOUND ─────────────────────────────────── */}
           <div onClick={()=>setGenStereo(s=>!s)} style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 14px",background:"#0a0a0a",border:"1px solid "+(genStereo?GOLD:GOLDDIM),cursor:"pointer"}}>
             <div style={{width:20,height:20,borderRadius:4,border:"2px solid "+(genStereo?GOLD:GOLDDIM),background:genStereo?GOLD:"transparent",color:"#000",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{genStereo?"✓":""}</div>
             <div><div style={{color:genStereo?GOLD:WHITE,fontWeight:900,fontSize:12,letterSpacing:1}}>🔊 USE STEREO SOUND</div><div style={{color:GOLDDIM,fontSize:10,marginTop:1}}>Full stereo width baked into the generated video's audio</div></div>
           </div>
-          {/* ── SCRIPT-TO-MOVIE BRIEF (from Page 5) ──────────────── */}
           {hasBrief&&(
             <div onClick={()=>setUseBrief(b=>!b)} style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 14px",background:"#0a0a0a",border:"1px solid "+(useBrief?GOLD:GOLDDIM),cursor:"pointer"}}>
               <div style={{width:20,height:20,borderRadius:4,border:"2px solid "+(useBrief?GOLD:GOLDDIM),background:useBrief?GOLD:"transparent",color:"#000",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{useBrief?"✓":""}</div>
@@ -3081,6 +3056,7 @@ Write the drawFrame body now.`}]
     </div>
   );
 }
+
 function P1({ go }) {
   return (
     <div style={{...Sp}}>
@@ -3113,27 +3089,23 @@ function P1({ go }) {
       <div style={{textAlign:"center",paddingBottom:24,paddingTop:16}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
           <button onClick={async()=>{
-            const ua = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua) || (/(macintosh)/.test(ua) && navigator.maxTouchPoints>1);
-            const isAndroid = /android/.test(ua);
-            const isStandalone = (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
-            if(isStandalone){
-              alert("✓ MandaStrong Studio is already installed on this device.\n\nYou're using the installed app right now. Look for the gold M icon on your home screen to open it any time.");
-              return;
-            }
+            const isStandalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
+            if(isStandalone){alert("MandaStrong Studio is already installed.");return;}
             if(window.deferredInstallPrompt){
               try{
                 window.deferredInstallPrompt.prompt();
-                const choice=await window.deferredInstallPrompt.userChoice;
+                const c=await window.deferredInstallPrompt.userChoice;
                 window.deferredInstallPrompt=null;
-                if(choice&&choice.outcome==="accepted") alert("✓ Installing MandaStrong Studio to your home screen. Look for the gold M icon.");
-              }catch(e){ alert("To install: use your browser menu → 'Add to Home Screen' or 'Install App'."); }
-            } else if(isIOS){
-              alert("Install MandaStrong Studio on iPhone/iPad:\n\n1. Tap the Share button ⬆ (Safari, at the bottom or top)\n2. Scroll down and tap 'Add to Home Screen'\n3. Tap 'Add'\n\nThe gold M icon will appear on your home screen and open full screen.\n\n(Note: on iPhone/iPad this only works in the Safari browser, not Chrome.)");
-            } else if(isAndroid){
-              alert("Install MandaStrong Studio on Android:\n\n1. Tap the menu ⋮ in Chrome (top right)\n2. Tap 'Add to Home screen' or 'Install app'\n3. Tap Install\n\nThe gold M icon will appear on your home screen and open full screen.");
-            } else {
-              alert("Install MandaStrong Studio on Desktop:\n\n1. Look for the install icon ⊕ in your browser's address bar (right side)\n2. Click it and select Install\n\nOr open your browser menu and choose 'Install MandaStrong Studio'.\nChrome or Edge give the best result.");
+                if(c&&c.outcome==="accepted"){alert("✓ Installing MandaStrong Studio — look for the gold M icon.");return;}
+              }catch(e){}
+            }
+            const ua=navigator.userAgent.toLowerCase();
+            if(/iphone|ipad|ipod/.test(ua)||(/macintosh/.test(ua)&&navigator.maxTouchPoints>1)){
+              alert("To install on iPhone/iPad:\n1. Tap Share ⬆ in Safari\n2. Add to Home Screen\n3. Add");
+            }else if(/android/.test(ua)){
+              alert("To install:\n1. Tap menu ⋮ in Chrome\n2. Install app / Add to Home screen");
+            }else{
+              alert("To install: click the install icon ⊕ in your browser's address bar.");
             }
           }} style={{background:"linear-gradient(135deg,"+GOLDDIM+","+GOLD+")",border:"none",color:"#000",padding:"14px 32px",fontSize:14,fontWeight:900,letterSpacing:3,cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",width:"100%",maxWidth:320}}>
             ⬇ DOWNLOAD APP
@@ -3201,7 +3173,6 @@ function P3() {
   const refs = [useRef(null),useRef(null),useRef(null)];
   const videoRefs = [useRef(null),useRef(null),useRef(null)];
 
-  // Load saved proof-of-concept films from permanent storage on mount
   useEffect(()=>{
     let alive=true;
     (async()=>{
@@ -3232,7 +3203,6 @@ function P3() {
     if(!f)return;
     const url=URL.createObjectURL(f);
     setUploads(p=>{const n=[...p];if(n[i])URL.revokeObjectURL(n[i].url);n[i]={url,name:f.name,type:f.type,size:(f.size/1024/1024).toFixed(1)};return n;});
-    // Persist the actual file to IndexedDB so it stays forever
     try{await saveClipToDB("poc_"+i,f,f.name,f.type);}catch(err){alert("Could not save film "+(i+1)+" — storage may be full.");}
   };
   const removeUpload=async(i)=>{
@@ -3256,8 +3226,6 @@ function P3() {
           {[0,1,2].map(i=>(
             <div key={i} style={{...Card(),padding:16}}>
               <div style={{color:GOLD,fontSize:10,letterSpacing:3,fontWeight:900,marginBottom:10}}>FILM {i+1}</div>
-
-              {/* Video/Image preview area */}
               <div style={{background:"#000",aspectRatio:"16/9",marginBottom:10,border:"1px solid "+(uploads[i]?GOLD:GOLDDIM),overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}
                 onClick={()=>!uploads[i]&&refs[i].current&&refs[i].current.click()}>
                 {uploads[i]?(
@@ -3280,20 +3248,13 @@ function P3() {
                   </button>
                 )}
               </div>
-
               <input ref={refs[i]} type="file" accept="video/*,image/*" style={{display:"none"}} onChange={e=>handleFile(i,e)}/>
-
-              {/* Title */}
               <div style={{color:GOLD,fontSize:9,letterSpacing:2,fontWeight:900,marginBottom:4}}>FILM TITLE</div>
               <input value={titles[i]} onChange={e=>setTitles(p=>{const n=[...p];n[i]=e.target.value;saveTitles(n);return n;})}
                 placeholder="Enter film title..." style={{...inp,marginBottom:8}}/>
-
-              {/* Description */}
               <div style={{color:GOLD,fontSize:9,letterSpacing:2,fontWeight:900,marginBottom:4}}>DESCRIPTION</div>
               <textarea value={descs[i]} onChange={e=>setDescs(p=>{const n=[...p];n[i]=e.target.value;saveDescs(n);return n;})}
                 placeholder="Describe this film..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:10}}/>
-
-              {/* Upload button */}
               {!uploads[i]?(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                   <button onClick={()=>{const inp2=document.createElement("input");inp2.type="file";inp2.accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif";inp2.onchange=e=>handleFile(i,e);inp2.click();}}
@@ -3323,8 +3284,6 @@ function P3() {
             </div>
           ))}
         </div>
-
-        {/* If nothing uploaded yet */}
         {uploads.every(u=>!u)&&(
           <div style={{marginTop:32,padding:24,border:"1px dashed "+GOLDDIM,textAlign:"center"}}>
             <div style={{color:GOLDDIM,fontSize:12,letterSpacing:2,lineHeight:2}}>
@@ -3337,6 +3296,7 @@ function P3() {
     </div>
   );
 }
+
 function P4({ go, setUser }) {
   const [email,setEmail]=useState(""); const [pass,setPass]=useState("");
   const [name,setName]=useState(""); const [re,setRe]=useState("");
@@ -3358,7 +3318,6 @@ function P4({ go, setUser }) {
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:1000,margin:"0 auto"}}>
-        {/* Live subscriber counter — green live light, auto-updates */}
         <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
           <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 48px",textAlign:"center",boxShadow:"0 0 24px "+GOLD+"33",position:"relative"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:4}}>
@@ -3418,8 +3377,6 @@ function P4({ go, setUser }) {
             </div>
           ))}
         </div>
-
-        {/* ── PURCHASE USAGE CREDITS ── one-time top-up at the bottom of the page ── */}
         <div style={{marginTop:40,padding:"28px 24px",background:"#050500",border:"2px solid "+GOLD,textAlign:"center",boxShadow:"0 0 24px "+GOLD+"22"}}>
           <div style={{fontSize:11,color:GOLD,letterSpacing:4,fontWeight:900,marginBottom:6}}>NEED MORE USAGE?</div>
           <h3 style={{...H1,fontSize:20,marginBottom:8}}>PURCHASE USAGE CREDITS</h3>
@@ -3430,6 +3387,7 @@ function P4({ go, setUser }) {
     </div>
   );
 }
+
 function MergeVideos({ onSave }) {
   const [clips, setClips] = useState([]);
   const [merging, setMerging] = useState(false);
@@ -3505,11 +3463,9 @@ function MergeVideos({ onSave }) {
                 try {
                   ctx.clearRect(0,0,1920,1080);
                   ctx.drawImage(vid,0,0,1920,1080);
-                  // Vignette
                   const vig = ctx.createRadialGradient(960,540,100,960,540,1000);
                   vig.addColorStop(0,"rgba(0,0,0,0)"); vig.addColorStop(1,"rgba(0,0,0,0.7)");
                   ctx.fillStyle=vig; ctx.fillRect(0,0,1920,1080);
-                  // Letterbox
                   ctx.fillStyle="#000";
                   ctx.fillRect(0,0,1920,78); ctx.fillRect(0,1002,1920,78);
                   lastDraw = now;
@@ -3524,7 +3480,6 @@ function MergeVideos({ onSave }) {
           vid.load();
         });
 
-        // Brief black gap between clips
         if(ci < clips.length-1) {
           const gapFrames = fps * 0.5;
           const gapStart = performance.now();
@@ -3630,13 +3585,11 @@ function P11({ mediaLib, setMediaLib }) {
     const arr=Array.from(files);
     const added=[];
     for(const f of arr){
-      // Large files: warn but still allow — IndexedDB handles big blobs fine
-      if(f.size>1024*1024*1024){ // >1GB
+      if(f.size>1024*1024*1024){
         alert('"'+f.name+'" is very large ('+(f.size/1024/1024/1024).toFixed(1)+"GB). It may load slowly. For smoothest results keep single files under 1GB.");
       }
       const id=Date.now()+Math.random();
       const asset={id,name:f.name,type:f.type,file:f,url:URL.createObjectURL(f),dbId:"upload_"+id};
-      // Persist to IndexedDB so it survives refresh and doesn't rely on holding the File in memory
       try{await safeSaveClipToDB("upload_"+id,f,f.name,f.type);}catch(err){console.warn("upload persist failed",err);}
       added.push(asset);
     }
@@ -3726,6 +3679,7 @@ function P12({ go, mediaLib }) {
     </div>
   );
 }
+
 function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmDuration }) {
   const [tracks,setTracks]=useState(["VIDEO TRACK","AUDIO TRACK","TEXT / TITLES"]);
   const addToTrack=(idx,asset)=>setTimeline(p=>({...p,[idx]:[...(p[idx]||[]),asset]}));
@@ -3746,8 +3700,6 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setTracks(p=>[...p,"TRACK "+p.length+1])} style={{...G("out",true)}}>+ ADD TRACK</button>
           <button onClick={()=>{
-            // Auto-populate tracks from media library and sync — sorted in correct order
-            // Sort by leading number in name (Scene 1, Scene 2, etc.), then by name, then by id/timestamp
             const sortClips=(clips)=>{
               return clips.slice().sort((a,b)=>{
                 const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
@@ -3760,7 +3712,6 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
             };
             const videoAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("video")||(a.type.includes("webm")&&!a.type.startsWith("audio")))));
             const audioAssets=sortClips(mediaLib.filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration")));
-            // Assign sequential start times so clips play in order
             let vTime=0;
             const videoTrack=videoAssets.map((a,i)=>{const startTime=vTime;vTime+=(a.duration||5);return {...a,startTime,order:i,syncGroup:"master",synced:true};});
             let aTime=0;
@@ -3769,9 +3720,8 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
             if(videoTrack.length>0)newTl[0]=videoTrack;
             if(audioTrack.length>0)newTl[1]=audioTrack;
             setTimeline(newTl);
-            // ── DURATION GAP CHECK — works across the whole slider, any length ──
             const targetSec=(filmDuration||60)*60;
-            const filledSec=vTime; // total seconds of laid video clips
+            const filledSec=vTime;
             const gapSec=targetSec-filledSec;
             const fmt=(s)=>{const m=Math.floor(s/60),ss=Math.round(s%60);return m+"m"+(ss?" "+ss+"s":"");};
             if(gapSec>30){
@@ -3814,7 +3764,6 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
               const fromTrack=e.dataTransfer.getData("trackIdx");
               const fromClip=e.dataTransfer.getData("clipIdx");
               if(fromTrack!==""&&fromClip!==""){
-                // Move clip between tracks
                 const ft=Number(fromTrack);const fc=Number(fromClip);
                 if(ft===idx)return;
                 setTimeline(p=>{
@@ -3823,7 +3772,6 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
                   return{...p,[ft]:src,[idx]:dst};
                 });
               }else{
-                // New clip from library
                 const id=e.dataTransfer.getData("assetId");const a=mediaLib.find(x=>String(x.id)===id);if(a)addToTrack(idx,a);
               }
             }}
@@ -3831,7 +3779,6 @@ function P13({ go, mediaLib, timeline, setTimeline, user, filmDuration, setFilmD
             {(timeline[idx]||[]).map((a,i)=>(
               <div key={i} draggable
                 onDragStart={e=>{e.dataTransfer.setData("trackIdx",String(idx));e.dataTransfer.setData("clipIdx",String(i));e.dataTransfer.setData("assetId","");}}
-
                 onDragOver={e=>e.preventDefault()}
                 onDrop={e=>{
                   e.preventDefault();
@@ -3942,6 +3889,7 @@ function P15() {
     </div>
   );
 }
+
 function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDuration, setFilmDuration }) {
   const [quality,setQuality]=useState("1080p");
   const [progress,setProgress]=useState(0);
@@ -3952,7 +3900,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   const [fps,setFps]=useState(30);
   const [codec,setCodec]=useState("vp9");
   const [currentClipIdx,setCurrentClipIdx]=useState(-1);
-  // ── GAP-FILL CHOICE (Y = generate extra scenes, N = stretch clips) ──
   const [gapFill,setGapFill]=useState(false);
   const canvasRef=useRef(null);
 
@@ -3965,49 +3912,38 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
   };
 
   const getAudioTrack=()=>{
-    const tAudio=Object.values(timeline||{}).flat().filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
-    if(tAudio.length>0)return tAudio[0];
-    return (mediaLib||[]).find(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="audio/webm"));
+    const pool=[
+      ...Object.values(timeline||{}).flat(),
+      ...(mediaLib||[])
+    ].filter(a=>a&&a.type&&(a.type.startsWith("audio")||a.type==="audio/narration"||a.type==="narration"||a.type==="audio/webm"));
+    if(!pool.length)return undefined;
+    const cloned=pool.find(a=>a.clonedVoiceId&&a.narrText);
+    if(cloned)return cloned;
+    const myVoice=pool.find(a=>a.type==="audio/myvoice");
+    if(myVoice)return myVoice;
+    return pool[0];
   };
 
-  // Background music bed. A music asset is any audio the user tagged as music,
-  // or a second audio asset that is NOT the narration we're already using.
   const getMusicTrack=(narr)=>{
     const isMusic=(a)=>a&&a.type&&(a.type==="audio/music"||a.type==="music"||/music|score|soundtrack|bgm|bed/i.test(a.name||""));
     const pool=[...Object.values(timeline||{}).flat(),...(mediaLib||[])].filter(Boolean);
     const tagged=pool.find(isMusic);
     if(tagged)return tagged;
-    // else: a distinct second audio asset (not the narration)
     const audios=pool.filter(a=>a.type&&(a.type.startsWith("audio")||a.type==="audio/webm"));
     return audios.find(a=>narr?(a.id!==narr.id&&a.dbId!==narr.dbId):true&&a!==narr);
   };
 
   const startRender=async()=>{
-    // ── PRIORITY SAVE — runs before anything else ──────────────────────────────
-    // Saves current state immediately so a crash mid-render doesn't lose work.
     try{
       localStorage.setItem("ms_page",JSON.stringify(16));
-      const tl=localStorage.getItem("ms_timeline");
-      if(tl)localStorage.setItem("ms_timeline",tl); // re-write to confirm it's current
     }catch(e){}
-    // ── PRE-RENDER STORAGE CHECK — never touches source clips ──────────────────
-    // Only clears old render_final files, never user-generated source clips.
-    // Before this fix, autoPruneClips was destroying 12 of 13 clips before render.
     try{
       const clips=await getAllClipsFromDB();
-      // Delete only old finished renders, never source scene clips
       const oldRenders=clips.filter(c=>String(c.id).includes("render_final_old"));
       for(const c of oldRenders){await deleteClipFromDB(c.id);}
       log("Memory check complete — "+clips.length+" clips preserved");
     }catch(e){}
 
-    // ── CLIP ORDER: the TIMELINE is the authority ──────────────────────────
-    // Previously the render loaded clips from IndexedDB (which returns them in
-    // keyPath / alphabetical order) and then sorted by the first number in the
-    // filename — with names like GODS_GURUS_6 and LOVE_WAR_60s that number is
-    // meaningless, so scenes came out in the wrong order. Now: take the order
-    // straight from the timeline, and use IndexedDB ONLY to refresh each clip's
-    // blob/url. The number-sort runs ONLY when there is no timeline at all.
     let freshClips = [];
     let dbClipsAll = [];
     try{ dbClipsAll = await getAllClipsFromDB(); }catch(e){ console.warn("DB load failed",e); }
@@ -4020,7 +3956,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       }
       return c2;
     };
-    const timelineClips = getVideoClips(); // already in timeline order (falls back to mediaLib)
+    const timelineClips = getVideoClips();
     const hasTimeline = Object.values(timeline||{}).flat().some(a=>a&&a.type&&a.type.startsWith("video"));
     if(timelineClips.length>0){
       freshClips = timelineClips.map(relink);
@@ -4031,18 +3967,13 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
     }
     if(freshClips.length>0){ setMediaLib(freshClips); }
 
-    // Fall back to current mediaLib if nothing resolved
     let clips = freshClips.length > 0 ? freshClips.filter(c2=>c2.type&&c2.type.startsWith("video")) : getVideoClips();
-    // ── EXCLUDE old rendered films and empty clips ──────────────────────────
-    // A previously-rendered "MandaStrong_Film..." file in the library has no real
-    // scene frames — including it makes the whole render come out 0.0MB.
     clips = clips.filter(c2=>{
       const n=(c2.name||"").toLowerCase();
       if(n.includes("mandastrong_film")||n.includes("render_final")||n.includes("_film_")) return false;
-      if(c2.file&&c2.file.size!==undefined&&c2.file.size<1000) return false; // skip empty blobs
+      if(c2.file&&c2.file.size!==undefined&&c2.file.size<1000) return false;
       return true;
     });
-    // Number-sort ONLY when there is no timeline to define the order.
     if(!hasTimeline){
       clips.sort((a,b)=>{
         const na=parseInt((a.name||"").match(/\b(\d+)\b/)?.[1]||"9999");
@@ -4071,12 +4002,35 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       let audioSource=null,audioBuffer=null;
       let liveNarration=false;
       if(audioAsset){
-        // NARRATION: bake through the Cinema Voice Engine so it RECORDS into the film.
-        // Device speech (speechSynthesis) plays out the speaker and never enters the
-        // captured audio graph, so on iPad the film came out silent / "voice unavailable".
-        // Fix: fetch real audio from engineSpeak, decode into THIS audioCtx, feed audioDest —
-        // the same path uploaded audio uses. Live speech remains only as a fallback.
-        if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
+        if(audioAsset.clonedVoiceId&&audioAsset.narrText){
+          try{
+            log("Baking FULL narration in your cloned voice...");
+            const cChunks=buildChunks(audioAsset.narrText);
+            const decoded=[];
+            for(const c of cChunks){
+              if(!c||!c.text) continue;
+              const u=await engineSpeak(c.text,{voice:audioAsset.clonedVoiceId});
+              if(!u) continue;
+              try{ const r=await fetch(u); const ab=await r.arrayBuffer(); decoded.push(await audioCtx.decodeAudioData(ab)); }catch(e){}
+            }
+            if(decoded.length){
+              const total=decoded.reduce((s,b)=>s+b.duration,0);
+              const merged=audioCtx.createBuffer(1,Math.max(1,Math.ceil(total*audioCtx.sampleRate)),audioCtx.sampleRate);
+              const out=merged.getChannelData(0); let off=0;
+              for(const b of decoded){ out.set(b.getChannelData(0),Math.floor(off*audioCtx.sampleRate)); off+=b.duration; }
+              audioBuffer=merged;
+              log("✓ Full narration baked in your cloned voice: "+total.toFixed(1)+"s");
+            }
+          }catch(e){log("Cloned-voice narration error — trying the recording: "+e.message);}
+          if(!audioBuffer){
+            try{
+              const dbId=audioAsset.dbId||audioAsset.id;
+              let audioBlob=null;
+              if(dbId){const stored=await loadClipFromDB(dbId);if(stored&&stored.blob)audioBlob=stored.blob;}
+              if(audioBlob){const arrayBuf=await audioBlob.arrayBuffer();audioBuffer=await audioCtx.decodeAudioData(arrayBuf);log("✓ Played your recording instead: "+audioBuffer.duration.toFixed(1)+"s");}
+            }catch(e){}
+          }
+        } else if(audioAsset.type==="narration"||(!audioAsset.url&&!audioAsset.file&&audioAsset.text)){
           try{
             const vc=(typeof VOICE_CHARACTERS!=="undefined")?VOICE_CHARACTERS.find(v=>v.id===(audioAsset.voice||"blaze")):null;
             const meta={voice:vc?.engineVoice||"",gender:vc?.gender||"",origin:vc?.origin||"",speed:vc?.rate||0.9};
@@ -4129,9 +4083,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         }
       }
       if(audioBuffer){audioSource=audioCtx.createBufferSource();audioSource.buffer=audioBuffer;audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);}
-      // ── BACKGROUND MUSIC BED ────────────────────────────────────────────────
-      // Plays under the narration, quiet, looped to cover the whole film. Voice
-      // stays on top (locked mix VOICE 85 / MUSIC 40 ≈ 0.25 gain under voice).
       let musicSource=null;
       try{
         const musicAsset=getMusicTrack(audioAsset);
@@ -4145,7 +4096,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             const mBuf=await audioCtx.decodeAudioData(await mBlob.arrayBuffer());
             musicSource=audioCtx.createBufferSource();
             musicSource.buffer=mBuf;
-            musicSource.loop=true; // music beds loop to fill; narration never does
+            musicSource.loop=true;
             const mGain=audioCtx.createGain();
             mGain.gain.value=0.25;
             musicSource.connect(mGain);
@@ -4155,8 +4106,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           }
         }
       }catch(e){log("Music bed skipped: "+e.message);}
-      // Draw several plain frames BEFORE capturing so the stream is definitely live.
-      // No words on screen — the film shows only the source footage.
       for(let w=0;w<5;w++){
         ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
         await new Promise(r=>setTimeout(r,60));
@@ -4172,43 +4121,33 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       const combinedStream=new MediaStream(tracks);
       const vCodec=codec==="vp9"?"vp9":"vp8";
       const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs="+vCodec+",opus")?"video/webm;codecs="+vCodec+",opus":"video/webm";
-      // ── ADAPTIVE BITRATE — caps total memory so long films finish encoding ──
-      // The end-of-render crash was memory: chunks pile up all render, then the
-      // final Blob build doubles them. iPad Safari kills the tab (~1.4GB).
-      // Fix: budget ~320MB of chunks max, whatever the film length.
       const totalFilmSec=Math.max(1,clips.reduce((s,c)=>s+(c.duration||60),0));
       const requested=quality==="4K"?40000000:quality==="1080p"?8000000:4000000;
-      const budgetBits=320*1024*1024*8; // 320MB in bits
+      const budgetBits=320*1024*1024*8;
       const safeBitrate=Math.floor(budgetBits/totalFilmSec);
       const bitrate=Math.min(requested,Math.max(2000000,safeBitrate));
       if(bitrate<requested)log("Adaptive bitrate: "+(bitrate/1000000).toFixed(1)+"Mbps for "+Math.round(totalFilmSec)+"s film — keeps memory safe to the end");
       const recorder=new MediaRecorder(combinedStream,{mimeType,videoBitsPerSecond:bitrate,audioBitsPerSecond:128000});
       const chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
-      // Prime the canvas so captureStream has a real frame
       ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h);
       await new Promise(r=>setTimeout(r,200));
-      recorder.start(1000);
-      // iPad Safari fix: force the recorder to flush data every second so chunks
-      // never end up empty, and keep the canvas stream alive with a heartbeat.
+      recorder.start(100);
       const dataInterval=setInterval(()=>{try{if(recorder.state==="recording")recorder.requestData();}catch(e){}},1000);
       const heartbeat=setInterval(()=>{
         try{
-          // Nudge one pixel each tick so captureStream always sees a new frame
           ctx.fillStyle="rgba(0,0,0,0.003)";ctx.fillRect(0,0,2,2);
           if(vTrack&&vTrack.requestFrame)vTrack.requestFrame();
         }catch(e){}
       },Math.round(1000/fps));
       if(audioSource)audioSource.start(0);
       if(musicSource){try{musicSource.start(0);}catch(e){}}
-      // Live-speak fallback ONLY when the engine bake could not deliver audio.
       if(liveNarration&&audioAsset?.text){
         speakText(audioAsset.voice||"blaze",audioAsset.text,null,null);
         log("✓ Speaking narration live (fallback): "+(audioAsset.voice||"blaze"));
       }
       log("Recording started...");
       setProgress(5);
-      // Helper: render a scene directly to canvas using Claude
       const renderSceneToCanvas=async(sceneName,clipDurSec)=>{
         const scenePrompt=sceneName.replace(/\.[^.]+$/,"").replace(/_/g," ").replace(/\d+s$/,"").trim();
         log("  Regenerating: "+scenePrompt.slice(0,40)+"...");
@@ -4249,7 +4188,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         }catch(e){log("  Error: "+e.message);return false;}
       };
 
-      // Reload fresh blobs from IndexedDB for every clip before rendering
       log("Loading clips from storage...");
       try{
         const freshDB=await getAllClipsFromDB();
@@ -4265,16 +4203,10 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         }
       }catch(e){log("Storage reload: "+e.message);}
 
-      // ── GAP-FILL: the DURATION SLIDER is master ─────────────────────────────
-      // filmDuration (1–180 min, set on the timeline page) decides the film length.
-      // Clips stretch to fill that total: each clip holds (sliderSecs / clipCount).
-      // The old 65s-per-clip cap is lifted — the engine accepts long clips, so a
-      // clip can hold as long as the slider needs. If the slider is somehow unset,
-      // fall back to the narration length, then to natural clip lengths.
       const sliderSecs = (Number(filmDuration)>0 ? Number(filmDuration)*60 : 0);
       const narrationSecs = audioBuffer ? audioBuffer.duration : 0;
       const targetTotal = sliderSecs>0 ? sliderSecs : narrationSecs;
-      let perClipTarget = 0; // 0 = use each clip's natural duration
+      let perClipTarget = 0;
       if(targetTotal>0 && clips.length>0){
         if(gapFill){
           let naturalTotal=0;
@@ -4303,13 +4235,11 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         log("Clip "+(ci+1)+"/"+clips.length+": "+clip.name.slice(0,45));
         setProgress(5+Math.round((ci/clips.length)*80));
 
-        // Try to play the video file first
         let videoPlayed=false;
         if(clip.file instanceof File){
           videoPlayed=await new Promise(resolve=>{
             const vid=document.createElement("video");
             vid.muted=true;vid.playsInline=true;
-            // Use file blob or fall back to existing blob URL
             const clipSrc = clip.file ? URL.createObjectURL(clip.file) : (clip.url||"");
             if(!clipSrc){resolve(false);return;}
             vid.src=clipSrc;
@@ -4317,14 +4247,9 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
             const finish=(ok)=>{if(!done2){done2=true;resolve(ok);}};
             vid.onloadeddata=async()=>{
               const natural=vid.duration||30;
-              // Hold this clip for its share of the film (slider-driven). No 65s cap:
-              // the engine accepts long clips, so a clip can hold as long as needed.
-              // Never below its natural length. Loop the source within the window so
-              // the picture keeps moving instead of freezing.
               const clipDur=perClipTarget>0?Math.max(perClipTarget,natural):Math.min(natural,65);
               vid.currentTime=0;
-              vid.loop=true; // replay within the hold window; render stops it by time, not by end
-              // Wait for first frame to decode before drawing
+              vid.loop=true;
               await new Promise(r=>{
                 if(vid.readyState>=3){r();}
                 else{vid.oncanplay=r;}
@@ -4336,19 +4261,15 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
               const draw=()=>{
                 if(done2)return;
                 const elapsed=(Date.now()-startTime)/1000;
-                // Stop strictly by elapsed time now (video loops), so the clip fills
-                // its whole target window even if the source footage is short.
                 if(elapsed>=clipDur){vid.pause();finish(true);return;}
                 const now=performance.now();
                 if(now-lastDraw>=msPerF-2){
                   try{
                     ctx.clearRect(0,0,dims.w,dims.h);
                     ctx.drawImage(vid,0,0,dims.w,dims.h);
-                    // Vignette
                     const vig=ctx.createRadialGradient(dims.w/2,dims.h/2,dims.w*0.1,dims.w/2,dims.h/2,dims.w*0.8);
                     vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.7)");
                     ctx.fillStyle=vig;ctx.fillRect(0,0,dims.w,dims.h);
-                    // Letterbox
                     ctx.fillStyle="#000";ctx.fillRect(0,0,dims.w,dims.h*0.05);ctx.fillRect(0,dims.h*0.95,dims.w,dims.h*0.05);
                     lastDraw=now;
                   }catch(e){finish(true);return;}
@@ -4363,15 +4284,12 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
           });
         }
 
-        // If video failed or no file — regenerate scene with Claude
         if(!videoPlayed){
           log("  Clip not playable — generating scene: "+clip.name.slice(0,30)+"...");
           const natSec=parseInt(clip.name.match(/(\d+)s/)?.[1]||"30");
           const clipDurSec=perClipTarget>0?Math.max(perClipTarget,natSec):natSec;
           const ok=await renderSceneToCanvas(clip.name,clipDurSec);
           if(!ok){
-            // Last resort: plain black hold — real-time paced. No words on screen;
-            // the film never burns the clip/scene name onto the picture.
             const tcFrames=5*fps;
             const tcStart=performance.now();
             await new Promise(resolve=>{
@@ -4388,7 +4306,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
         }
       }
       setCurrentClipIdx(-1);
-      // End card — real-time paced
       {const ecFrames=fps*2;const ecStart=performance.now();
       await new Promise(resolve=>{
         let f=0;
@@ -4405,11 +4322,9 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       try{clearInterval(heartbeat);}catch(e){}
       if(audioSource){try{audioSource.stop();}catch(e){}}
       if(musicSource){try{musicSource.stop();}catch(e){}}
-      // Flush any final data before stopping
       try{if(recorder.state==="recording")recorder.requestData();}catch(e){}
       await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};setTimeout(f,5000);try{recorder.onstop=f;if(recorder.state!=="inactive"){recorder.stop();}else{f();}}catch(e){f();}});
       const blob=new Blob(chunks,{type:mimeType});
-      // ── SAFETY: never hand an empty file to the player (that's the grey arrow) ──
       if(!chunks.length||blob.size<10000){
         log("⚠ RENDER PRODUCED NO VIDEO DATA");
         log("Your browser blocked canvas capture. Fix: keep this tab in front");
@@ -4426,7 +4341,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
       if(setRendered)setRendered({url,quality,format:"WebM",timestamp:new Date().toLocaleString()});
       setProgress(100);setDone(true);
       log("RENDER COMPLETE — "+(blob.size/1024/1024).toFixed(1)+"MB");
-      // Save final render to IndexedDB — timeout-protected, never blocks completion
       try{
         const renderName="MandaStrong_Film_"+new Date().toISOString().slice(0,10)+".webm";
         await Promise.race([
@@ -4537,7 +4451,6 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
               </div>
             </div>
           )}
-          {/* ── FILL IN THE GAPS? ─────────────────────────────────── */}
           <div style={{background:"#0a0a0a",border:"1px solid "+GOLDDIM,padding:"14px 16px",marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
@@ -4596,6 +4509,7 @@ function P16({ go, timeline, setRendered, mediaLib, setMediaLib, user, filmDurat
     </div>
   );
 }
+
 function P17({ go, rendered, mediaLib }) {
   const videoRef = useRef(null);
   const [isPlaying,setIsPlaying]=useState(false);
@@ -4603,11 +4517,9 @@ function P17({ go, rendered, mediaLib }) {
   const [duration,setDuration]=useState(0);
   const [vs,setVs]=useState("");
   useEffect(()=>{
-    // Try rendered prop first, then IndexedDB render_final, then latest video in mediaLib
     if(rendered?.url){setVs(rendered.url);return;}
     loadClipFromDB("render_final").then(r=>{
       if(r?.blob){setVs(URL.createObjectURL(r.blob));return;}
-      // Fall back to latest video in mediaLib
       const latest=mediaLib?.filter(a=>a?.type?.startsWith("video")).slice(-1)[0];
       if(latest?.url) setVs(latest.url);
     }).catch(()=>{
@@ -4676,6 +4588,7 @@ function P18({ rendered, mediaLib }) {
     </div>
   );
 }
+
 function TutCanvas({drawFn}){
   const cvRef=useRef(null);const rafRef=useRef(null);const t0=useRef(null);
   useEffect(()=>{
@@ -4683,7 +4596,6 @@ function TutCanvas({drawFn}){
     const ctx=cv.getContext("2d");
     const resize=()=>{const p=cv.parentElement;if(!p)return;cv.width=p.clientWidth;cv.height=Math.round(p.clientWidth*9/16);};
     resize();window.addEventListener("resize",resize);
-    // Ambient particles for depth
     const particles=Array.from({length:40},()=>({x:Math.random(),y:Math.random(),z:Math.random()*0.6+0.2,s:Math.random()*0.7+0.3}));
     const draw=(ts)=>{
       if(!t0.current)t0.current=ts;
@@ -4691,25 +4603,13 @@ function TutCanvas({drawFn}){
       const loop=120;
       const t=Math.min(1,(sec%loop)/loop);
       const W=cv.width,H=cv.height;
-
-      // Base — Claude animation
       try{drawFn(ctx,W,H,t,sec);}
       catch(e){ctx.fillStyle="#050300";ctx.fillRect(0,0,W,H);}
-
-      // ── CINEMATIC POLISH LAYER — makes every tutorial feel premium ────
-
-      // Warm cinematic grade — subtle gold tint over entire frame
       ctx.fillStyle="rgba(232,180,60,0.045)";ctx.fillRect(0,0,W,H);
-
-      // Deepen shadows for contrast
       ctx.fillStyle="rgba(10,5,0,0.06)";ctx.fillRect(0,0,W,H);
-
-      // Highlight recovery — glow near top centre
       const hr=ctx.createRadialGradient(W/2,H*0.3,0,W/2,H*0.3,W*0.4);
       hr.addColorStop(0,"rgba(255,245,215,0.06)");hr.addColorStop(1,"rgba(0,0,0,0)");
       ctx.fillStyle=hr;ctx.fillRect(0,0,W,H);
-
-      // Ambient particle depth — slow-drifting gold specks
       particles.forEach(p=>{
         const drift=(sec*0.008*(1-p.z))%1;
         const x=((p.x+drift)%1)*W;
@@ -4718,59 +4618,41 @@ function TutCanvas({drawFn}){
         ctx.fillStyle="rgba(232,201,109,"+(0.10*(1-p.z)).toFixed(3)+")";
         ctx.beginPath();ctx.arc(x,y,size,0,Math.PI*2);ctx.fill();
       });
-
-      // Vignette — cinematic edge fall-off
       const vig=ctx.createRadialGradient(W/2,H/2,W*0.18,W/2,H/2,W*0.78);
       vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,0.62)");
       ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
-
-      // Letterbox bars — 2.35:1 cinema look
       const bar=Math.round(H*0.068);
       ctx.fillStyle="#000";
       ctx.fillRect(0,0,W,bar);
       ctx.fillRect(0,H-bar,W,bar);
-
-      // Fine film grain
       for(let g=0;g<28;g++){
         const gv=Math.random()>0.5?160:20;
         ctx.fillStyle="rgba("+gv+","+gv+","+gv+",0.013)";
         ctx.fillRect(Math.random()*W,Math.random()*H,1.2,1.2);
       }
-
-      // Chromatic aberration hint at edges (subtle warmth)
       const edge=ctx.createLinearGradient(0,0,0,H);
       edge.addColorStop(0,"rgba(232,180,60,0.04)");
       edge.addColorStop(0.5,"rgba(0,0,0,0)");
       edge.addColorStop(1,"rgba(160,80,20,0.04)");
       ctx.fillStyle=edge;ctx.fillRect(0,0,W,H);
-
-      // Fade-in first 1.5s and fade-out last 1.5s of loop
       const loopSec=sec%loop;
       if(loopSec<1.5){ctx.fillStyle="rgba(0,0,0,"+(1-loopSec/1.5).toFixed(3)+")";ctx.fillRect(0,0,W,H);}
       if(loopSec>loop-1.5){ctx.fillStyle="rgba(0,0,0,"+((loopSec-(loop-1.5))/1.5).toFixed(3)+")";ctx.fillRect(0,0,W,H);}
-
-      // Professional branding overlay — top-left studio mark
       const brandY=bar+Math.round(H*0.045);
       ctx.font="bold "+Math.round(H*0.022)+"px Georgia, serif";
       ctx.textAlign="left";
-      // Gold gradient text
       const brandGrad=ctx.createLinearGradient(bar+8,brandY-Math.round(H*0.02),bar+8,brandY);
       brandGrad.addColorStop(0,"rgba(255,243,207,0.95)");
       brandGrad.addColorStop(1,"rgba(160,120,32,0.95)");
       ctx.fillStyle=brandGrad;
       ctx.fillText("MANDASTRONG STUDIO",bar+10,brandY);
-      // Thin gold line under brand
       ctx.strokeStyle="rgba(232,201,109,0.6)";ctx.lineWidth=1;
       ctx.beginPath();ctx.moveTo(bar+10,brandY+4);ctx.lineTo(bar+10+Math.round(H*0.28),brandY+4);ctx.stroke();
-
-      // Bottom right — TUTORIAL watermark
       ctx.font="bold "+Math.round(H*0.017)+"px Georgia, serif";
       ctx.textAlign="right";
       ctx.fillStyle="rgba(232,201,109,0.55)";
       ctx.fillText("• TUTORIAL •",W-bar-10,H-bar-Math.round(H*0.025));
-
       ctx.textAlign="left";
-
       rafRef.current=requestAnimationFrame(draw);
     };
     rafRef.current=requestAnimationFrame(draw);
@@ -4804,7 +4686,6 @@ function P19({ go }) {
   const generate=async(idx)=>{
     setGenerating(idx);setActive(idx);
     const t=tuts[idx];
-    // Stop any current narration before starting a new one
     try{window.speechSynthesis.cancel();}catch{}
     try{
       const res=await fetch("https://njqfexhltjwpgvctmyaw.supabase.co/functions/v1/claude-proxy",{
@@ -4820,7 +4701,6 @@ function P19({ go }) {
       const body=bo>=0&&bc>bo?code.slice(bo+1,bc):"";
       const fn=new Function("ctx","W","H","t","sec",body);
       setDrawFns(p=>({...p,[idx]:fn}));
-      // Blaze female voice narration for this lesson
       const narration="Lesson "+parseInt(t.n)+". "+t.t+". "+t.d+" Pro tips. "+t.tips.join(". ")+".";
       setTimeout(()=>{try{speakText("blaze",narration,null,null);}catch(e){}},500);
     }catch(e){console.error(e);}
@@ -4863,7 +4743,6 @@ function P19({ go }) {
                     <button onClick={e=>{
                       e.stopPropagation();
                       if(hasFn){
-                        // PLAY AGAIN — re-narrate with Blaze
                         try{window.speechSynthesis.cancel();}catch{}
                         const narration="Lesson "+parseInt(t.n)+". "+t.t+". "+t.d+" Pro tips. "+t.tips.join(". ")+".";
                         setTimeout(()=>{try{speakText("blaze",narration,null,null);}catch(e){}},300);
@@ -4925,6 +4804,7 @@ function P19({ go }) {
     </div>
   );
 }
+
 function P20() {
   const [tab,setTab]=useState("tos");
   const sec=(title,body)=>(
@@ -4935,15 +4815,12 @@ function P20() {
   );
   const p=(txt)=><p style={{color:WHITE,fontSize:13,lineHeight:1.9,marginBottom:8}}>{txt}</p>;
   const li=(items)=><ul style={{color:WHITE,fontSize:13,lineHeight:1.9,paddingLeft:20,marginBottom:8}}>{items.map((t,i)=><li key={i} style={{marginBottom:3}}>{t}</li>)}</ul>;
-
   return (
     <div style={{...Sp,padding:40}}>
       <div style={{maxWidth:860,margin:"0 auto"}}>
         <div style={{fontSize:11,color:GOLD,letterSpacing:4,marginBottom:4,fontWeight:700}}>LEGAL</div>
         <h1 style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:28,fontWeight:900,letterSpacing:4,marginBottom:4}}>TERMS & DISCLAIMER</h1>
         <div style={{color:WHITE,fontSize:11,marginBottom:20,letterSpacing:2}}>EFFECTIVE MARCH 2026 · MANDASTRONG STUDIO</div>
-
-        {/* Tab selector */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",marginBottom:28,border:"1px solid "+GOLDDIM}}>
           {[["tos","TERMS OF SERVICE"],["disc","DISCLAIMER"]].map(([id,label])=>(
             <button key={id} onClick={()=>setTab(id)}
@@ -4952,14 +4829,12 @@ function P20() {
             </button>
           ))}
         </div>
-
         {tab==="tos"&&(
           <div>
             <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 20px",marginBottom:20,textAlign:"center"}}>
               <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>MANDASTRONG STUDIO · PROFESSIONAL CINEMA INTELLIGENCE PLATFORM</div>
               <div style={{color:WHITE,fontSize:12,marginTop:4}}>By using this platform you agree to be legally bound by these Terms.</div>
             </div>
-
             {sec("1. ACCEPTANCE OF TERMS",<>{p("By accessing or using MandaStrong Studio you agree to be legally bound by these Terms of Service. If you do not agree, do not use this platform. These terms apply to all users including free, trial, and paid subscribers.")}</>)}
             {sec("2. SUBSCRIPTIONS & BILLING",<>{p("MandaStrong Studio offers three paid plans: Creator ($20/mo), Pro ($30/mo), and Studio ($50/mo). All plans bill monthly and auto-renew unless cancelled before the renewal date. The Studio Plan includes a 7-day free trial with no charge during the trial period. All payments are processed securely via Stripe. No refunds are issued for partial billing periods.")}</>)}
             {sec("3. INTELLECTUAL PROPERTY & CONTENT RIGHTS",<>{p("You retain full ownership of all original media, scripts, and creative content you upload to MandaStrong Studio. Studio Plan subscribers receive full commercial rights to content produced using the platform's AI tools. Creator and Pro plan subscribers may use content for personal and non-commercial purposes unless otherwise agreed in writing.")}{p("MandaStrong Studio, its tools, interface, branding, and codebase remain the intellectual property of Amanda Woolley and MandaStrong Studio. You may not reproduce, distribute, or resell the platform itself.")}</>)}
@@ -4970,20 +4845,17 @@ function P20() {
             {sec("8. TERMINATION",<>{p("We reserve the right to suspend or terminate your account at any time if you violate these Terms. You may cancel your subscription at any time via your account settings. Cancellation takes effect at the end of the current billing period.")}</>)}
             {sec("9. GOVERNING LAW",<>{p("These Terms are governed by the laws of the jurisdiction in which MandaStrong Studio is registered. Any disputes shall be resolved by binding arbitration or the courts of that jurisdiction.")}</>)}
             {sec("10. CONTACT",<>{p("For support, billing enquiries, or legal notices contact us at MandaStrong1.Etsy.com or through Agent Grok on Page 21 of the platform.")}</>)}
-
             <div style={{background:"#050500",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginTop:8}}>
               <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>MANDASTRONG STUDIO · AMANDA WOOLLEY, FOUNDER · MARCH 2026</p>
             </div>
           </div>
         )}
-
         {tab==="disc"&&(
           <div>
             <div style={{background:"#050500",border:"2px solid "+GOLD,padding:"14px 20px",marginBottom:20,textAlign:"center"}}>
               <div style={{color:GOLD,fontSize:11,letterSpacing:3,fontWeight:900}}>IMPORTANT — PLEASE READ BEFORE USING THIS PLATFORM</div>
               <div style={{color:WHITE,fontSize:12,marginTop:4}}>This disclaimer governs your use of all AI-generated content and platform services.</div>
             </div>
-
             {sec("AI-GENERATED CONTENT",<>{p("MandaStrong Studio is an AI-assisted creative platform. All outputs — including scripts, narrations, images, and video — are generated algorithmically and must be reviewed by the user before publication or commercial use. The platform does not guarantee the accuracy, completeness, or appropriateness of any AI-generated material.")}{p("AI-generated content may occasionally contain inaccuracies, unintended bias, outdated information, or incomplete details. You are solely responsible for fact-checking, editing, and ensuring compliance before publishing or distributing any content created on this platform.")}</>)}
             {sec("NO PROFESSIONAL ADVICE",<>{p("Nothing generated by MandaStrong Studio constitutes legal, medical, financial, psychological, or any other form of professional advice. The platform is a creative production tool only. Always consult a qualified professional before acting on any information produced by AI tools.")}</>)}
             {sec("THIRD-PARTY SERVICES",<>{p("MandaStrong Studio integrates with third-party services including payment processors and AI providers. We are not responsible for the availability, accuracy, or conduct of these services. Your use of third-party services is governed by their own terms and privacy policies.")}</>)}
@@ -4992,7 +4864,6 @@ function P20() {
             {sec("SOCIAL MISSION COMMITMENT",<>{p("A meaningful portion of all subscription revenue is directed to veterans mental health programmes and school anti-bullying initiatives. This commitment is a founding principle of MandaStrong Studio and is carried out in good faith. It does not constitute a legally binding charitable obligation under these terms.")}</>)}
             {sec("USER RESPONSIBILITY",<>{p("All responsibility for how content created on MandaStrong Studio is deployed, distributed, monetised, or shared rests entirely with the user. MandaStrong Studio shall not be held liable for any consequences arising from the publication or use of platform-generated content.")}</>)}
             {sec("CHANGES TO THIS DISCLAIMER",<>{p("MandaStrong Studio reserves the right to update this disclaimer at any time. Continued use of the platform following any update constitutes your acceptance of the revised terms.")}</>)}
-
             <div style={{background:"#050500",border:"1px solid "+GOLDDIM,padding:"12px 16px",marginTop:8}}>
               <p style={{color:GOLDDIM,fontSize:11,margin:0,letterSpacing:1}}>— AMANDA WOOLLEY · FOUNDER · MANDASTRONG STUDIO · MARCH 2026 · mandastrong-01.bolt.host</p>
             </div>
@@ -5116,47 +4987,29 @@ function P22() {
     </div>
   );
 }
+
 function HowToGuide() {
   const [open,setOpen]=useState(null);
   const SECTIONS=[
     {t:"WELCOME — HOW TO READ THIS BOOK",c:"This is more than a how-to. It is a complete guide to making films with AI on MandaStrong Studio (mandastrong-01.bolt.host) AND a plain-English education in what AI actually is, so you are never at its mercy. Read Part One to understand the machine you are working with. Read Part Two to master the studio page by page. Read Part Three for the craft — prompting, voice, story, and ethics. You do not need any technical background. Every idea here is explained the way you would explain it to a friend across a kitchen table."},
-
     {t:"PART ONE · WHAT AI ACTUALLY IS",c:"AI does not think, feel, or know things the way you do. A large language model — the kind of AI behind most creative tools — is a very powerful pattern machine. It has read an enormous amount of human writing and images and learned which words and shapes tend to follow which. When you ask it for something, it is not looking up an answer; it is predicting, piece by piece, the most likely continuation of your request. That is why it can sound confident and still be wrong. Understanding this one fact changes how you use it: you are the director, it is the crew. It is fast and tireless and knows a thousand styles, but it has no judgement about YOUR story. That judgement is yours, and it always will be."},
-
     {t:"PART ONE · WHY AI SOMETIMES GETS IT WRONG",c:"Because AI predicts rather than knows, it can 'hallucinate' — state something untrue with total confidence, invent a fact, or misread what you wanted. This is normal and expected, not a fault in you. The fix is always the same: be more specific, give an example, or break the task into smaller steps. If a render or a line of narration comes out wrong, it is almost never because you did something stupid — it is because the machine guessed and guessed poorly. Re-roll it, refine your wording, and move on. Treat every output as a first draft from a talented but literal-minded assistant."},
-
     {t:"PART ONE · PROMPTING — TALKING TO THE MACHINE",c:"A prompt is simply your instruction to the AI. The single biggest skill in the whole studio is learning to prompt well, and it comes down to specificity. 'A man walking' gives the machine nothing to hold onto. 'A weathered fisherman in his sixties walking along a stormy grey beach at dawn, wind pulling at his yellow raincoat, shot from behind, cinematic, muted cold colour grade' gives it everything. Name the subject, the setting, the light, the mood, the camera angle, and the style. Show, don't summarise. When in doubt, describe it as if to someone who cannot see what is in your head — because that is exactly the situation."},
-
     {t:"PART ONE · AI AND YOU — STAYING IN CHARGE",c:"AI is a tool, like a camera or a pen. It amplifies whoever holds it. It has no taste of its own, so your taste is the whole game. Never let a machine talk you out of a creative instinct, and never assume its confident answer is correct without checking. Keep your own copies of everything important. Understand that what you type may be processed on servers you don't control, so don't paste anything you'd be uncomfortable sharing. And remember the deeper point behind this whole studio: AI should widen the door to creativity, not replace the human standing in it. You are not being replaced. You are being equipped."},
-
     {t:"PART TWO · GETTING STARTED",c:"Open mandastrong-01.bolt.host. Log in with your credentials or start a free trial. Use the ☰ hamburger menu top left to jump to any of the 24 pages. AUTOSAVE ON is real — your work saves automatically every time you change page, generate a clip, or update your timeline. Hit 💾 SAVE PROJECT to create a named restore point you can return to from MY PROJECTS. Your plan and remaining usage are always visible from your account panel — tap the avatar top right."},
-
     {t:"PART TWO · PAGE 1 — HOME & INSTALL",c:"The front door of mandastrong-01.bolt.host. The DOWNLOAD APP button installs the studio to your device like a real app, using your browser's built-in install prompt — on iPhone and iPad use Share then Add to Home Screen, as Apple does not allow one-tap install. The whole page is built to fit any screen, phone or laptop. From here, enter the studio and begin."},
-
     {t:"PART TWO · PAGE 4 — PLANS & USAGE CREDITS",c:"Three plans: Basic $20, Pro $30, Studio $50 — pick the one that fits how much you create. At the very bottom is PURCHASE USAGE CREDITS: a one-time top-up for extra renders and generations when you need more than your plan includes. Credits never expire. All payments run through Stripe's secure checkout — the studio never sees your card details."},
-
     {t:"PART TWO · PAGE 5 — WRITING TOOLS & SCRIPT TO MOVIE",c:"100+ AI writing tools. Type a description into any tool and hit AI CREATE for professional results. At the top sits SCRIPT TO MOVIE — three boxes: PRODUCER (your vision, tone, casting), DESCRIBE (the film scene by scene), and PRODUCTION NOTES (shots, camera, lighting, locations). Fill them, save each to your Media Library, then hit WIRE INTO RENDER. From that moment the video generator on Page 8 uses your three boxes to drive every scene it makes. This is how your written vision becomes moving pictures."},
-
     {t:"PART TWO · PAGE 6 — VOICE ENGINE",c:"Cinematic voices that sound human, not robotic. Filter by gender, age, and origin. Tap any voice card to hear it. Paste your narration into the text box and hit PREPARE TO SPEAK to hear it in your chosen voice with your exact speed, pitch, and mood settings. RECORD MY VOICE lets you narrate yourself; UPLOAD lets you bring in a recording. On the right, USE MY VOICE AS NARRATION turns your own recording into the film's narration, with a duration option. Hit SAVE TO MEDIA LIBRARY and the narration auto-adds to your timeline's audio track. The MUSIC VIDEO STUDIO button lives up top."},
-
     {t:"PART TWO · PAGE 8 — VIDEO GENERATOR",c:"The heart of the studio. Upload a reference photo first and the engine builds the scene around your real image for photorealistic output. Paste your scene prompt — or let your wired Script to Movie brief drive it — pick your options, and hit GENERATE SCENE. You can add background music from the built-in library with a live preview, and toggle USE STEREO SOUND for a full stereo mix. Clips save automatically and populate your timeline's video track. Generate all your scenes, then move to the timeline."},
-
     {t:"PART TWO · THE TIMELINE, MIX & RENDER",c:"Page 13: hit ⚡ SYNC ALL TRACKS to lay your clips and narration in order — drag to reorder. Page 15: set your audio mix so voice sits above music. Page 16: choose quality up to 4K and render — auto-enhancement (warm grade, contrast, sharpness) runs on every frame, and an emergency save fires before rendering so a crash never costs you the session. Do not close the tab while rendering. Page 17 previews the finished film; Page 18 exports and shares to YouTube, Instagram, TikTok, Facebook, X, and Vimeo."},
-
     {t:"PART TWO · MUSIC VIDEO STUDIO",c:"Open from Page 6, top right. SONG step: enter title, artist, genre, mood, tempo; drag and drop your audio, click to upload, or hit RECORD YOUR OWN SONG; toggle USE STEREO SOUND. The DURATION slider runs freely from AUTO up to 180 minutes — at AUTO the film matches your song's length exactly; drag it up to lock a fixed length that overrides the music. STYLE step: video look, colour grade, effects. SCENE step: describe what we see. GENERATE builds a full beat-synced video. Download or save when done."},
-
     {t:"PART TWO · PAGE 24 — CHARACTER STUDIO",c:"Build reusable characters. Drag and drop a reference photo or tap to choose one, assign a voice, and record appearance notes — hair, eyes, costume, personality, role. Save the character and reuse them across every scene so your cast stays consistent. Characters persist across sessions. From here, HOME returns to the studio and EXIT APP signs you out."},
-
     {t:"PART THREE · THE CRAFT OF PROMPTING FOR FILM",c:"For video, think like a cinematographer. Always specify five things: subject (who or what), setting (where and when), light (dawn, neon, candlelight), motion (what moves and how), and style (film stock, colour grade, mood). Add a camera instruction — wide establishing shot, slow push-in, handheld, aerial. Contradictions confuse the machine, so keep your prompt coherent. If a scene comes out flat, add sensory and lighting detail rather than more objects. Consistency across scenes comes from reusing the same style language every time."},
-
     {t:"PART THREE · WRITING NARRATION THAT LANDS",c:"Narration is written to be heard, not read. Short sentences. Natural breath points. Read every line aloud before you save it — if you stumble, the voice engine will too. Punctuation is your friend: a full stop is a real pause, a comma a small one. Match the voice to the story — a documentary wants warmth and authority; a thriller wants restraint. Use the PREPARE TO SPEAK button as your rehearsal room, and tune speed and pitch until it feels like a person, not a reader."},
-
     {t:"PART THREE · STORY FIRST, ALWAYS",c:"The most photorealistic render in the world means nothing without a reason to watch. Decide what your film is really about before you generate a single frame — the feeling you want to leave behind. Use the Script to Movie PRODUCER box to write that down and keep yourself honest. AI can make anything look good; only you can make it mean something. Structure beats spectacle. A clear beginning, a turn in the middle, and an earned ending will carry a simple film further than dazzling clips with no spine."},
-
     {t:"PART THREE · ETHICS & RESPONSIBILITY",c:"With these tools you can make almost anything, which means the responsibility is yours. Don't put real people's faces or voices into films they never agreed to. Be honest when something is AI-generated if presenting it as real could mislead. Respect others' work rather than copying a living artist's style wholesale and calling it your own. And remember MandaStrong's founding mission — these tools exist to spread kindness, understanding, and hope, with proceeds supporting veterans' mental health and anti-bullying work. Make things that would make that mission proud."},
-
     {t:"SAVING, RECOVERING & GETTING HELP",c:"AUTOSAVE ON saves as you work. 💾 SAVE PROJECT creates a named session — name it meaningfully. 📂 MY PROJECTS shows your history; CONTINUE PROJECT restores a session including all clips. An emergency save fires if the tab closes or crashes, so work is never permanently lost. Stuck? Agent Grok on Page 21 is your 24/7 production consultant with full knowledge of every page and workflow. This guide lives on your closing page at mandastrong-01.bolt.host and is updated as the studio grows."},
-
     {t:"RECOMMENDED WORKFLOW — START TO FINISH",c:"Page 5 → fill Script to Movie's Producer, Describe, Production boxes → WIRE INTO RENDER. Page 6 → choose a voice → PREPARE TO SPEAK → SAVE TO MEDIA LIBRARY. Page 8 → upload a reference photo → generate each scene (your brief drives them) → add background music and stereo if you like. Page 13 → SYNC ALL TRACKS. Page 15 → set the mix. Page 16 → choose quality → render. Page 17 → preview. Page 18 → export and share. That is a finished film, made by you, at mandastrong-01.bolt.host."},
   ];
   return(
@@ -5210,7 +5063,6 @@ function P24CharacterStudio({ onSave, go }) {
     setPhotoName(f.name);
     const reader=new FileReader();
     reader.onload=ev=>{
-      // Downscale large photos so localStorage doesn't overflow and crash
       const img=new Image();
       img.onload=()=>{
         const max=900;let{width:w,height:h}=img;
@@ -5260,7 +5112,6 @@ function P24CharacterStudio({ onSave, go }) {
     }
   };
 
-  // Generate a scene prompt from character details
   const generatePrompt=(c)=>{
     const parts=[];
     if(c.gender) parts.push(c.gender.toLowerCase());
@@ -5294,46 +5145,32 @@ function P24CharacterStudio({ onSave, go }) {
         <div style={{color:WHITE,fontSize:13,marginBottom:24,lineHeight:1.7}}>Create reusable characters with full physical and costume details. Send a character's reference image to your Media Library, then upload on Page 8 to keep the same face across every scene. Hit COPY SCENE PROMPT to get a ready-to-paste prompt for any scene.</div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
-          {/* Create / Edit panel */}
           <div style={{...Card(),border:"2px solid "+GOLD,maxHeight:"80vh",overflowY:"auto"}}>
             <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>{editId?"✏ EDIT CHARACTER":"✦ CREATE A CHARACTER"}</div>
-
             {lbl("CHARACTER NAME")}
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Doxy, Ethan, Lily..." style={{...inp,marginBottom:4}}/>
-
             {lbl("ROLE IN FILM")}
             <input value={role} onChange={e=>setRole(e.target.value)} placeholder="e.g. Protagonist, School Bully, Narrator..." style={{...inp,marginBottom:4}}/>
-
             {lbl("GENDER")}
             {optBtn(gender,gender,setGender,["Male","Female","Non-Binary","Unknown"])}
-
             {lbl("AGE")}
             {optBtn(age,age,setAge,["Child","Teen","Young Adult","Adult","Middle Aged","Elderly"])}
-
             {lbl("ETHNICITY / HERITAGE (OPTIONAL)")}
             <input value={ethnicity} onChange={e=>setEthnicity(e.target.value)} placeholder="e.g. British, Nigerian, East Asian, Mixed..." style={{...inp,marginBottom:4}}/>
-
             {lbl("HAIR COLOUR")}
             {optBtn(hairColor,hairColor,setHairColor,["Black","Dark Brown","Brown","Blonde","Red","Auburn","Grey","White","Dyed"])}
-
             {lbl("HAIR STYLE")}
             {optBtn(hairStyle,hairStyle,setHairStyle,["Short","Medium","Long","Curly","Straight","Wavy","Braided","Afro","Shaved","Ponytail","Bun"])}
-
             {lbl("EYE COLOUR")}
             {optBtn(eyeColor,eyeColor,setEyeColor,["Brown","Dark Brown","Blue","Green","Grey","Hazel","Amber"])}
-
             {lbl("COSTUME / WARDROBE")}
             <input value={costume} onChange={e=>setCostume(e.target.value)} placeholder="e.g. black top, black jeans, school uniform..." style={{...inp,marginBottom:4}}/>
-
             {lbl("PERSONALITY / DEMEANOUR")}
             <input value={personality} onChange={e=>setPersonality(e.target.value)} placeholder="e.g. confident, quiet, aggressive, warm..." style={{...inp,marginBottom:4}}/>
-
             {lbl("ADDITIONAL NOTES")}
             <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. scar on left cheek, always wears earrings..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:4}}/>
-
             {lbl("SCENE NOTES")}
             <textarea value={sceneNotes} onChange={e=>setSceneNotes(e.target.value)} placeholder="e.g. usually seen in school corridors, confrontational body language..." style={{...inp,height:60,resize:"none",lineHeight:1.6,marginBottom:4}}/>
-
             {lbl("REFERENCE PHOTO")}
             {photo?(
               <div style={{position:"relative",marginBottom:12}}>
@@ -5357,20 +5194,16 @@ function P24CharacterStudio({ onSave, go }) {
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" style={{display:"none"}} onChange={handlePhoto}/>
-
             {lbl("ASSIGNED VOICE")}
             <select value={voice} onChange={e=>setVoice(e.target.value)} style={{...inp,marginBottom:14,cursor:"pointer"}}>
               {VOICE_CHARACTERS.map(v=><option key={v.id} value={v.id} style={{background:"#000"}}>{v.name} — {v.origin} {v.gender} · {v.style}</option>)}
             </select>
-
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               <button onClick={addChar} style={{...G("gold",false),padding:"14px",fontSize:13,letterSpacing:2}}>{editId?"✓ UPDATE":"+ SAVE CHARACTER"}</button>
               {editId&&<button onClick={clearForm} style={{...G("out",false),padding:"14px",fontSize:13,letterSpacing:2}}>CANCEL</button>}
             </div>
             {savedNote&&<div style={{marginTop:10,background:"#061406",border:"1px solid #22c55e",padding:"10px",textAlign:"center",color:"#22c55e",fontWeight:900,fontSize:12,letterSpacing:2}}>✓ CHARACTER SAVED</div>}
           </div>
-
-          {/* Library panel */}
           <div>
             <div style={{color:GOLD,fontSize:12,letterSpacing:3,fontWeight:900,marginBottom:14}}>YOUR CHARACTERS — {chars.length}</div>
             {chars.length===0?(
@@ -5430,17 +5263,12 @@ function P23({ go }) {
   useEffect(()=>{
     const v=bgRef.current;
     if(!v)return;
-    v.muted=true;
-    v.defaultMuted=true;
-    v.loop=true;
-    v.playsInline=true;
-    v.preload="auto";
+    v.muted=true;v.defaultMuted=true;v.loop=true;v.playsInline=true;v.preload="auto";
     try{v.load();}catch{}
     const tryPlay=()=>{
       const p=v.play();
       if(p&&p.then){p.then(()=>setVidNeedsTap(false)).catch(()=>setVidNeedsTap(true));}
     };
-    // Try immediately and again once data is ready
     tryPlay();
     if(v.readyState>=2){tryPlay();}
     v.addEventListener("loadeddata",tryPlay);
@@ -5459,10 +5287,6 @@ function P23({ go }) {
     };
   },[]);
   const tapPlayVideo=()=>{const v=bgRef.current;if(!v)return;v.muted=true;v.play().then(()=>setVidNeedsTap(false)).catch(()=>{});};
-  const exitApp = () => {
-    try{localStorage.removeItem("ms_user");}catch{}
-    window.location.reload();
-  };
   return(
     <div style={{...Sp,padding:0,background:"#000",position:"relative",minHeight:"100vh",overflow:"hidden"}}>
       <div style={{position:"relative",zIndex:1,padding:"30px 24px 80px"}}>
@@ -5514,106 +5338,108 @@ function P23({ go }) {
     </div>
   );
 }
-// ══════════════════════════════════════════════════════════════════
-// CINEMATIC INTRO — black shiny gold doors that open to reveal the app
-// One giant M spans both doors (splits when they part). Wordmark, tagline,
-// ENTER button and URL sit in the lower area. ~6 seconds. Synthesized music.
-// ══════════════════════════════════════════════════════════════════
+
 function IntroDoors({ onEnter }){
   const [phase,setPhase]=useState("closed");
   const playChime=()=>{
     try{
       const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      if(ctx.state==="suspended"){try{ctx.resume();}catch(e){}}
       const now=ctx.currentTime;
-      const master=ctx.createGain(); master.gain.value=0.95; master.connect(ctx.destination);
-      // Deep mysterious sub-drone bed
+      const master=ctx.createGain(); master.gain.value=2.2; master.connect(ctx.destination);
+      const conv=ctx.createConvolver();
+      const len=Math.floor(ctx.sampleRate*2.6); const imp=ctx.createBuffer(2,len,ctx.sampleRate);
+      for(let ch=0;ch<2;ch++){const d=imp.getChannelData(ch);for(let i=0;i<len;i++){d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6);}}
+      conv.buffer=imp; const rev=ctx.createGain(); rev.gain.value=0.35; conv.connect(rev); rev.connect(master);
+      const boom=ctx.createOscillator(); const bg=ctx.createGain();
+      boom.type="sine"; boom.frequency.setValueAtTime(120,now); boom.frequency.exponentialRampToValueAtTime(28,now+1.2);
+      bg.gain.setValueAtTime(0.9,now); bg.gain.exponentialRampToValueAtTime(0.001,now+1.8);
+      boom.connect(bg); bg.connect(master); bg.connect(conv); boom.start(now); boom.stop(now+1.9);
       const drone=ctx.createOscillator(); const dg=ctx.createGain();
-      drone.type="sine"; drone.frequency.value=41.20; // low E
-      dg.gain.setValueAtTime(0,now);
-      dg.gain.linearRampToValueAtTime(0.14,now+1.4);
-      dg.gain.exponentialRampToValueAtTime(0.001,now+6.0);
-      drone.connect(dg); dg.connect(master); drone.start(now); drone.stop(now+6.2);
-      // Second darker drone a fifth above for tension
-      const drone2=ctx.createOscillator(); const dg2=ctx.createGain();
-      drone2.type="triangle"; drone2.frequency.value=61.74; // low B
-      dg2.gain.setValueAtTime(0,now+0.3);
-      dg2.gain.linearRampToValueAtTime(0.08,now+1.8);
-      dg2.gain.exponentialRampToValueAtTime(0.001,now+5.6);
-      drone2.connect(dg2); dg2.connect(master); drone2.start(now+0.3); drone2.stop(now+5.8);
-      // Slow, minor, mysterious rising line (E minor feel)
-      const notes=[82.41,98.00,123.47,164.81,196.00]; // E2 G2 B2 E3 G3
-      notes.forEach((f,i)=>{
-        const o=ctx.createOscillator(); const g=ctx.createGain();
-        o.type="triangle"; o.frequency.value=f;
-        const t0=now+0.4+i*0.42; // slower, more deliberate
-        g.gain.setValueAtTime(0,t0);
-        g.gain.linearRampToValueAtTime(0.12,t0+0.5);
-        g.gain.exponentialRampToValueAtTime(0.001,t0+3.8);
-        o.connect(g); g.connect(master); o.start(t0); o.stop(t0+4.0);
+      drone.type="sawtooth"; drone.frequency.value=41.20;
+      const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=180;
+      dg.gain.setValueAtTime(0,now); dg.gain.linearRampToValueAtTime(0.22,now+1.6); dg.gain.exponentialRampToValueAtTime(0.001,now+5.5);
+      drone.connect(lp); lp.connect(dg); dg.connect(master); drone.start(now); drone.stop(now+5.7);
+      const rise=[110.00,130.81,164.81,196.00,246.94,329.63];
+      rise.forEach((f,i)=>{
+        const o=ctx.createOscillator(); const g=ctx.createGain(); const o2=ctx.createOscillator();
+        o.type="sawtooth"; o2.type="square"; o.frequency.value=f; o2.frequency.value=f*1.005;
+        const flt=ctx.createBiquadFilter(); flt.type="lowpass"; flt.frequency.setValueAtTime(600,now); flt.frequency.linearRampToValueAtTime(3200,now+2.8);
+        const t0=now+0.3+i*0.22;
+        g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.16,t0+0.12); g.gain.exponentialRampToValueAtTime(0.001,t0+1.6);
+        o.connect(flt); o2.connect(flt); flt.connect(g); g.connect(master); g.connect(conv);
+        o.start(t0); o.stop(t0+1.7); o2.start(t0); o2.stop(t0+1.7);
       });
-      // Distant high shimmer for cinematic air
-      const sh=ctx.createOscillator(); const sg=ctx.createGain();
-      sh.type="sine"; sh.frequency.value=659.25;
-      sg.gain.setValueAtTime(0,now+1.5);
-      sg.gain.linearRampToValueAtTime(0.035,now+2.6);
-      sg.gain.exponentialRampToValueAtTime(0.001,now+5.5);
-      sh.connect(sg); sg.connect(master); sh.start(now+1.5); sh.stop(now+5.6);
-      // Low resolving bell
-      const bell=ctx.createOscillator(); const bg=ctx.createGain();
-      bell.type="triangle"; bell.frequency.value=164.81;
-      bg.gain.setValueAtTime(0,now+2.6);
-      bg.gain.linearRampToValueAtTime(0.10,now+2.9);
-      bg.gain.exponentialRampToValueAtTime(0.001,now+6.0);
-      bell.connect(bg); bg.connect(master); bell.start(now+2.6); bell.stop(now+6.1);
+      [1318.51,1567.98,1975.53].forEach((f,i)=>{
+        const sh=ctx.createOscillator(); const sg=ctx.createGain();
+        sh.type="sine"; sh.frequency.value=f;
+        const t0=now+1.4+i*0.15;
+        sg.gain.setValueAtTime(0,t0); sg.gain.linearRampToValueAtTime(0.04,t0+0.6); sg.gain.exponentialRampToValueAtTime(0.001,t0+3.2);
+        sh.connect(sg); sg.connect(master); sg.connect(conv); sh.start(t0); sh.stop(t0+3.3);
+      });
+      const hit=ctx.createOscillator(); const hitG=ctx.createGain();
+      hit.type="triangle"; hit.frequency.value=110.00;
+      const hit2=ctx.createOscillator(); hit2.type="sine"; hit2.frequency.value=220.00;
+      hitG.gain.setValueAtTime(0,now); hitG.gain.linearRampToValueAtTime(0.5,now+0.08); hitG.gain.exponentialRampToValueAtTime(0.001,now+3.4);
+      hit.connect(hitG); hit2.connect(hitG); hitG.connect(master); hitG.connect(conv);
+      hit.start(now); hit.stop(now+3.5); hit2.start(now); hit2.stop(now+3.5);
       setTimeout(()=>{try{ctx.close();}catch(e){}},6400);
     }catch(e){}
   };
   const enter=()=>{
     if(phase!=="closed")return;
     playChime(); setPhase("opening");
-    setTimeout(()=>setPhase("gone"),3200);
-    setTimeout(()=>{ if(onEnter)onEnter(); },4200);
+    setTimeout(()=>setPhase("gone"),2800);
+    setTimeout(()=>{ if(onEnter)onEnter(); },3900);
   };
   const opening=phase==="opening"||phase==="gone";
   const halfM=(side)=>(
     <svg viewBox={side==="left"?"0 0 150 200":"150 0 150 200"} width="min(46vw,340px)" height="min(50vh,440px)"
       preserveAspectRatio={side==="left"?"xMaxYMid meet":"xMinYMid meet"}
-      style={{filter:"drop-shadow(0 0 30px rgba(232,201,109,0.5))",overflow:"visible",marginTop:"-12vh",maxWidth:"46vw"}}>
+      style={{filter:"drop-shadow(0 0 34px rgba(232,201,109,0.6))",overflow:"visible",marginTop:"-12vh",maxWidth:"46vw"}}>
       <defs>
         <linearGradient id={"goldM"+side} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff6d0"/><stop offset="0.35" stopColor="#e8c96d"/>
-          <stop offset="0.7" stopColor="#a07820"/><stop offset="1" stopColor="#5a3f10"/>
+          <stop offset="0" stopColor="#fffbe8"/><stop offset="0.2" stopColor="#f4dd8f"/>
+          <stop offset="0.4" stopColor="#e8c96d"/><stop offset="0.62" stopColor="#c79a3a"/>
+          <stop offset="0.82" stopColor="#8a6418"/><stop offset="1" stopColor="#4a340d"/>
+        </linearGradient>
+        <linearGradient id={"sheen"+side} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.85"/><stop offset="0.18" stopColor="#ffffff" stopOpacity="0"/>
+          <stop offset="0.55" stopColor="#ffffff" stopOpacity="0"/><stop offset="0.7" stopColor="#fff3c4" stopOpacity="0.45"/><stop offset="1" stopColor="#ffffff" stopOpacity="0"/>
         </linearGradient>
       </defs>
-      <text x="150" y="150" textAnchor="middle" fontFamily="Georgia,serif" fontSize="200" fontWeight="900" fill={"url(#goldM"+side+")"}>M</text>
+      <text x="150" y="150" textAnchor="middle" fontFamily="Georgia,serif" fontSize="200" fontWeight="900" fill={"url(#goldM"+side+")"} stroke="#fff3c4" strokeWidth="0.6">M</text>
+      <text x="150" y="150" textAnchor="middle" fontFamily="Georgia,serif" fontSize="200" fontWeight="900" fill={"url(#sheen"+side+")"}>M</text>
     </svg>
   );
+  const metalLeft="linear-gradient(95deg,#000 0%,#0c0a04 20%,#241a06 40%,#3a2b0a 50%,#4a3810 55%,#2a2008 62%,#0e0b04 80%,#000 100%), repeating-linear-gradient(90deg,rgba(232,201,109,0.06) 0px,rgba(232,201,109,0.06) 1px,transparent 1px,transparent 5px)";
+  const metalRight="linear-gradient(265deg,#000 0%,#0c0a04 20%,#241a06 40%,#3a2b0a 50%,#4a3810 55%,#2a2008 62%,#0e0b04 80%,#000 100%), repeating-linear-gradient(90deg,rgba(232,201,109,0.06) 0px,rgba(232,201,109,0.06) 1px,transparent 1px,transparent 5px)";
   return (
     <div style={{position:"fixed",inset:0,zIndex:100000,background:"#000",overflow:"hidden",
-      opacity:phase==="gone"?0:1,transition:"opacity 1s ease",pointerEvents:phase==="gone"?"none":"auto"}}>
+      opacity:phase==="gone"?0:1,transition:"opacity 1.1s ease",pointerEvents:phase==="gone"?"none":"auto"}}>
       <div style={{position:"absolute",top:0,left:0,width:"50%",height:"100%",
-        background:"linear-gradient(100deg,#050505 0%,#1a1305 30%,#2a2008 45%,#0a0803 60%,#000 100%)",
-        borderRight:"1px solid "+GOLD,boxShadow:"inset -40px 0 80px rgba(0,0,0,0.9), inset 0 0 120px rgba(232,201,109,0.08)",
-        transform:opening?"perspective(1600px) rotateY(-105deg)":"perspective(1600px) rotateY(0deg)",
-        transformOrigin:"left center",transition:"transform 3s cubic-bezier(0.7,0,0.3,1)",
-        display:"flex",alignItems:"center",justifyContent:"flex-end",paddingTop:0,overflow:"hidden"}}>
+        background:metalLeft,backgroundBlendMode:"screen",
+        borderRight:"2px solid "+GOLD,boxShadow:"inset -50px 0 90px rgba(0,0,0,0.9), inset 0 0 140px rgba(232,201,109,0.12), 8px 0 40px rgba(0,0,0,0.8)",
+        transform:opening?"translateX(-102%)":"translateX(0)",
+        transition:"transform 2.6s cubic-bezier(0.76,0,0.24,1)",
+        display:"flex",alignItems:"center",justifyContent:"flex-end",overflow:"hidden"}}>
         {halfM("left")}
       </div>
       <div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",
-        background:"linear-gradient(260deg,#050505 0%,#1a1305 30%,#2a2008 45%,#0a0803 60%,#000 100%)",
-        borderLeft:"1px solid "+GOLD,boxShadow:"inset 40px 0 80px rgba(0,0,0,0.9), inset 0 0 120px rgba(232,201,109,0.08)",
-        transform:opening?"perspective(1600px) rotateY(105deg)":"perspective(1600px) rotateY(0deg)",
-        transformOrigin:"right center",transition:"transform 3s cubic-bezier(0.7,0,0.3,1)",
-        display:"flex",alignItems:"center",justifyContent:"flex-start",paddingTop:0,overflow:"hidden"}}>
+        background:metalRight,backgroundBlendMode:"screen",
+        borderLeft:"2px solid "+GOLD,boxShadow:"inset 50px 0 90px rgba(0,0,0,0.9), inset 0 0 140px rgba(232,201,109,0.12), -8px 0 40px rgba(0,0,0,0.8)",
+        transform:opening?"translateX(102%)":"translateX(0)",
+        transition:"transform 2.6s cubic-bezier(0.76,0,0.24,1)",
+        display:"flex",alignItems:"center",justifyContent:"flex-start",overflow:"hidden"}}>
         {halfM("right")}
       </div>
       <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",
-        width:opening?"5px":"2px",height:opening?"100%":"0%",
-        background:"linear-gradient(180deg,#fff6d0,#e8c96d,#a07820)",
-        boxShadow:"0 0 30px 6px rgba(232,201,109,0.8)",
-        transition:"height 0.9s ease-out, width 0.9s ease-out",zIndex:5}}/>
+        width:opening?"6px":"2px",height:opening?"100%":"0%",
+        background:"linear-gradient(180deg,#fffbe8,#e8c96d,#a07820)",
+        boxShadow:"0 0 40px 10px rgba(232,201,109,0.9)",opacity:opening?0:1,
+        transition:"height 0.9s ease-out, width 0.9s ease-out, opacity 2s ease 0.6s",zIndex:5}}/>
       <div style={{position:"absolute",left:0,right:0,bottom:"6%",display:"flex",flexDirection:"column",alignItems:"center",
-        zIndex:6,opacity:opening?0:1,transition:"opacity 0.7s",pointerEvents:opening?"none":"auto"}}>
+        zIndex:6,opacity:opening?0:1,transition:"opacity 0.6s",pointerEvents:opening?"none":"auto"}}>
         <div style={{fontFamily:"'Cinzel',serif",color:GOLD,fontSize:"clamp(22px,5.5vw,50px)",fontWeight:900,letterSpacing:8,textShadow:"0 0 30px rgba(232,201,109,0.6)"}}>MANDASTRONG</div>
         <div style={{fontFamily:"'Cinzel',serif",color:WHITE,fontSize:"clamp(11px,2vw,18px)",letterSpacing:14,marginTop:4}}>STUDIO</div>
         <div style={{color:GOLDDIM,fontSize:"clamp(8px,1.4vw,11px)",letterSpacing:3,marginTop:12,textAlign:"center",padding:"0 16px"}}>CINEMA INTELLIGENCE PLATFORM · 600+ AI TOOLS · UP TO 3-HOUR FILMS</div>
@@ -5631,22 +5457,16 @@ function IntroDoors({ onEnter }){
 
 export default function App() {
   const [page,setPage]=useState(1);
-  // ── CINEMATIC INTRO — gold doors open to reveal the app ──
   const [showIntro,setShowIntro]=useState(true);
   const [menu,setMenu]=useState(false);
   useEffect(()=>{
-    // Raise the storage ceiling so large uploads don't crash — ask the browser
-    // to make storage persistent (grants a much larger quota when accepted).
     try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist().catch(()=>{});}).catch(()=>{});}}catch(e){}
-    // Fonts
     const link=document.createElement("link");
     link.rel="stylesheet";
     link.href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;600;700;800;900&display=swap";
     document.head.appendChild(link);
-    // Viewport — responsive for all devices
     let vp=document.querySelector("meta[name=viewport]");
     if(!vp){vp=document.createElement("meta");vp.name="viewport";document.head.appendChild(vp);}
-    // Set viewport based on device type
     const hua=navigator.userAgent.toLowerCase();
     const isHPhone=/android.*mobile|iphone|ipod/.test(hua);
     const isHTablet=/ipad|android(?!.*mobile)/.test(hua);
@@ -5657,14 +5477,11 @@ export default function App() {
     } else {
       vp.content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes";
     }
-    // Global responsive + Bolt badge suppression
     const style=document.createElement("style");
-    style.textContent="*{box-sizing:border-box!important;}body,html{margin:0;padding:0;width:100%;overflow-x:hidden;}[data-bolt-badge],a[href*='bolt.new'],.bolt-badge,[class*='bolt'],[id*='bolt']{display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;}@media(max-width:900px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr 1fr!important;}}@media(max-width:600px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr!important;}}";
+    style.textContent="*{box-sizing:border-box!important;}body,html{margin:0;padding:0;width:100%;overflow-x:hidden;}[data-bolt-badge],a[href*=\'bolt.new\'],.bolt-badge,[class*=\'bolt\'],[id*=\'bolt\']{display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;}@media(max-width:900px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr 1fr!important;}}@media(max-width:600px){.grid-cols-2,.grid-cols-3,.grid-cols-4{grid-template-columns:1fr!important;}}";
     document.head.appendChild(style);
-    // PWA install prompt capture
     const handleInstall=(e)=>{e.preventDefault();window.deferredInstallPrompt=e;};
     window.addEventListener("beforeinstallprompt",handleInstall);
-    // PWA MANIFEST — makes the DOWNLOAD APP button work as a real install
     try{
       const manifestData={
         name:"MandaStrong Studio",
@@ -5685,7 +5502,6 @@ export default function App() {
       let mLink=document.querySelector('link[rel="manifest"]');
       if(!mLink){mLink=document.createElement("link");mLink.rel="manifest";document.head.appendChild(mLink);}
       mLink.href=manifestUrl;
-      // Apple-specific PWA meta
       const addMeta=(name,content)=>{if(!document.querySelector('meta[name="'+name+'"]')){const m=document.createElement("meta");m.name=name;m.content=content;document.head.appendChild(m);}};
       addMeta("apple-mobile-web-app-capable","yes");
       addMeta("apple-mobile-web-app-status-bar-style","black-translucent");
@@ -5724,18 +5540,10 @@ export default function App() {
     return()=>window.removeEventListener("ms_open_history",handler);
   },[]);
 
-  // Real auto-persist — saves state silently whenever page, timeline or mediaLib changes
-  useEffect(()=>{
-    try{localStorage.setItem("ms_page",JSON.stringify(page));}catch(e){}
-  },[page]);
-  useEffect(()=>{
-    try{localStorage.setItem("ms_timeline",JSON.stringify(timeline));}catch(e){}
-  },[timeline]);
-  useEffect(()=>{
-    try{localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));}catch(e){}
-  },[mediaLib]);
+  useEffect(()=>{try{localStorage.setItem("ms_page",JSON.stringify(page));}catch(e){}},[page]);
+  useEffect(()=>{try{localStorage.setItem("ms_timeline",JSON.stringify(timeline));}catch(e){}},[timeline]);
+  useEffect(()=>{try{localStorage.setItem("ms_medialib",JSON.stringify(mediaLib.map(a=>({...a,file:undefined}))));}catch(e){}},[mediaLib]);
 
-  // Emergency crash save — fires when tab is closed or crashes
   useEffect(()=>{
     const emergencySave=()=>{
       try{
@@ -5747,9 +5555,7 @@ export default function App() {
     };
     window.addEventListener("beforeunload",emergencySave);
     window.addEventListener("visibilitychange",()=>{if(document.hidden)emergencySave();});
-    return()=>{
-      window.removeEventListener("beforeunload",emergencySave);
-    };
+    return()=>{window.removeEventListener("beforeunload",emergencySave);};
   },[page,timeline,mediaLib,user]);
 
   const saveAsset=async(a)=>{
@@ -5759,7 +5565,6 @@ export default function App() {
       catch(e){}
     }
     setMediaLib(p=>[...p,asset]);
-    // Auto-route to correct timeline track (0 = VIDEO TRACK, 1 = AUDIO TRACK)
     const isAudio=asset.type&&(asset.type.startsWith("audio")||asset.type==="narration"||asset.type==="audio/narration");
     const isVideo=asset.type&&(asset.type.startsWith("video")||asset.type==="video/webm");
     if(isAudio||isVideo){
